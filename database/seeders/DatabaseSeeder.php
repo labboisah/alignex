@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
         User::factory()->create([
             'name' => 'Admin',
             'email' => 'admin@alignex.com',
+            'role' => User::ROLE_SUPER_ADMIN,
             'password'=> Hash::make('admin')
         ]);
     }

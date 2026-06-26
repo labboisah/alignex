@@ -7,9 +7,9 @@ import { Button } from '@/Components/ui/button';
 import { cn } from '@/lib/cn';
 
 export function PortalTopbar({ title, userName = 'AlignEx User', role = 'Admin', actions, className }: { title?: string; userName?: string; role?: string; actions?: ReactNode; className?: string }) {
-    const user = usePage().props.auth?.user as { name?: string; role?: string } | undefined;
+    const user = usePage().props.auth?.user as { name?: string; role?: string; role_label?: string } | undefined;
     const displayName = user?.name ?? userName;
-    const displayRole = user?.role ?? role;
+    const displayRole = user?.role_label ?? user?.role ?? role;
 
     return (
         <header className={cn('sticky top-0 z-20 border-b border-border bg-white/95 backdrop-blur', className)}>

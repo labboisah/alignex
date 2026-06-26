@@ -7,11 +7,13 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\Response;
 
-class EnsurePortalUser
+class EnsureUserHasRole
 {
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next, string ...$roles): Response
     {
-        if ($request->user()?->isPortalUser()) {
+        $user = $request->user();
+
+        if ($user && in_array($user->role, $roles, true)) {
             return $next($request);
         }
 

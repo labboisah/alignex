@@ -7,11 +7,11 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\Response;
 
-class EnsurePortalUser
+class EnsureUserHasPermission
 {
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next, string $permission): Response
     {
-        if ($request->user()?->isPortalUser()) {
+        if ($request->user()?->hasPermission($permission)) {
             return $next($request);
         }
 
