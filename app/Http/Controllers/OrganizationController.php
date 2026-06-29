@@ -21,6 +21,7 @@ class OrganizationController extends Controller
         return Inertia::render('Organizations/Index', [
             'organizations' => OrganizationResource::collection(
                 Organization::query()
+                    ->withCount(['exams', 'candidates'])
                     ->latest()
                     ->get()
             ),
@@ -36,6 +37,7 @@ class OrganizationController extends Controller
 
         return Inertia::render('Organizations/Create', [
             'statuses' => $this->statuses(),
+            'organizationTypes' => $this->organizationTypes(),
         ]);
     }
 
@@ -53,7 +55,14 @@ class OrganizationController extends Controller
         Gate::authorize('view', $organization);
 
         return Inertia::render('Organizations/Show', [
-            'organization' => OrganizationResource::make($organization),
+            'organization' => OrganizationResource::make($organization
+                ->load([
+                    'secondarySchools:id,organization_id,name,code,status',
+                    'professionalSchools:id,organization_id,name,code,status',
+                    'cbtCenters:id,organization_id,name,code,status',
+                    'exams' => fn ($query) => $query->with(['attempts.candidate', 'attempts.exam'])->latest()->limit(8),
+                ])
+                ->loadCount(['exams', 'candidates', 'questionBanks', 'secondarySchools', 'professionalSchools', 'cbtCenters'])),
             'can' => [
                 'update' => $request->user()->can('update', $organization),
                 'deactivate' => $request->user()->can('deactivate', $organization),
@@ -68,6 +77,7 @@ class OrganizationController extends Controller
         return Inertia::render('Organizations/Edit', [
             'organization' => OrganizationResource::make($organization),
             'statuses' => $this->statuses(),
+            'organizationTypes' => $this->organizationTypes(),
         ]);
     }
 
@@ -98,5 +108,13 @@ class OrganizationController extends Controller
             ['value' => Organization::STATUS_ACTIVE, 'label' => 'Active'],
             ['value' => Organization::STATUS_INACTIVE, 'label' => 'Inactive'],
         ];
+    }
+
+    private function organizationTypes(): array
+    {
+        return collect(Organization::TYPES)
+            ->map(fn (string $type) => ['value' => $type, 'label' => str($type)->replace('_', ' ')->title()->toString()])
+            ->values()
+            ->all();
     }
 }

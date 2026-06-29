@@ -9,11 +9,12 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'role', 'organization_id', 'center_id', 'school_id', 'password'])]
+#[Fillable(['name', 'email', 'role', 'organization_id', 'center_id', 'school_id', 'secondary_school_id', 'professional_school_id', 'cbt_center_id', 'active_context_type', 'active_context_id', 'password'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -24,15 +25,22 @@ class User extends Authenticatable
     public const ROLE_ORGANIZATION_ADMIN = 'organization_admin';
     public const ROLE_CENTER_ADMIN = 'center_admin';
     public const ROLE_SCHOOL_ADMIN = 'school_admin';
+    public const ROLE_SECONDARY_SCHOOL_ADMIN = 'secondary_school_admin';
+    public const ROLE_PROFESSIONAL_SCHOOL_ADMIN = 'professional_school_admin';
+    public const ROLE_CBT_CENTER_ADMIN = 'cbt_center_admin';
     public const ROLE_EXAMINER = 'examiner';
     public const ROLE_SUPERVISOR = 'supervisor';
     public const ROLE_CANDIDATE = 'candidate';
+    public const ROLE_STUDENT = 'student';
 
     public const PORTAL_ROLES = [
         self::ROLE_SUPER_ADMIN,
         self::ROLE_ORGANIZATION_ADMIN,
         self::ROLE_CENTER_ADMIN,
         self::ROLE_SCHOOL_ADMIN,
+        self::ROLE_SECONDARY_SCHOOL_ADMIN,
+        self::ROLE_PROFESSIONAL_SCHOOL_ADMIN,
+        self::ROLE_CBT_CENTER_ADMIN,
         self::ROLE_EXAMINER,
         self::ROLE_SUPERVISOR,
     ];
@@ -65,9 +73,59 @@ class User extends Authenticatable
         return $this->belongsTo(School::class);
     }
 
+    public function secondarySchool(): BelongsTo
+    {
+        return $this->belongsTo(SecondarySchool::class);
+    }
+
+    public function professionalSchool(): BelongsTo
+    {
+        return $this->belongsTo(ProfessionalSchool::class);
+    }
+
+    public function cbtCenter(): BelongsTo
+    {
+        return $this->belongsTo(CbtCenter::class);
+    }
+
     public function systemRole(): BelongsTo
     {
         return $this->belongsTo(Role::class, 'role', 'name');
+    }
+
+    public function createdExams(): HasMany
+    {
+        return $this->hasMany(Exam::class, 'created_by');
+    }
+
+    public function createdQuestionBanks(): HasMany
+    {
+        return $this->hasMany(QuestionBank::class, 'created_by');
+    }
+
+    public function createdQuestions(): HasMany
+    {
+        return $this->hasMany(Question::class, 'created_by');
+    }
+
+    public function reviewedQuestions(): HasMany
+    {
+        return $this->hasMany(Question::class, 'reviewed_by');
+    }
+
+    public function scoredCandidateAnswers(): HasMany
+    {
+        return $this->hasMany(CandidateAnswer::class, 'scored_by');
+    }
+
+    public function examAuditLogs(): HasMany
+    {
+        return $this->hasMany(ExamAuditLog::class, 'actor_user_id');
+    }
+
+    public function reviewedProctoringEvents(): HasMany
+    {
+        return $this->hasMany(ProctoringEvent::class, 'reviewed_by');
     }
 
     public function isSuperAdmin(): bool
@@ -87,12 +145,27 @@ class User extends Authenticatable
 
     public function isCenterAdmin(): bool
     {
-        return $this->role === self::ROLE_CENTER_ADMIN;
+        return in_array($this->role, [self::ROLE_CENTER_ADMIN, self::ROLE_CBT_CENTER_ADMIN], true);
     }
 
     public function isSchoolAdmin(): bool
     {
-        return $this->role === self::ROLE_SCHOOL_ADMIN;
+        return in_array($this->role, [self::ROLE_SCHOOL_ADMIN, self::ROLE_SECONDARY_SCHOOL_ADMIN, self::ROLE_PROFESSIONAL_SCHOOL_ADMIN], true);
+    }
+
+    public function isSecondarySchoolAdmin(): bool
+    {
+        return in_array($this->role, [self::ROLE_SECONDARY_SCHOOL_ADMIN, self::ROLE_SCHOOL_ADMIN], true);
+    }
+
+    public function isProfessionalSchoolAdmin(): bool
+    {
+        return $this->role === self::ROLE_PROFESSIONAL_SCHOOL_ADMIN;
+    }
+
+    public function isCbtCenterAdmin(): bool
+    {
+        return in_array($this->role, [self::ROLE_CBT_CENTER_ADMIN, self::ROLE_CENTER_ADMIN], true);
     }
 
     public function isSupervisor(): bool
@@ -103,6 +176,11 @@ class User extends Authenticatable
     public function isCandidate(): bool
     {
         return $this->role === self::ROLE_CANDIDATE;
+    }
+
+    public function isStudent(): bool
+    {
+        return $this->role === self::ROLE_STUDENT;
     }
 
     public function isPortalUser(): bool
@@ -140,6 +218,47 @@ class User extends Authenticatable
         return $schoolId !== null && (string) $this->school_id === (string) $schoolId;
     }
 
+    public function canAccessOrganization(int|string|null $organizationId): bool
+    {
+        return $this->isSuperAdmin()
+            || ($organizationId !== null && (string) $this->organization_id === (string) $organizationId);
+    }
+
+    public function canAccessSecondarySchool(int|string|null $secondarySchoolId): bool
+    {
+        return $this->isSuperAdmin()
+            || ($secondarySchoolId !== null && (string) ($this->secondary_school_id ?? $this->school_id) === (string) $secondarySchoolId);
+    }
+
+    public function canAccessProfessionalSchool(int|string|null $professionalSchoolId): bool
+    {
+        return $this->isSuperAdmin()
+            || ($professionalSchoolId !== null && (string) $this->professional_school_id === (string) $professionalSchoolId);
+    }
+
+    public function canAccessCbtCenter(int|string|null $cbtCenterId): bool
+    {
+        return $this->isSuperAdmin()
+            || ($cbtCenterId !== null && (string) ($this->cbt_center_id ?? $this->center_id) === (string) $cbtCenterId);
+    }
+
+    public function currentContext(): ?array
+    {
+        if ($this->active_context_type && $this->active_context_id) {
+            return ['type' => $this->active_context_type, 'id' => $this->active_context_id];
+        }
+
+        return match (true) {
+            $this->organization_id !== null => ['type' => 'organization', 'id' => $this->organization_id],
+            $this->secondary_school_id !== null => ['type' => 'secondary_school', 'id' => $this->secondary_school_id],
+            $this->professional_school_id !== null => ['type' => 'professional_school', 'id' => $this->professional_school_id],
+            $this->cbt_center_id !== null => ['type' => 'cbt_center', 'id' => $this->cbt_center_id],
+            $this->school_id !== null => ['type' => 'secondary_school', 'id' => $this->school_id],
+            $this->center_id !== null => ['type' => 'cbt_center', 'id' => $this->center_id],
+            default => null,
+        };
+    }
+
     public function portalRedirectRoute(): string
     {
         return match ($this->role) {
@@ -147,6 +266,9 @@ class User extends Authenticatable
             self::ROLE_ORGANIZATION_ADMIN,
             self::ROLE_CENTER_ADMIN,
             self::ROLE_SCHOOL_ADMIN,
+            self::ROLE_SECONDARY_SCHOOL_ADMIN,
+            self::ROLE_PROFESSIONAL_SCHOOL_ADMIN,
+            self::ROLE_CBT_CENTER_ADMIN,
             self::ROLE_EXAMINER,
             self::ROLE_SUPERVISOR => 'dashboard',
             default => 'dashboard',

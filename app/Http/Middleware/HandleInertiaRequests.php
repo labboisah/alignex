@@ -45,6 +45,10 @@ class HandleInertiaRequests extends Middleware
                     'organization_id' => $user->organization_id,
                     'center_id' => $user->center_id,
                     'school_id' => $user->school_id,
+                    'secondary_school_id' => $user->secondary_school_id,
+                    'professional_school_id' => $user->professional_school_id,
+                    'cbt_center_id' => $user->cbt_center_id,
+                    'current_context' => $user->currentContext(),
                 ] : null,
                 'permissions' => $user ? $this->permissionsFor($user) : [],
                 'navigation' => $user ? $this->navigationFor($user) : [],
@@ -63,6 +67,7 @@ class HandleInertiaRequests extends Middleware
         return [
             'manageOrganizations' => $user->hasPermission('manageOrganizations'),
             'manageAccessControls' => $user->hasPermission('manageAccessControls'),
+            'manageAdminRegistrations' => $user->hasPermission('manageAdminRegistrations'),
             'manageCenters' => $user->hasPermission('manageCenters'),
             'manageSchools' => $user->hasPermission('manageSchools'),
             'manageUsers' => $user->hasPermission('manageUsers'),
@@ -84,12 +89,14 @@ class HandleInertiaRequests extends Middleware
                 ['label' => 'Dashboard', 'href' => '/dashboard'],
                 ['label' => 'Organizations', 'href' => '/organizations', 'permission' => 'manageOrganizations'],
                 ['label' => 'Access Controls', 'href' => '/access-controls', 'permission' => 'manageAccessControls'],
+                ['label' => 'Applications', 'href' => '/admin-registrations', 'permission' => 'manageAdminRegistrations'],
                 ['label' => 'Centers', 'href' => '/centers', 'permission' => 'manageCenters'],
                 ['label' => 'Schools', 'href' => '/schools', 'permission' => 'manageSchools'],
                 ['label' => 'Users', 'href' => '/users', 'permission' => 'manageUsers'],
                 ['label' => 'Subjects', 'href' => '/subjects'],
                 ['label' => 'Topics', 'href' => '/topics'],
                 ['label' => 'Question Bank', 'href' => '/question-bank', 'permission' => 'manageQuestionBank'],
+                ['label' => 'Questions', 'href' => '/questions', 'permission' => 'manageQuestionBank'],
                 ['label' => 'Exams', 'href' => '/exams', 'permission' => 'manageExams'],
                 ['label' => 'Candidates', 'href' => '/candidates'],
                 ['label' => 'Results', 'href' => '/results'],
@@ -98,28 +105,42 @@ class HandleInertiaRequests extends Middleware
             ],
             User::ROLE_ORGANIZATION_ADMIN => [
                 ['label' => 'Dashboard', 'href' => '/dashboard'],
-                ['label' => 'Users', 'href' => '/users', 'permission' => 'manageUsers'],
-                ['label' => 'Subjects', 'href' => '/subjects'],
-                ['label' => 'Topics', 'href' => '/topics'],
+                ['label' => 'Candidates', 'href' => '/candidates', 'permission' => 'manageExams'],
                 ['label' => 'Question Bank', 'href' => '/question-bank', 'permission' => 'manageQuestionBank'],
                 ['label' => 'Exams', 'href' => '/exams', 'permission' => 'manageExams'],
-                ['label' => 'Candidates', 'href' => '/candidates'],
+                ['label' => 'Recruitment Exams', 'href' => '/exams?category=recruitment', 'permission' => 'manageExams'],
+                ['label' => 'Assessment Exams', 'href' => '/exams?category=assessment', 'permission' => 'manageExams'],
+                ['label' => 'Certification Exams', 'href' => '/exams?category=certification', 'permission' => 'manageExams'],
+                ['label' => 'Adaptive Exams', 'href' => '/exams?mode=adaptive', 'permission' => 'manageExams'],
                 ['label' => 'Results', 'href' => '/results'],
                 ['label' => 'Reports', 'href' => '/reports', 'permission' => 'viewReports'],
+                ['label' => 'Users', 'href' => '/users', 'permission' => 'manageUsers'],
                 ['label' => 'Settings', 'href' => '/settings', 'permission' => 'manageSettings'],
             ],
             User::ROLE_CENTER_ADMIN => [
                 ['label' => 'Dashboard', 'href' => '/dashboard'],
                 ['label' => 'Centers', 'href' => '/centers', 'permission' => 'manageCenters'],
+                ['label' => 'Subjects', 'href' => '/subjects', 'permission' => 'manageQuestionBank'],
+                ['label' => 'Topics', 'href' => '/topics', 'permission' => 'manageQuestionBank'],
+                ['label' => 'Question Bank', 'href' => '/question-bank', 'permission' => 'manageQuestionBank'],
+                ['label' => 'Questions', 'href' => '/questions', 'permission' => 'manageQuestionBank'],
+                ['label' => 'Exams', 'href' => '/exams', 'permission' => 'manageExams'],
+                ['label' => 'Candidates', 'href' => '/candidates', 'permission' => 'manageExams'],
                 ['label' => 'Assigned Exams', 'href' => '/assigned-exams'],
                 ['label' => 'Supervisor Monitor', 'href' => '/supervisor-monitor', 'permission' => 'viewSupervisorMonitor'],
                 ['label' => 'Candidate Activity', 'href' => '/candidate-activity'],
+                ['label' => 'Results', 'href' => '/results', 'permission' => 'viewReports'],
                 ['label' => 'Reports', 'href' => '/reports', 'permission' => 'viewReports'],
             ],
             User::ROLE_SCHOOL_ADMIN => [
                 ['label' => 'Dashboard', 'href' => '/dashboard'],
-                ['label' => 'Schools', 'href' => '/schools', 'permission' => 'manageSchools'],
+                ['label' => 'My Schools', 'href' => '/schools', 'permission' => 'manageSchools'],
+                ['label' => 'Subjects', 'href' => '/subjects', 'permission' => 'manageQuestionBank'],
+                ['label' => 'Topics', 'href' => '/topics', 'permission' => 'manageQuestionBank'],
+                ['label' => 'Question Bank', 'href' => '/question-bank', 'permission' => 'manageQuestionBank'],
+                ['label' => 'Questions', 'href' => '/questions', 'permission' => 'manageQuestionBank'],
                 ['label' => 'Exams', 'href' => '/exams', 'permission' => 'manageExams'],
+                ['label' => 'Secondary School', 'href' => '/secondary-school', 'permission' => 'manageExams'],
                 ['label' => 'Candidates', 'href' => '/candidates'],
                 ['label' => 'Results', 'href' => '/results'],
                 ['label' => 'Reports', 'href' => '/reports', 'permission' => 'viewReports'],
@@ -129,6 +150,7 @@ class HandleInertiaRequests extends Middleware
                 ['label' => 'Subjects', 'href' => '/subjects'],
                 ['label' => 'Topics', 'href' => '/topics'],
                 ['label' => 'Question Bank', 'href' => '/question-bank', 'permission' => 'manageQuestionBank'],
+                ['label' => 'Questions', 'href' => '/questions', 'permission' => 'manageQuestionBank'],
                 ['label' => 'Exams', 'href' => '/exams', 'permission' => 'manageExams'],
                 ['label' => 'Candidates', 'href' => '/candidates'],
                 ['label' => 'Results', 'href' => '/results'],
@@ -139,11 +161,30 @@ class HandleInertiaRequests extends Middleware
                 ['label' => 'Assigned Exams', 'href' => '/assigned-exams'],
                 ['label' => 'Supervisor Monitor', 'href' => '/supervisor-monitor', 'permission' => 'viewSupervisorMonitor'],
                 ['label' => 'Candidate Activity', 'href' => '/candidate-activity'],
+                ['label' => 'Results', 'href' => '/results', 'permission' => 'viewReports'],
                 ['label' => 'Reports', 'href' => '/reports', 'permission' => 'viewReports'],
             ],
         ];
 
-        return collect($items[$user->role] ?? [])
+        $navigation = collect($items[$user->role] ?? []);
+
+        if (($user->currentContext()['type'] ?? null) === 'organization' && $user->organization_id) {
+            $organizationHref = '/organizations/'.$user->organization_id;
+
+            if ($user->organization?->secondarySchools()->exists()) {
+                $navigation->push(['label' => 'Secondary Schools', 'href' => $organizationHref]);
+            }
+
+            if ($user->organization?->professionalSchools()->exists()) {
+                $navigation->push(['label' => 'Professional Schools', 'href' => $organizationHref]);
+            }
+
+            if ($user->organization?->cbtCenters()->exists()) {
+                $navigation->push(['label' => 'CBT Centers', 'href' => $organizationHref]);
+            }
+        }
+
+        return $navigation
             ->filter(fn (array $item) => ! isset($item['permission']) || $user->hasPermission($item['permission']))
             ->values()
             ->all();

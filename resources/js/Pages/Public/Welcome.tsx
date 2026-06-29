@@ -24,58 +24,126 @@ import {
 import { Button } from '@/Components/ui/button';
 import { StatusBadge } from '@/Components/Platform';
 
-const solutions = [
+type LandingIcon = keyof typeof iconMap;
+type LandingCard = { title: string; body: string; icon: LandingIcon };
+type LandingStep = { title: string; body: string };
+type LandingStat = { value: string; label: string };
+type LandingMetric = { value: string; label: string };
+type LandingContent = {
+    hero?: {
+        eyebrow?: string;
+        title?: string;
+        description?: string;
+        badges?: string[];
+    };
+    solutions?: LandingCard[];
+    features?: LandingCard[];
+    workflow?: LandingStep[];
+    stats?: LandingStat[];
+    metrics?: LandingMetric[];
+    activity?: {
+        label: string;
+        bars: number[];
+    };
+    candidateMockup?: {
+        question_label: string;
+        title: string;
+        timer_label: string;
+    };
+    operations?: LandingMetric[];
+};
+
+const iconMap = {
+    Activity,
+    BarChart3,
+    FileCheck2,
+    GraduationCap,
+    MonitorDot,
+    TabletSmartphone,
+    Users,
+};
+
+const defaultSolutions: LandingCard[] = [
     {
         title: 'Secondary Schools',
         body: 'Run term exams, mock tests, entrance assessments, and multi-subject CBT sessions with structured subjects and topics.',
-        icon: GraduationCap,
+        icon: 'GraduationCap',
     },
     {
         title: 'Professional Exams',
         body: 'Deliver certification assessments with timed sections, question banks, supervisor monitoring, and controlled result release.',
-        icon: FileCheck2,
+        icon: 'FileCheck2',
     },
     {
         title: 'Recruitment Exams',
         body: 'Screen applicants at scale with secure online tests, candidate identity controls, and report-ready analytics.',
-        icon: Users,
+        icon: 'Users',
     },
 ];
 
-const features = [
-    ['Hybrid delivery', 'Online delivery now, with offline center-based examination planned for controlled venues.', TabletSmartphone],
-    ['Real-time monitoring', 'Supervisors can track candidate status, incidents, timing, and live exam activity.', MonitorDot],
-    ['Adaptive-ready', 'Architecture leaves room for future FastAPI-based adaptive question selection.', Activity],
-    ['Result management', 'Support scoring, moderation, release workflows, reports, and exports.', BarChart3],
+const defaultFeatures: LandingCard[] = [
+    { title: 'Hybrid delivery', body: 'Online delivery now, with offline center-based examination planned for controlled venues.', icon: 'TabletSmartphone' },
+    { title: 'Real-time monitoring', body: 'Supervisors can track candidate status, incidents, timing, and live exam activity.', icon: 'MonitorDot' },
+    { title: 'Adaptive-ready', body: 'Architecture leaves room for future FastAPI-based adaptive question selection.', icon: 'Activity' },
+    { title: 'Result management', body: 'Support scoring, moderation, release workflows, reports, and exports.', icon: 'BarChart3' },
 ];
 
-const workflow = [
-    ['Prepare', 'Create subjects, topics, question banks, candidates, and exam settings.'],
-    ['Deliver', 'Candidates write in a focused exam interface while answers autosave through secure APIs.'],
-    ['Monitor', 'Supervisors review live sessions, warnings, and anti-cheating events in real time.'],
-    ['Release', 'Scores are reviewed, approved, released, and exported through controlled result workflows.'],
+const defaultWorkflow: LandingStep[] = [
+    { title: 'Prepare', body: 'Create subjects, topics, question banks, candidates, and exam settings.' },
+    { title: 'Deliver', body: 'Candidates write in a focused exam interface while answers autosave through secure APIs.' },
+    { title: 'Monitor', body: 'Supervisors review live sessions, warnings, and anti-cheating events in real time.' },
+    { title: 'Release', body: 'Scores are reviewed, approved, released, and exported through controlled result workflows.' },
 ];
 
-const stats = [
-    ['3', 'Exam markets'],
-    ['6', 'Candidate exam routes'],
-    ['24/7', 'Online readiness'],
-    ['100%', 'Answer-key isolation'],
+const defaultStats: LandingStat[] = [
+    { value: '3', label: 'Exam markets' },
+    { value: '6', label: 'Candidate exam routes' },
+    { value: '24/7', label: 'Online readiness' },
+    { value: '100%', label: 'Answer-key isolation' },
 ];
 
-export default function PublicWelcome() {
+const defaultMetrics: LandingMetric[] = [
+    { label: 'Active Exams', value: '0' },
+    { label: 'Candidates', value: '0' },
+    { label: 'Question Banks', value: '0' },
+];
+
+const defaultOperations: LandingMetric[] = [
+    { label: 'Institutions', value: '0' },
+    { label: 'Subjects', value: '0' },
+    { label: 'Questions', value: '0' },
+    { label: 'Scheduled Exams', value: '0' },
+];
+
+export default function PublicWelcome({ landing = {} }: { landing?: LandingContent }) {
+    const hero = {
+        eyebrow: landing.hero?.eyebrow ?? 'Secure CBT operations',
+        title: landing.hero?.title ?? 'Secure Online and Offline CBT Examination Platform',
+        description: landing.hero?.description ?? 'AlignEx helps institutions deliver secondary school exams, professional certification exams, and recruitment exams with support for adaptive assessment, online and future offline delivery, real-time supervisor monitoring, anti-cheating controls, result management, and reports.',
+        badges: landing.hero?.badges ?? ['Laravel + Inertia', 'React + TypeScript', 'Reverb-ready'],
+    };
+    const solutions = landing.solutions ?? defaultSolutions;
+    const features = landing.features ?? defaultFeatures;
+    const workflow = landing.workflow ?? defaultWorkflow;
+    const stats = landing.stats ?? defaultStats;
+    const metrics = landing.metrics ?? defaultMetrics;
+    const activity = landing.activity ?? { label: 'Submissions in the last 7 days', bars: [8, 8, 8, 8, 8, 8, 8] };
+    const candidateMockup = landing.candidateMockup ?? { question_label: 'Question 1 of 1', title: 'No active exam yet', timer_label: 'Ready' };
+    const operations = landing.operations ?? defaultOperations;
+
     return (
         <>
             <Head title="Secure CBT Examination Platform" />
             <main className="min-h-screen bg-surface text-slateDark">
                 <Navbar />
-                <HeroSection />
-                <MockupSection />
-                <SolutionsSection />
-                <FeaturesSection />
+                <HeroSection hero={hero} metrics={metrics} activity={activity} candidateMockup={candidateMockup} />
+                <OperationsSection operations={operations} />
+                <MockupSection metrics={metrics} />
+                <SolutionsSection solutions={solutions} />
+                <FeaturesSection features={features} />
                 <SecuritySection />
-                <WorkflowSection />
-                <TrustSection />
+                <WorkflowSection workflow={workflow} />
+                <TrustSection stats={stats} />
                 <FinalCta />
                 <Footer />
             </main>
@@ -106,8 +174,14 @@ function Navbar() {
                     <Button asChild variant="ghost" className="hidden sm:inline-flex">
                         <Link href="/login">Login</Link>
                     </Button>
+                    <Button asChild variant="ghost" className="hidden lg:inline-flex">
+                        <Link href="/verify-certificate">Verify Certificate</Link>
+                    </Button>
+                    <Button asChild variant="secondary" className="hidden sm:inline-flex">
+                        <Link href="/exam/login">Candidate Exam</Link>
+                    </Button>
                     <Button asChild>
-                        <Link href="/dashboard">View Demo</Link>
+                        <Link href="/register-admin">Register</Link>
                     </Button>
                 </div>
             </nav>
@@ -115,31 +189,37 @@ function Navbar() {
     );
 }
 
-function HeroSection() {
+function HeroSection({ hero, metrics, activity, candidateMockup }: { hero: Required<NonNullable<LandingContent['hero']>>; metrics: LandingMetric[]; activity: NonNullable<LandingContent['activity']>; candidateMockup: NonNullable<LandingContent['candidateMockup']> }) {
     return (
         <section className="border-b border-border bg-white">
             <div className="mx-auto grid max-w-7xl gap-10 px-6 py-16 lg:grid-cols-[0.95fr_1.05fr] lg:px-8 lg:py-20">
                 <div className="flex flex-col justify-center">
                     <div className="mb-5 inline-flex w-fit items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-1 text-sm font-semibold text-primary">
                         <ShieldCheck className="h-4 w-4" />
-                        Secure CBT operations
+                        {hero.eyebrow}
                     </div>
                     <h1 className="max-w-4xl text-4xl font-bold leading-tight text-primaryDark sm:text-5xl lg:text-6xl">
-                        Secure Online and Offline CBT Examination Platform
+                        {hero.title}
                     </h1>
                     <p className="mt-6 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg">
-                        AlignEx helps institutions deliver secondary school exams, professional certification exams, and recruitment exams with support for adaptive assessment, online and future offline delivery, real-time supervisor monitoring, anti-cheating controls, result management, and reports.
+                        {hero.description}
                     </p>
                     <div className="mt-8 flex flex-wrap gap-3">
                         <Button asChild className="h-11">
                             <Link href="/dashboard">Explore Platform <ArrowRight className="h-4 w-4" /></Link>
                         </Button>
                         <Button asChild variant="secondary" className="h-11">
+                            <Link href="/exam/login">Write Exam</Link>
+                        </Button>
+                        <Button asChild variant="secondary" className="h-11">
+                            <Link href="/verify-certificate">Verify Certificate</Link>
+                        </Button>
+                        <Button asChild variant="secondary" className="h-11">
                             <a href="#mockups">View Mockups</a>
                         </Button>
                     </div>
                     <div className="mt-8 grid max-w-xl gap-3 sm:grid-cols-3">
-                        {['Laravel + Inertia', 'React + TypeScript', 'Reverb-ready'].map((item) => (
+                        {hero.badges.map((item) => (
                             <div key={item} className="flex items-center gap-2 text-sm font-semibold text-slate-600">
                                 <CheckCircle2 className="h-4 w-4 text-success" />
                                 {item}
@@ -147,23 +227,19 @@ function HeroSection() {
                         ))}
                     </div>
                 </div>
-                <HeroMockup />
+                <HeroMockup metrics={metrics} activity={activity} candidateMockup={candidateMockup} />
             </div>
         </section>
     );
 }
 
-function HeroMockup() {
+function HeroMockup({ metrics, activity, candidateMockup }: { metrics: LandingMetric[]; activity: NonNullable<LandingContent['activity']>; candidateMockup: NonNullable<LandingContent['candidateMockup']> }) {
     return (
         <div className="relative min-h-[440px]" id="mockups">
             <div className="absolute left-0 top-0 w-[86%] rounded-lg border border-border bg-white shadow-xl">
                 <MockupChrome title="Admin Dashboard" />
                 <div className="grid gap-4 p-4 sm:grid-cols-3">
-                    {[
-                        ['Active Exams', '18'],
-                        ['Candidates', '2,460'],
-                        ['Question Banks', '74'],
-                    ].map(([label, value]) => (
+                    {metrics.slice(0, 3).map(({ label, value }) => (
                         <div key={label} className="rounded-md border border-border bg-slate-50 p-3">
                             <div className="text-xs font-semibold text-slate-500">{label}</div>
                             <div className="mt-2 text-2xl font-bold text-primaryDark">{value}</div>
@@ -172,10 +248,10 @@ function HeroMockup() {
                     <div className="col-span-full h-28 rounded-md border border-border bg-white p-3">
                         <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-slate-500">
                             <BarChart3 className="h-4 w-4 text-accent" />
-                            Exam activity
+                            {activity.label}
                         </div>
                         <div className="flex h-16 items-end gap-2">
-                            {[40, 70, 54, 92, 64, 80, 48].map((height, index) => (
+                            {activity.bars.map((height, index) => (
                                 <span key={index} className="flex-1 rounded-t bg-primary" style={{ height: `${height}%` }} />
                             ))}
                         </div>
@@ -187,10 +263,10 @@ function HeroMockup() {
                 <div className="p-4">
                     <div className="flex items-center justify-between border-b border-border pb-3">
                         <div>
-                            <div className="text-xs font-semibold text-primary">Question 12 of 60</div>
-                            <div className="mt-1 text-sm font-bold">Biology Certification</div>
+                            <div className="text-xs font-semibold text-primary">{candidateMockup.question_label}</div>
+                            <div className="mt-1 text-sm font-bold">{candidateMockup.title}</div>
                         </div>
-                        <StatusBadge label="42:18" tone="warning" />
+                        <StatusBadge label={candidateMockup.timer_label} tone="warning" />
                     </div>
                     <div className="mt-4 space-y-2">
                         <div className="h-3 w-full rounded bg-slate-200" />
@@ -209,7 +285,27 @@ function HeroMockup() {
     );
 }
 
-function MockupSection() {
+function OperationsSection({ operations }: { operations: LandingMetric[] }) {
+    return (
+        <section className="border-b border-border bg-white">
+            <div className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+                    {operations.map(({ label, value }) => (
+                        <div key={label} className="rounded-md border border-border bg-surface p-4">
+                            <div className="text-2xl font-bold text-primaryDark">{value}</div>
+                            <div className="mt-1 text-xs font-semibold uppercase text-slate-500">{label}</div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </section>
+    );
+}
+
+function MockupSection({ metrics }: { metrics: LandingMetric[] }) {
+    const examCount = metrics.find((item) => item.label === 'Active Exams')?.value ?? '0';
+    const bankCount = metrics.find((item) => item.label === 'Question Banks')?.value ?? '0';
+
     return (
         <section className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
             <SectionHeading
@@ -220,8 +316,8 @@ function MockupSection() {
             <div className="grid gap-5 lg:grid-cols-4">
                 <MiniMockup title="Admin dashboard" icon={Laptop} accent="bg-primary">
                     <div className="grid grid-cols-2 gap-2">
-                        <MetricPill label="Exams" value="18" />
-                        <MetricPill label="Banks" value="74" />
+                        <MetricPill label="Active" value={examCount} />
+                        <MetricPill label="Banks" value={bankCount} />
                     </div>
                     <div className="mt-3 h-20 rounded-md bg-slate-100 p-2">
                         <div className="h-full rounded bg-white">
@@ -263,26 +359,28 @@ function MockupSection() {
     );
 }
 
-function SolutionsSection() {
+function SolutionsSection({ solutions }: { solutions: LandingCard[] }) {
     return (
         <section id="solutions" className="border-y border-border bg-white">
             <div className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
                 <SectionHeading eyebrow="Solutions" title="One CBT foundation for many exam programs" />
                 <div className="grid gap-5 md:grid-cols-3">
-                    {solutions.map(({ title, body, icon: Icon }) => (
-                        <div key={title} className="rounded-md border border-border bg-white p-6 shadow-sm">
+                    {solutions.map(({ title, body, icon }) => {
+                        const Icon = iconMap[icon] ?? GraduationCap;
+
+                        return <div key={title} className="rounded-md border border-border bg-white p-6 shadow-sm">
                             <Icon className="h-7 w-7 text-primary" />
                             <h3 className="mt-5 text-lg font-bold">{title}</h3>
                             <p className="mt-3 text-sm leading-7 text-slate-600">{body}</p>
-                        </div>
-                    ))}
+                        </div>;
+                    })}
                 </div>
             </div>
         </section>
     );
 }
 
-function FeaturesSection() {
+function FeaturesSection({ features }: { features: LandingCard[] }) {
     return (
         <section id="features" className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
             <SectionHeading
@@ -291,8 +389,10 @@ function FeaturesSection() {
                 description="The platform architecture keeps exam operations organized while protecting candidate delivery from administrative complexity."
             />
             <div className="grid gap-5 md:grid-cols-2">
-                {features.map(([title, body, Icon]) => (
-                    <div key={title as string} className="flex gap-4 rounded-md border border-border bg-white p-5 shadow-sm">
+                {features.map(({ title, body, icon }) => {
+                    const Icon = iconMap[icon] ?? Activity;
+
+                    return <div key={title} className="flex gap-4 rounded-md border border-border bg-white p-5 shadow-sm">
                         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-green-50 text-primary">
                             <Icon className="h-5 w-5" />
                         </div>
@@ -300,8 +400,8 @@ function FeaturesSection() {
                             <h3 className="font-bold">{title}</h3>
                             <p className="mt-2 text-sm leading-7 text-slate-600">{body}</p>
                         </div>
-                    </div>
-                ))}
+                    </div>;
+                })}
             </div>
         </section>
     );
@@ -339,12 +439,12 @@ function SecuritySection() {
     );
 }
 
-function WorkflowSection() {
+function WorkflowSection({ workflow }: { workflow: LandingStep[] }) {
     return (
         <section id="workflow" className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
             <SectionHeading eyebrow="Workflow" title="From question bank to released results" />
             <div className="grid gap-5 md:grid-cols-4">
-                {workflow.map(([title, body], index) => (
+                {workflow.map(({ title, body }, index) => (
                     <div key={title} className="rounded-md border border-border bg-white p-5 shadow-sm">
                         <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-sm font-bold text-white">{index + 1}</div>
                         <h3 className="mt-5 font-bold">{title}</h3>
@@ -356,7 +456,7 @@ function WorkflowSection() {
     );
 }
 
-function TrustSection() {
+function TrustSection({ stats }: { stats: LandingStat[] }) {
     return (
         <section className="border-y border-border bg-white">
             <div className="mx-auto max-w-7xl px-6 py-14 lg:px-8">
@@ -366,7 +466,7 @@ function TrustSection() {
                         <h2 className="mt-2 text-3xl font-bold">Prepared for high-stakes examination operations.</h2>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-4">
-                        {stats.map(([value, label]) => (
+                        {stats.map(({ value, label }) => (
                             <div key={label} className="rounded-md border border-border bg-surface p-4 text-center">
                                 <div className="text-2xl font-bold text-primaryDark">{value}</div>
                                 <div className="mt-1 text-xs font-semibold uppercase text-slate-500">{label}</div>
@@ -413,6 +513,8 @@ function Footer() {
                     <a href="#solutions" className="hover:text-primary">Solutions</a>
                     <a href="#security" className="hover:text-primary">Security</a>
                     <Link href="/login" className="hover:text-primary">Login</Link>
+                    <Link href="/exam/login" className="hover:text-primary">Candidate Exam</Link>
+                    <Link href="/verify-certificate" className="hover:text-primary">Verify Certificate</Link>
                 </div>
             </div>
         </footer>

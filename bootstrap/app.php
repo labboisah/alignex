@@ -10,7 +10,9 @@ use Inertia\Inertia;
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
+        api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
+        channels: __DIR__.'/../routes/channels.php',
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
@@ -18,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'portal.user' => \App\Http\Middleware\EnsurePortalUser::class,
             'role' => \App\Http\Middleware\EnsureUserHasRole::class,
             'permission' => \App\Http\Middleware\EnsureUserHasPermission::class,
+            'context.access' => \App\Http\Middleware\EnsureEntityContextAccess::class,
         ]);
 
         $middleware->web(append: [

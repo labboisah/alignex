@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Center;
+use App\Models\Candidate;
+use App\Models\Exam;
 use App\Models\Organization;
 use App\Models\School;
 use App\Models\User;
@@ -34,12 +36,14 @@ class RbacTest extends TestCase
             '/dashboard',
             '/organizations',
             '/access-controls',
+            '/admin-registrations',
             '/centers',
             '/schools',
             '/users',
             '/subjects',
             '/topics',
             '/question-bank',
+            '/questions',
             '/exams',
             '/candidates',
             '/results',
@@ -92,12 +96,14 @@ class RbacTest extends TestCase
                 'Dashboard',
                 'Organizations',
                 'Access Controls',
+                'Applications',
                 'Centers',
                 'Schools',
                 'Users',
                 'Subjects',
                 'Topics',
                 'Question Bank',
+                'Questions',
                 'Exams',
                 'Candidates',
                 'Results',
@@ -110,6 +116,7 @@ class RbacTest extends TestCase
                 'Subjects',
                 'Topics',
                 'Question Bank',
+                'Questions',
                 'Exams',
                 'Candidates',
                 'Results',
@@ -121,6 +128,7 @@ class RbacTest extends TestCase
                 'Subjects',
                 'Topics',
                 'Question Bank',
+                'Questions',
                 'Exams',
                 'Candidates',
                 'Results',
@@ -131,19 +139,31 @@ class RbacTest extends TestCase
                 'Assigned Exams',
                 'Supervisor Monitor',
                 'Candidate Activity',
+                'Results',
                 'Reports',
             ],
             User::ROLE_CENTER_ADMIN => [
                 'Dashboard',
                 'Centers',
+                'Subjects',
+                'Topics',
+                'Question Bank',
+                'Questions',
+                'Exams',
+                'Candidates',
                 'Assigned Exams',
                 'Supervisor Monitor',
                 'Candidate Activity',
+                'Results',
                 'Reports',
             ],
             User::ROLE_SCHOOL_ADMIN => [
                 'Dashboard',
-                'Schools',
+                'My Schools',
+                'Subjects',
+                'Topics',
+                'Question Bank',
+                'Questions',
                 'Exams',
                 'Candidates',
                 'Results',
@@ -158,9 +178,44 @@ class RbacTest extends TestCase
                 ->get('/dashboard')
                 ->assertInertia(fn (Assert $page) => $page
                     ->component('Dashboard')
-                    ->where('auth.navigation', fn ($navigation) => $navigation->pluck('label')->all() === $labels)
+                    ->where('auth.navigation', function ($navigation) use ($labels, $role) {
+                        $this->assertSame($labels, $navigation->pluck('label')->all(), "Navigation mismatch for {$role}");
+
+                        return true;
+                    })
                 );
         }
+    }
+
+    public function test_dashboard_metrics_are_scoped_to_user_role(): void
+    {
+        $ownOrganization = Organization::factory()->create();
+        $otherOrganization = Organization::factory()->create();
+        $ownExam = Exam::factory()->create(['organization_id' => $ownOrganization->id]);
+        Exam::factory()->create(['organization_id' => $otherOrganization->id]);
+        Candidate::factory()->create(['organization_id' => $ownOrganization->id]);
+        Candidate::factory()->create(['organization_id' => $otherOrganization->id]);
+        $organizationAdmin = User::factory()->create([
+            'role' => User::ROLE_ORGANIZATION_ADMIN,
+            'organization_id' => $ownOrganization->id,
+        ]);
+
+        $this->actingAs($organizationAdmin)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Dashboard')
+                ->where('role.scope', 'Organization scope')
+                ->where('metrics', function ($metrics) {
+                    $values = $metrics->pluck('value', 'label');
+
+                    $this->assertSame(1, $values['Exams']);
+                    $this->assertSame(1, $values['Candidates']);
+
+                    return true;
+                })
+                ->where('recent_exams.0.code', $ownExam->code)
+            );
     }
 
     public function test_only_super_admin_can_manage_access_controls(): void

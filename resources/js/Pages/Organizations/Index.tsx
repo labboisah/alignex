@@ -39,6 +39,7 @@ export default function OrganizationsIndex({ organizations, can }: Props) {
                 columns={[
                     { key: 'name', header: 'Name', render: (organization) => <span className="font-semibold text-slateDark">{organization.name}</span> },
                     { key: 'code', header: 'Code' },
+                    { key: 'organization_type', header: 'Organization Type', render: (organization) => organization.organization_type_label || 'N/A' },
                     { key: 'contact_person', header: 'Contact Person' },
                     { key: 'email', header: 'Email' },
                     { key: 'phone', header: 'Phone', render: (organization) => organization.phone || 'N/A' },
@@ -49,6 +50,8 @@ export default function OrganizationsIndex({ organizations, can }: Props) {
                             <StatusBadge label={organization.status_label} tone={organization.status === 'active' ? 'success' : 'neutral'} />
                         ),
                     },
+                    { key: 'exams_count', header: 'Exams Count', render: (organization) => organization.exams_count ?? 0 },
+                    { key: 'candidates_count', header: 'Candidates Count', render: (organization) => organization.candidates_count ?? 0 },
                     {
                         key: 'actions',
                         header: 'Actions',

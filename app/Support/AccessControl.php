@@ -24,9 +24,21 @@ class AccessControl
                 'label' => 'Center Admin',
                 'description' => 'Manages one CBT center and delivery operations for allocated exams.',
             ],
+            User::ROLE_CBT_CENTER_ADMIN => [
+                'label' => 'CBT Center Admin',
+                'description' => 'Manages one CBT center, candidates, question banks, traditional exams, and adaptive exams.',
+            ],
             User::ROLE_SCHOOL_ADMIN => [
                 'label' => 'School Admin',
                 'description' => 'Manages one school and its candidates, exam assignments, and reports.',
+            ],
+            User::ROLE_SECONDARY_SCHOOL_ADMIN => [
+                'label' => 'Secondary School Admin',
+                'description' => 'Manages one secondary school, academic structure, terminal exams, students, results, and report cards.',
+            ],
+            User::ROLE_PROFESSIONAL_SCHOOL_ADMIN => [
+                'label' => 'Professional School Admin',
+                'description' => 'Manages one professional school, programmes, courses, modules, trainees, exams, and certificates.',
             ],
             User::ROLE_EXAMINER => [
                 'label' => 'Examiner',
@@ -58,6 +70,11 @@ class AccessControl
                 'label' => 'Manage access controls',
                 'group' => 'Platform',
                 'description' => 'Review and update system role permission assignments.',
+            ],
+            'manageAdminRegistrations' => [
+                'label' => 'Manage applications',
+                'group' => 'Platform',
+                'description' => 'Review, edit, approve, or reject organization, school, and center applications.',
             ],
             'manageCenters' => [
                 'label' => 'Manage centers',
@@ -118,14 +135,36 @@ class AccessControl
             ],
             User::ROLE_CENTER_ADMIN => [
                 'manageCenters',
+                'manageQuestionBank',
+                'manageExams',
+                'viewSupervisorMonitor',
+                'viewReports',
+            ],
+            User::ROLE_CBT_CENTER_ADMIN => [
+                'manageCenters',
+                'manageQuestionBank',
                 'manageExams',
                 'viewSupervisorMonitor',
                 'viewReports',
             ],
             User::ROLE_SCHOOL_ADMIN => [
                 'manageSchools',
+                'manageQuestionBank',
                 'manageExams',
                 'viewReports',
+            ],
+            User::ROLE_SECONDARY_SCHOOL_ADMIN => [
+                'manageSchools',
+                'manageQuestionBank',
+                'manageExams',
+                'viewReports',
+            ],
+            User::ROLE_PROFESSIONAL_SCHOOL_ADMIN => [
+                'manageSchools',
+                'manageQuestionBank',
+                'manageExams',
+                'viewReports',
+                'manageSettings',
             ],
             User::ROLE_EXAMINER => [
                 'manageQuestionBank',
@@ -137,6 +176,7 @@ class AccessControl
                 'viewReports',
             ],
             User::ROLE_CANDIDATE => [],
+            User::ROLE_STUDENT => [],
         ];
     }
 

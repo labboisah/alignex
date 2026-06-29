@@ -26,4 +26,19 @@ class Center extends Model
     {
         return $this->hasMany(User::class);
     }
+
+    public function examSessions(): HasMany
+    {
+        return $this->hasMany(ExamSession::class);
+    }
+
+    public function attempts(): HasMany
+    {
+        return $this->hasMany(CandidateExamAttempt::class);
+    }
+
+    public function proctoringEvents(): HasMany
+    {
+        return $this->hasMany(ProctoringEvent::class);
+    }
 }

@@ -123,7 +123,10 @@ export default function Login({ status, canResetPassword }) {
                     </form>
 
                     <div className="mt-6 rounded-md bg-slate-50 p-3 text-sm text-slate-600">
-                        Public registration is disabled. Admin users are created by authorized portal users.
+                        Need to register an organization, school, or CBT center?{' '}
+                        <Link href="/register-admin" className="font-semibold text-primary hover:text-primaryDark">
+                            Submit an admin registration request.
+                        </Link>
                     </div>
                 </div>
             </section>

@@ -20,6 +20,10 @@ class UpdateOrganizationRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'code' => ['required', 'string', 'max:50', 'alpha_dash', Rule::unique('organizations', 'code')->ignore($organization)],
+            'organization_type' => ['nullable', Rule::in(Organization::TYPES)],
+            'description' => ['nullable', 'string', 'max:5000'],
+            'logo' => ['nullable', 'string', 'max:255'],
+            'website' => ['nullable', 'url', 'max:255'],
             'contact_person' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('organizations', 'email')->ignore($organization)],
             'phone' => ['nullable', 'string', 'max:50'],

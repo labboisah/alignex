@@ -8,6 +8,10 @@ import { Organization, StatusOption } from './types';
 type OrganizationFormData = {
     name: string;
     code: string;
+    organization_type: string;
+    description: string;
+    logo: string;
+    website: string;
     contact_person: string;
     email: string;
     phone: string;
@@ -18,10 +22,14 @@ type OrganizationFormData = {
 const inputClass = 'mt-1 block w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm';
 const labelClass = 'text-sm font-semibold text-slateDark';
 
-export function OrganizationForm({ organization, statuses, submitLabel }: { organization?: Organization; statuses: StatusOption[]; submitLabel: string }) {
+export function OrganizationForm({ organization, statuses, organizationTypes = [], submitLabel }: { organization?: Organization; statuses: StatusOption[]; organizationTypes?: StatusOption[]; submitLabel: string }) {
     const { data, setData, post, patch, processing, errors } = useForm<OrganizationFormData>({
         name: organization?.name ?? '',
         code: organization?.code ?? '',
+        organization_type: organization?.organization_type ?? '',
+        description: organization?.description ?? '',
+        logo: organization?.logo ?? '',
+        website: organization?.website ?? '',
         contact_person: organization?.contact_person ?? '',
         email: organization?.email ?? '',
         phone: organization?.phone ?? '',
@@ -64,6 +72,17 @@ export function OrganizationForm({ organization, statuses, submitLabel }: { orga
                     <Field label="Code" error={errors.code}>
                         <input className={inputClass} value={data.code} onChange={(event) => setData('code', event.target.value)} required />
                     </Field>
+                    <Field label="Organization Type" error={errors.organization_type}>
+                        <select className={inputClass} value={data.organization_type} onChange={(event) => setData('organization_type', event.target.value)}>
+                            <option value="">Not specified</option>
+                            {organizationTypes.map((type) => (
+                                <option key={type.value} value={type.value}>{type.label}</option>
+                            ))}
+                        </select>
+                    </Field>
+                    <Field label="Website" error={errors.website}>
+                        <input className={inputClass} type="url" value={data.website} onChange={(event) => setData('website', event.target.value)} />
+                    </Field>
                     <Field label="Contact Person" error={errors.contact_person}>
                         <input className={inputClass} value={data.contact_person} onChange={(event) => setData('contact_person', event.target.value)} required />
                     </Field>
@@ -83,6 +102,9 @@ export function OrganizationForm({ organization, statuses, submitLabel }: { orga
                         </select>
                     </Field>
                 </div>
+                <Field label="Description" error={errors.description}>
+                    <textarea className={inputClass} rows={3} value={data.description} onChange={(event) => setData('description', event.target.value)} />
+                </Field>
                 <Field label="Address" error={errors.address}>
                     <textarea className={inputClass} rows={4} value={data.address} onChange={(event) => setData('address', event.target.value)} />
                 </Field>

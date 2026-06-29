@@ -17,7 +17,7 @@ class QuestionBankPolicy
 
     public function view(User $user, QuestionBank $questionBank): bool
     {
-        return $this->viewAny($user) && $this->canAccessOrganization($user, $questionBank);
+        return $this->viewAny($user) && $this->canAccessTenant($user, $questionBank);
     }
 
     public function create(User $user): bool
@@ -33,6 +33,6 @@ class QuestionBankPolicy
     public function delete(User $user, QuestionBank $questionBank): bool
     {
         return $user->hasPermission('manageQuestionBank')
-            && $this->canAccessOrganization($user, $questionBank);
+            && $this->canAccessTenant($user, $questionBank);
     }
 }
