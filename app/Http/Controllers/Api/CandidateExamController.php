@@ -13,6 +13,7 @@ use App\Models\Question;
 use App\Services\CandidateExamSessionService;
 use App\Services\CandidatePerformanceProfileService;
 use App\Services\ExamMonitorService;
+use App\Services\ExamResultService;
 use App\Services\ExamStatusService;
 use App\Services\ProfessionalExamService;
 use App\Services\ResultManagementService;
@@ -221,7 +222,7 @@ class CandidateExamController extends Controller
         $disqualified = false;
         $tabSwitchCount = null;
 
-        if ($type === 'suspicious') {
+        if (in_array($type, ['suspicious', 'webcam'], true)) {
             ProctoringEvent::query()->create([
                 'exam_id' => $attempt->exam_id,
                 'exam_session_id' => $attempt->exam_session_id,
@@ -289,6 +290,7 @@ class CandidateExamController extends Controller
                     $query
                         ->orWhere('candidate_number', $identifier)
                         ->orWhere('phone', $identifier)
+                        ->orWhere('nin', $identifier)
                         ->orWhere('metadata->nin', $identifier);
                 }
             })
@@ -361,28 +363,17 @@ class CandidateExamController extends Controller
             }
 
             $submittedAt = now();
-            $score = 0.0;
-
-            foreach ($attempt->answers as $answer) {
-                $scoreAwarded = $this->scoreAnswer($attempt, $answer);
-                $score += $scoreAwarded;
-                $answer->update([
-                    'score_awarded' => $scoreAwarded,
-                    'scored_at' => $submittedAt,
-                    'submitted_at' => $answer->submitted_at ?? $submittedAt,
-                ]);
-            }
 
             $attempt->update([
                 'status' => $status,
-                'score' => $score,
                 'submitted_at' => $submittedAt,
                 'auto_submitted_at' => $status === CandidateExamAttempt::STATUS_AUTO_SUBMITTED ? $submittedAt : $attempt->auto_submitted_at,
             ]);
+            $attempt = app(ExamResultService::class)->calculate($attempt, true);
             app(ResultManagementService::class)->ensureHash($attempt);
             app(CandidatePerformanceProfileService::class)->generate($attempt);
 
-            if (app(ProfessionalExamService::class)->certificateAutoGenerate($attempt->exam)) {
+            if ($attempt->certificate_eligible && app(ProfessionalExamService::class)->certificateAutoGenerate($attempt->exam)) {
                 app(ProfessionalExamService::class)->generateForAttempt($attempt);
             }
 
@@ -390,52 +381,17 @@ class CandidateExamController extends Controller
                 $request,
                 $status === CandidateExamAttempt::STATUS_AUTO_SUBMITTED ? 'auto_submit' : 'submission',
                 $attempt,
-                ['score' => $score, 'total_marks' => $attempt->total_marks]
+                ['score' => $attempt->score, 'total_marks' => $attempt->total_marks]
             );
             app(ExamMonitorService::class)->broadcast(
                 $attempt->exam,
                 $status === CandidateExamAttempt::STATUS_AUTO_SUBMITTED ? 'auto_submit' : 'submitted',
                 $attempt,
-                ['score' => $score, 'total_marks' => $attempt->total_marks]
+                ['score' => $attempt->score, 'total_marks' => $attempt->total_marks]
             );
 
             return $attempt->refresh()->load(['candidate', 'exam', 'papers.question.subject', 'papers.question.options']);
         });
-    }
-
-    private function scoreAnswer(CandidateExamAttempt $attempt, CandidateAnswer $answer): float
-    {
-        $question = $answer->question;
-
-        if (! $question || ! in_array($question->question_type, [Question::TYPE_SINGLE_CHOICE, Question::TYPE_MULTIPLE_CHOICE, Question::TYPE_TRUE_FALSE], true)) {
-            return 0.0;
-        }
-
-        $selectedIds = collect($answer->selected_option_ids ?? [])->sort()->values()->all();
-
-        if ($selectedIds === []) {
-            return 0.0;
-        }
-
-        $correctIds = $question->options
-            ->where('is_correct', true)
-            ->pluck('id')
-            ->sort()
-            ->values()
-            ->all();
-
-        if ($selectedIds === $correctIds) {
-            return (float) $question->marks;
-        }
-
-        if (! (bool) data_get($attempt->exam?->settings ?? [], 'negative_marking', false)) {
-            return 0.0;
-        }
-
-        $negativeMark = data_get($attempt->exam?->settings ?? [], 'negative_mark_value');
-        $negativeMark = $negativeMark !== null ? (float) $negativeMark : (float) ($question->negative_marks ?? 0);
-
-        return $negativeMark > 0 ? -1 * $negativeMark : 0.0;
     }
 
     private function ensureProfessionalEligibility(Request $request, Exam $exam, CandidateExamAttempt $attempt): void
@@ -460,6 +416,7 @@ class CandidateExamController extends Controller
     private function monitorEventType(string $eventType): string
     {
         return match (true) {
+            $eventType === 'webcam_heartbeat' => 'webcam',
             str_contains($eventType, 'disconnect') => 'disconnected',
             str_contains($eventType, 'focus'),
             str_contains($eventType, 'blur'),

@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
@@ -16,10 +16,11 @@ import {
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { DashboardCard, PageHeader, PortalAppShell, StatusBadge } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
+import { getContextTerminology } from '@/lib/terminology';
 
 type Metric = {
     label: string;
-    value: number;
+    value: number | string;
     description: string;
     icon: keyof typeof iconMap;
 };
@@ -93,6 +94,8 @@ export default function Dashboard({
     work_queue: WorkItem[];
     quick_actions: { label: string; href: string }[];
 }) {
+    const currentContext = (usePage().props.current_context ?? null) as { type: string; name: string } | null;
+    const terms = getContextTerminology(currentContext?.type);
     const passFail = [
         { name: 'Passed', value: result_summary.passed },
         { name: 'Failed', value: result_summary.failed },
@@ -104,8 +107,8 @@ export default function Dashboard({
             <section className="mx-auto max-w-7xl">
                 <PageHeader
                     eyebrow={role.label}
-                    title="Dashboard"
-                    description={`${role.scope} operational overview for exams, candidates, question readiness, monitoring, and results.`}
+                    title={currentContext?.name ?? 'Dashboard'}
+                    description={`${role.scope} overview for ${terms.examLabel.toLowerCase()}s, ${terms.learnerPlural.toLowerCase()}, ${terms.questionStructure.toLowerCase()}, and ${terms.resultDocument.toLowerCase()}s.`}
                     actions={quick_actions.slice(0, 2).map((action) => (
                         <Button key={action.href} asChild variant="secondary">
                             <Link href={action.href}>{action.label}</Link>

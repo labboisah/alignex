@@ -9,6 +9,12 @@ export type ScopeOption = {
     code: string;
 };
 
+export type ClassOption = {
+    id: string;
+    name: string;
+    level?: string | null;
+};
+
 export type Subject = Record<string, unknown> & {
     id: string;
     organization_id?: number | null;
@@ -17,6 +23,8 @@ export type Subject = Record<string, unknown> & {
     school_name?: string | null;
     center_id?: number | null;
     center_name?: string | null;
+    school_class_id?: string | null;
+    school_class_name?: string | null;
     name: string;
     code: string;
     description?: string | null;

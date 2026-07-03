@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['professional_school_id', 'name', 'code', 'description', 'status'])]
+#[Fillable(['professional_school_id', 'name', 'code', 'description', 'duration', 'status'])]
 class Programme extends Model
 {
     use HasFactory;
@@ -34,5 +34,15 @@ class Programme extends Model
     public function trainingBatches(): HasMany
     {
         return $this->hasMany(TrainingBatch::class);
+    }
+
+    public function candidates(): HasMany
+    {
+        return $this->hasMany(Candidate::class);
+    }
+
+    public function exams(): HasMany
+    {
+        return $this->hasMany(Exam::class);
     }
 }

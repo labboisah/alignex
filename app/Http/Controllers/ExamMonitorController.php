@@ -9,6 +9,7 @@ use App\Services\ExamMonitorService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -103,6 +104,38 @@ class ExamMonitorController extends Controller
         ]);
     }
 
+    public function end(Request $request, Exam $exam): JsonResponse
+    {
+        $this->authorizeExam($request->user(), $exam);
+        abort_unless($request->user()->hasPermission('manageExams'), 403);
+
+        DB::transaction(function () use ($exam): void {
+            $exam->forceFill([
+                'status' => Exam::STATUS_COMPLETED,
+                'ends_at' => now(),
+            ])->save();
+
+            $exam->attempts()
+                ->whereIn('status', [
+                    CandidateExamAttempt::STATUS_NOT_STARTED,
+                    CandidateExamAttempt::STATUS_IN_PROGRESS,
+                ])
+                ->update([
+                    'status' => CandidateExamAttempt::STATUS_AUTO_SUBMITTED,
+                    'auto_submitted_at' => now(),
+                    'submitted_at' => now(),
+                    'updated_at' => now(),
+                ]);
+        });
+
+        return response()->json([
+            'ended' => true,
+            'summary' => $this->monitor->summary($exam->fresh()),
+            'rows' => $this->monitor->rows($exam->fresh()),
+            'feed' => $this->monitor->feed($exam->fresh()),
+        ]);
+    }
+
     private function authorizeExam(User $user, Exam $exam): void
     {
         abort_unless($user->hasPermission('viewSupervisorMonitor') || $user->hasPermission('manageExams'), 403);
@@ -117,7 +150,10 @@ class ExamMonitorController extends Controller
                     $inner->whereRaw('1 = 0')
                         ->when($user->organization_id, fn ($scope) => $scope->orWhere('organization_id', $user->organization_id))
                         ->when($user->school_id, fn ($scope) => $scope->orWhere('school_id', $user->school_id))
-                        ->when($user->center_id, fn ($scope) => $scope->orWhere('center_id', $user->center_id));
+                        ->when($user->center_id, fn ($scope) => $scope->orWhere('center_id', $user->center_id))
+                        ->when($user->secondary_school_id, fn ($scope) => $scope->orWhere('secondary_school_id', $user->secondary_school_id))
+                        ->when($user->professional_school_id, fn ($scope) => $scope->orWhere('professional_school_id', $user->professional_school_id))
+                        ->when($user->cbt_center_id, fn ($scope) => $scope->orWhere('cbt_center_id', $user->cbt_center_id));
                 });
             });
     }

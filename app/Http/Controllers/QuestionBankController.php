@@ -7,10 +7,12 @@ use App\Http\Requests\UpdateQuestionBankRequest;
 use App\Http\Resources\QuestionBankResource;
 use App\Http\Resources\SubjectResource;
 use App\Models\Center;
+use App\Models\Exam;
 use App\Models\Organization;
 use App\Models\QuestionBank;
 use App\Models\School;
 use App\Models\Subject;
+use App\Support\ReferenceCode;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -28,7 +30,7 @@ class QuestionBankController extends Controller
         return Inertia::render('QuestionBanks/Index', [
             'questionBanks' => QuestionBankResource::collection(
                 $this->scopedQuestionBanks($request)
-                    ->with(['organization', 'school', 'center', 'subject'])
+                    ->with(['organization', 'school', 'center', 'subject', 'secondarySchool', 'professionalSchool', 'cbtCenter', 'programme', 'course', 'module'])
                     ->withCount('questions')
                     ->latest()
                     ->get()
@@ -54,7 +56,8 @@ class QuestionBankController extends Controller
     {
         $data = $request->validated();
         $subject = $this->authorizedSubject($request, $data['subject_id']);
-        $tenant = ['organization_id' => $subject->organization_id, 'school_id' => $subject->school_id, 'center_id' => $subject->center_id];
+        $tenant = $this->tenantFromSubject($subject);
+        $data['code'] = $this->referenceCode($data['code'] ?? null, $data['name'], $tenant);
         $this->ensureUniqueCode($data['code'], $tenant);
 
         QuestionBank::create([
@@ -71,7 +74,7 @@ class QuestionBankController extends Controller
         Gate::authorize('update', $questionBank);
 
         return Inertia::render('QuestionBanks/Edit', [
-            'questionBank' => QuestionBankResource::make($questionBank->load(['organization', 'school', 'center', 'subject'])->loadCount('questions')),
+            'questionBank' => QuestionBankResource::make($questionBank->load(['organization', 'school', 'center', 'subject', 'secondarySchool', 'professionalSchool', 'cbtCenter', 'programme', 'course', 'module'])->loadCount('questions')),
             'statuses' => $this->statuses(),
             'subjects' => SubjectResource::collection($this->scopedSubjects($request)->orderBy('name')->get()),
         ]);
@@ -81,7 +84,8 @@ class QuestionBankController extends Controller
     {
         $data = $request->validated();
         $subject = $this->authorizedSubject($request, $data['subject_id']);
-        $tenant = ['organization_id' => $subject->organization_id, 'school_id' => $subject->school_id, 'center_id' => $subject->center_id];
+        $tenant = $this->tenantFromSubject($subject);
+        $data['code'] = $this->referenceCode($data['code'] ?? null, $data['name'], $tenant, $questionBank);
         $this->ensureUniqueCode($data['code'], $tenant, $questionBank);
 
         $questionBank->update([
@@ -125,11 +129,9 @@ class QuestionBankController extends Controller
         DB::transaction(function () use ($request, $rows, &$created): void {
             foreach ($rows as $index => $row) {
                 $subject = $this->subjectByCode($request, trim($row['subject_code'] ?? ''), $index + 2);
-                $tenant = ['organization_id' => $subject->organization_id, 'school_id' => $subject->school_id, 'center_id' => $subject->center_id];
+                $tenant = $this->tenantFromSubject($subject);
                 $data = [
-                    'organization_id' => $tenant['organization_id'],
-                    'school_id' => $tenant['school_id'],
-                    'center_id' => $tenant['center_id'],
+                    ...$tenant,
                     'subject_id' => $subject->id,
                     'name' => trim($row['name'] ?? ''),
                     'code' => strtoupper(trim($row['code'] ?? '')),
@@ -158,7 +160,10 @@ class QuestionBankController extends Controller
             ->when($organization, fn ($query) => $query->where('organization_id', $organization->id))
             ->when(! $user->isSuperAdmin() && $user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
             ->when(! $user->isSuperAdmin() && $user->school_id, fn ($query) => $query->where('school_id', $user->school_id))
-            ->when(! $user->isSuperAdmin() && $user->center_id, fn ($query) => $query->where('center_id', $user->center_id));
+            ->when(! $user->isSuperAdmin() && $user->center_id, fn ($query) => $query->where('center_id', $user->center_id))
+            ->when(! $user->isSuperAdmin() && $user->secondary_school_id, fn ($query) => $query->where('secondary_school_id', $user->secondary_school_id))
+            ->when(! $user->isSuperAdmin() && $user->professional_school_id, fn ($query) => $query->where('professional_school_id', $user->professional_school_id))
+            ->when(! $user->isSuperAdmin() && $user->cbt_center_id, fn ($query) => $query->where('cbt_center_id', $user->cbt_center_id));
     }
 
     private function scopedSubjects(Request $request)
@@ -170,7 +175,10 @@ class QuestionBankController extends Controller
             ->when($organization, fn ($query) => $query->where('organization_id', $organization->id))
             ->when(! $user->isSuperAdmin() && $user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
             ->when(! $user->isSuperAdmin() && $user->school_id, fn ($query) => $query->where('school_id', $user->school_id))
-            ->when(! $user->isSuperAdmin() && $user->center_id, fn ($query) => $query->where('center_id', $user->center_id));
+            ->when(! $user->isSuperAdmin() && $user->center_id, fn ($query) => $query->where('center_id', $user->center_id))
+            ->when(! $user->isSuperAdmin() && $user->secondary_school_id, fn ($query) => $query->where('secondary_school_id', $user->secondary_school_id))
+            ->when(! $user->isSuperAdmin() && $user->professional_school_id, fn ($query) => $query->where('professional_school_id', $user->professional_school_id))
+            ->when(! $user->isSuperAdmin() && $user->cbt_center_id, fn ($query) => $query->where('cbt_center_id', $user->cbt_center_id));
     }
 
     private function authorizedSubject(Request $request, string $subjectId): Subject
@@ -202,6 +210,9 @@ class QuestionBankController extends Controller
             ->where('organization_id', $tenant['organization_id'])
             ->where('school_id', $tenant['school_id'])
             ->where('center_id', $tenant['center_id'])
+            ->where('secondary_school_id', $tenant['secondary_school_id'] ?? null)
+            ->where('professional_school_id', $tenant['professional_school_id'] ?? null)
+            ->where('cbt_center_id', $tenant['cbt_center_id'] ?? null)
             ->when($ignore, fn ($query) => $query->whereKeyNot($ignore->id))
             ->exists();
 
@@ -209,6 +220,44 @@ class QuestionBankController extends Controller
             $prefix = $row ? "Row {$row}: " : '';
             throw ValidationException::withMessages(['code' => "{$prefix}The question bank code is already in use for this scope."]);
         }
+    }
+
+    private function referenceCode(?string $code, string $name, array $tenant, ?QuestionBank $ignore = null): string
+    {
+        if (filled($code)) {
+            return strtoupper($code);
+        }
+
+        return ReferenceCode::unique($name, QuestionBank::query()
+            ->where('organization_id', $tenant['organization_id'])
+            ->where('school_id', $tenant['school_id'])
+            ->where('center_id', $tenant['center_id'])
+            ->where('secondary_school_id', $tenant['secondary_school_id'] ?? null)
+            ->where('professional_school_id', $tenant['professional_school_id'] ?? null)
+            ->where('cbt_center_id', $tenant['cbt_center_id'] ?? null), $ignore);
+    }
+
+    private function tenantFromSubject(Subject $subject): array
+    {
+        return [
+            'owner_type' => match (true) {
+                filled($subject->secondary_school_id) => Exam::OWNER_SECONDARY_SCHOOL,
+                filled($subject->professional_school_id) => Exam::OWNER_PROFESSIONAL_SCHOOL,
+                filled($subject->cbt_center_id) => Exam::OWNER_CBT_CENTER,
+                filled($subject->organization_id) => Exam::OWNER_ORGANIZATION,
+                default => null,
+            },
+            'owner_id' => $subject->secondary_school_id
+                ?? $subject->professional_school_id
+                ?? $subject->cbt_center_id
+                ?? $subject->organization_id,
+            'organization_id' => $subject->organization_id,
+            'school_id' => $subject->school_id,
+            'center_id' => $subject->center_id,
+            'secondary_school_id' => $subject->secondary_school_id,
+            'professional_school_id' => $subject->professional_school_id,
+            'cbt_center_id' => $subject->cbt_center_id,
+        ];
     }
 
     private function csvRows(string $path): array

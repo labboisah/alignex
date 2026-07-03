@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
     'exam_id',
+    'organization_id',
     'secondary_school_id',
     'professional_school_id',
     'cbt_center_id',
@@ -19,6 +20,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'certificate_template_id',
     'serial_number',
     'verification_hash',
+    'verification_code',
     'status',
     'issued_at',
     'expires_at',
@@ -43,6 +45,11 @@ class Certificate extends Model
     public function exam(): BelongsTo
     {
         return $this->belongsTo(Exam::class);
+    }
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
     }
 
     public function secondarySchool(): BelongsTo

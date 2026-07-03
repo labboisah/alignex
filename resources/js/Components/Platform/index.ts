@@ -15,4 +15,5 @@ export * from './PortalSidebar';
 export * from './PortalTopbar';
 export * from './ProtectedAction';
 export * from './RoleBadge';
+export * from './SetupGuideIndicator';
 export * from './StatusBadge';

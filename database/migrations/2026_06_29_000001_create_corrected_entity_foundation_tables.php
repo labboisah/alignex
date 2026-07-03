@@ -66,7 +66,8 @@ return new class extends Migration
         if (! Schema::hasTable('class_arms')) {
             Schema::create('class_arms', function (Blueprint $table): void {
                 $table->id();
-                $table->foreignId('secondary_school_id')->constrained()->cascadeOnDelete();
+                $table->foreignId('school_id')->nullable()->constrained()->nullOnDelete();
+                $table->foreignId('secondary_school_id')->nullable()->constrained()->cascadeOnDelete();
                 $table->foreignUlid('school_class_id')->nullable()->constrained()->cascadeOnDelete();
                 $table->string('name');
                 $table->string('code');
@@ -120,6 +121,17 @@ return new class extends Migration
                 $table->softDeletes();
 
                 $table->index(['secondary_school_id', 'status']);
+            });
+        }
+
+        if (! Schema::hasTable('student_group_student')) {
+            Schema::create('student_group_student', function (Blueprint $table): void {
+                $table->id();
+                $table->foreignUlid('student_group_id')->constrained()->cascadeOnDelete();
+                $table->foreignId('student_id')->constrained()->cascadeOnDelete();
+                $table->timestamps();
+
+                $table->unique(['student_group_id', 'student_id'], 'student_group_student_unique');
             });
         }
 
@@ -196,6 +208,7 @@ return new class extends Migration
         Schema::dropIfExists('modules');
         Schema::dropIfExists('courses');
         Schema::dropIfExists('programmes');
+        Schema::dropIfExists('student_group_student');
         Schema::dropIfExists('report_cards');
         Schema::dropIfExists('students');
         Schema::dropIfExists('class_arms');

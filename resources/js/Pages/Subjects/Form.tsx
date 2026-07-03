@@ -3,12 +3,13 @@ import { Save } from 'lucide-react';
 import { FormEvent, ReactNode } from 'react';
 import { FormSection } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
-import { ScopeOption, StatusOption, Subject } from './types';
+import { ClassOption, ScopeOption, StatusOption, Subject } from './types';
 
 type SubjectFormData = {
     organization_id: string;
     school_id: string;
     center_id: string;
+    school_class_id: string;
     name: string;
     code: string;
     description: string;
@@ -18,11 +19,12 @@ type SubjectFormData = {
 const inputClass = 'mt-1 block w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm';
 const labelClass = 'text-sm font-semibold text-slateDark';
 
-export function SubjectForm({ subject, statuses, organizations = [], schools = [], centers = [], submitLabel }: { subject?: Subject; statuses: StatusOption[]; organizations?: ScopeOption[]; schools?: ScopeOption[]; centers?: ScopeOption[]; submitLabel: string }) {
+export function SubjectForm({ subject, statuses, organizations = [], schools = [], centers = [], classes = [], submitLabel }: { subject?: Subject; statuses: StatusOption[]; organizations?: ScopeOption[]; schools?: ScopeOption[]; centers?: ScopeOption[]; classes?: ClassOption[]; submitLabel: string }) {
     const { data, setData, post, patch, processing, errors } = useForm<SubjectFormData>({
         organization_id: subject?.organization_id ? String(subject.organization_id) : '',
         school_id: subject?.school_id ? String(subject.school_id) : '',
         center_id: subject?.center_id ? String(subject.center_id) : '',
+        school_class_id: subject?.school_class_id ? String(subject.school_class_id) : '',
         name: subject?.name ?? '',
         code: subject?.code ?? '',
         description: subject?.description ?? '',
@@ -117,9 +119,14 @@ export function SubjectForm({ subject, statuses, organizations = [], schools = [
                     <Field label="Name" error={errors.name}>
                         <input className={inputClass} value={data.name} onChange={(event) => setData('name', event.target.value)} required />
                     </Field>
-                    <Field label="Code" error={errors.code}>
-                        <input className={inputClass} value={data.code} onChange={(event) => setData('code', event.target.value.toUpperCase())} required />
-                    </Field>
+                    {classes.length > 0 && (
+                        <Field label="Class" error={errors.school_class_id}>
+                            <select className={inputClass} value={data.school_class_id} onChange={(event) => setData('school_class_id', event.target.value)}>
+                                <option value="">All classes</option>
+                                {classes.map((schoolClass) => <option key={schoolClass.id} value={schoolClass.id}>{schoolClass.name}{schoolClass.level ? ` (${schoolClass.level})` : ''}</option>)}
+                            </select>
+                        </Field>
+                    )}
                     <Field label="Status" error={errors.status}>
                         <select className={inputClass} value={data.status} onChange={(event) => setData('status', event.target.value)}>
                             {statuses.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}

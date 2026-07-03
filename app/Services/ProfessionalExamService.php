@@ -59,10 +59,14 @@ class ProfessionalExamService
                     'name' => $data['name'],
                     'title' => $data['title'],
                     'institution_name' => $data['institution_name'] ?? $this->institutionName($exam),
-                    'logo_url' => $data['logo_url'] ?? null,
+                    'logo_url' => $this->normalizeLogoUrl($data['logo_url'] ?? null),
                     'primary_color' => $data['primary_color'] ?? '#0F7A3A',
                     'accent_color' => $data['accent_color'] ?? '#F59E0B',
                     'background_color' => $data['background_color'] ?? '#FFFFFF',
+                    'theme' => $data['theme'] ?? 'classic',
+                    'paper_size' => $data['paper_size'] ?? 'a4',
+                    'orientation' => $data['orientation'] ?? 'landscape',
+                    'template_key' => $data['template_key'] ?? 'formal',
                     'use_logo_watermark' => (bool) ($data['use_logo_watermark'] ?? true),
                     'body' => $data['body'],
                     'signatory_name' => $data['signatory_name'] ?? null,
@@ -108,11 +112,16 @@ class ProfessionalExamService
 
             return Certificate::query()->create([
                 'exam_id' => $attempt->exam_id,
+                'organization_id' => $attempt->exam?->organization_id,
+                'secondary_school_id' => $attempt->exam?->secondary_school_id,
+                'professional_school_id' => $attempt->exam?->professional_school_id,
+                'cbt_center_id' => $attempt->exam?->cbt_center_id,
                 'candidate_id' => $attempt->candidate_id,
                 'candidate_exam_attempt_id' => $attempt->id,
                 'certificate_template_id' => $template?->id,
                 'serial_number' => $serial,
                 'verification_hash' => $hash,
+                'verification_code' => $hash,
                 'status' => Certificate::STATUS_ISSUED,
                 'issued_at' => now(),
                 'expires_at' => $validMonths ? now()->addMonths((int) $validMonths) : null,
@@ -124,7 +133,7 @@ class ProfessionalExamService
                     'score' => (float) ($attempt->score ?? 0),
                     'total_marks' => (float) ($attempt->total_marks ?? $attempt->exam?->total_marks ?? 0),
                     'institution_name' => $template?->institution_name ?? $this->institutionName($attempt->exam),
-                    'logo_url' => $template?->logo_url,
+                    'logo_url' => $this->normalizeLogoUrl($template?->logo_url) ?? '/images/logo.png',
                     'template_title' => $template?->title,
                 ],
             ]);
@@ -182,6 +191,7 @@ class ProfessionalExamService
         $certificate = Certificate::query()
             ->where('serial_number', $identifier)
             ->orWhere('verification_hash', $identifier)
+            ->orWhere('verification_code', $identifier)
             ->with(['candidate', 'exam', 'attempt', 'template'])
             ->first();
 
@@ -239,6 +249,7 @@ class ProfessionalExamService
             'id' => $certificate->id,
             'serial_number' => $certificate->serial_number,
             'verification_hash' => $certificate->verification_hash,
+            'verification_code' => $certificate->verification_code,
             'status' => $certificate->status,
             'candidate_name' => trim(($certificate->candidate?->first_name ?? '').' '.($certificate->candidate?->last_name ?? '')),
             'registration_number' => $certificate->candidate?->candidate_number,
@@ -251,10 +262,14 @@ class ProfessionalExamService
             'expires_at' => $certificate->expires_at?->toISOString(),
             'template_title' => $certificate->template?->title,
             'institution_name' => $certificate->template?->institution_name ?? data_get($certificate->metadata ?? [], 'institution_name') ?? $this->institutionName($certificate->exam),
-            'logo_url' => $certificate->template?->logo_url ?? data_get($certificate->metadata ?? [], 'logo_url'),
+            'logo_url' => $this->normalizeLogoUrl($certificate->template?->logo_url ?? data_get($certificate->metadata ?? [], 'logo_url')) ?? '/images/logo.png',
             'primary_color' => $certificate->template?->primary_color ?? '#0F7A3A',
             'accent_color' => $certificate->template?->accent_color ?? '#F59E0B',
             'background_color' => $certificate->template?->background_color ?? '#FFFFFF',
+            'theme' => $certificate->template?->theme ?? 'classic',
+            'paper_size' => $certificate->template?->paper_size ?? 'a4',
+            'orientation' => $certificate->template?->orientation ?? 'landscape',
+            'template_key' => $certificate->template?->template_key ?? 'formal',
             'use_logo_watermark' => (bool) ($certificate->template?->use_logo_watermark ?? true),
             'verification_url' => $this->verificationUrl($certificate),
             'qr_payload' => $this->verificationUrl($certificate),
@@ -288,15 +303,59 @@ class ProfessionalExamService
         return ($exam?->examType?->code ?? null) === 'secondary' ? 'secondary' : 'professional';
     }
 
+    public function normalizeLogoUrl(?string $logoUrl): ?string
+    {
+        if (blank($logoUrl)) {
+            return null;
+        }
+
+        $value = trim($logoUrl);
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (preg_match('/^(https?:)?\/\//i', $value) || str_starts_with($value, 'data:')) {
+            return $value;
+        }
+
+        $normalized = ltrim($value, '/');
+
+        if (str_starts_with($normalized, 'storage/')) {
+            return url('/'.$normalized);
+        }
+
+        if (str_starts_with($normalized, 'certificate-logos/')) {
+            return url('/storage/'.$normalized);
+        }
+
+        if (str_starts_with($normalized, 'uploads/')) {
+            return url('/'.$normalized);
+        }
+
+        if (str_starts_with($normalized, 'images/')) {
+            return url('/'.$normalized);
+        }
+
+        if (str_starts_with($normalized, '/')) {
+            return url($normalized);
+        }
+
+        return $value;
+    }
+
     public function institutionName(?Exam $exam): string
     {
         if (! $exam) {
             return config('app.name', 'AlignEx');
         }
 
-        $exam->loadMissing(['school', 'organization', 'center']);
+        $exam->loadMissing(['school', 'organization', 'center', 'secondarySchool', 'professionalSchool', 'cbtCenter']);
 
-        return $exam->school?->name
+        return $exam->professionalSchool?->name
+            ?? $exam->secondarySchool?->name
+            ?? $exam->cbtCenter?->name
+            ?? $exam->school?->name
             ?? $exam->organization?->name
             ?? $exam->center?->name
             ?? config('app.name', 'AlignEx');

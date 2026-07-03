@@ -21,4 +21,9 @@ class StudentGroup extends Model
     {
         return $this->belongsToMany(Candidate::class, 'student_group_members')->withTimestamps();
     }
+
+    public function students(): BelongsToMany
+    {
+        return $this->belongsToMany(Student::class, 'student_group_student')->withTimestamps();
+    }
 }

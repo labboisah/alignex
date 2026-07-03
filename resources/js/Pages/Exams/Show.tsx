@@ -6,6 +6,9 @@ import { Exam } from './types';
 
 export default function ShowExam({ exam, can }: { exam: { data: Exam }; can: { update: boolean; cancel: boolean } }) {
     const record = exam.data;
+    const isProfessional = record.owner_context === 'professional_school' || record.professional_school_id;
+    const paperLabel = isProfessional ? 'Module' : 'Subject';
+    const paperLabelPlural = isProfessional ? 'Module Configuration' : 'Subject Configuration';
     return (
         <PortalAppShell title={record.title}>
             <Head title={record.title} />
@@ -29,19 +32,34 @@ export default function ShowExam({ exam, can }: { exam: { data: Exam }; can: { u
                 />
                 <div className="grid gap-4 md:grid-cols-4">
                     <Metric label="Status" value={record.status_label} badge={record.status} />
+                    <Metric label="Owner Context" value={record.owner_context_label ?? 'Exam'} />
+                    <Metric label="Category" value={record.exam_category ?? 'N/A'} />
+                    <Metric label="Mode" value={record.exam_mode ?? record.mode} />
                     <Metric label="Total Marks" value={String(record.total_marks)} />
                     <Metric label="Pass Mark" value={String(record.pass_mark)} />
                     <Metric label="Duration" value={`${record.duration_minutes} minutes`} />
+                    <Metric label="Participants" value={String(record.participants_count ?? 0)} />
+                    <Metric label="Question Bank" value={record.question_bank_name ?? 'N/A'} />
+                    <Metric label="Papers" value={record.paper_generation_status ?? '0 generated'} />
+                    <Metric label="Submissions" value={record.submission_status ?? '0 submitted'} />
                 </div>
                 <div className="mt-6 rounded-md border border-border bg-white p-5 shadow-sm">
-                    <h2 className="font-semibold text-slateDark">Subject Configuration</h2>
+                    <h2 className="font-semibold text-slateDark">{paperLabelPlural}</h2>
                     <div className="mt-4 overflow-x-auto">
                         <table className="w-full text-left text-sm">
-                            <thead className="text-xs uppercase text-slate-500"><tr><th className="py-2">Subject</th><th>Questions</th><th>Marks Each</th><th>Total</th><th>Duration</th></tr></thead>
+                            <thead className="text-xs uppercase text-slate-500"><tr><th className="py-2">{paperLabel}</th><th>Questions</th><th>Marks Each</th><th>Total</th><th>Duration</th></tr></thead>
                             <tbody className="divide-y divide-border">
                                 {record.subjects?.map((subject) => <tr key={subject.subject_id}><td className="py-3 font-semibold">{subject.subject_name}</td><td>{subject.number_of_questions}</td><td>{subject.marks_per_question}</td><td>{subject.total_marks}</td><td>{subject.duration_minutes ?? 'Exam default'}</td></tr>)}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+                <div className="mt-6 rounded-md border border-border bg-white p-5 shadow-sm">
+                    <h2 className="font-semibold text-slateDark">Results Summary</h2>
+                    <div className="mt-4 grid gap-3 md:grid-cols-3">
+                        <Metric label="Submitted" value={String(record.results_summary?.submitted ?? 0)} />
+                        <Metric label="Passed" value={String(record.results_summary?.passed ?? 0)} />
+                        <Metric label="Failed" value={String(record.results_summary?.failed ?? 0)} />
                     </div>
                 </div>
                 <div className="mt-6 rounded-md border border-border bg-white p-5 shadow-sm">

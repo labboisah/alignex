@@ -17,7 +17,8 @@ class UpdateSubjectRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'code' => ['required', 'string', 'max:50', 'alpha_dash'],
+            'code' => ['nullable', 'string', 'max:50', 'alpha_dash'],
+            'school_class_id' => ['nullable', 'exists:school_classes,id'],
             'description' => ['nullable', 'string', 'max:2000'],
             'status' => ['required', Rule::in([Subject::STATUS_ACTIVE, Subject::STATUS_INACTIVE])],
         ];

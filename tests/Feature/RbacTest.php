@@ -97,75 +97,62 @@ class RbacTest extends TestCase
                 'Organizations',
                 'Access Controls',
                 'Applications',
-                'Centers',
-                'Schools',
+                'CBT Centers',
                 'Users',
-                'Subjects',
-                'Topics',
-                'Question Bank',
-                'Questions',
-                'Exams',
-                'Candidates',
-                'Results',
                 'Reports',
-                'Settings',
             ],
             User::ROLE_ORGANIZATION_ADMIN => [
                 'Dashboard',
-                'Users',
-                'Subjects',
-                'Topics',
-                'Question Bank',
-                'Questions',
-                'Exams',
                 'Candidates',
+                'Question Bank',
+                'Exams',
+                'Recruitment Exams',
+                'Assessment Exams',
+                'Certification Exams',
+                'Adaptive Exams',
                 'Results',
                 'Reports',
+                'Users',
                 'Settings',
             ],
             User::ROLE_EXAMINER => [
                 'Dashboard',
-                'Subjects',
-                'Topics',
-                'Question Bank',
-                'Questions',
-                'Exams',
                 'Candidates',
+                'Question Bank',
+                'Exams',
+                'Recruitment Exams',
+                'Assessment Exams',
+                'Certification Exams',
+                'Adaptive Exams',
                 'Results',
                 'Reports',
             ],
             User::ROLE_SUPERVISOR => [
                 'Dashboard',
-                'Assigned Exams',
-                'Supervisor Monitor',
-                'Candidate Activity',
                 'Results',
                 'Reports',
             ],
             User::ROLE_CENTER_ADMIN => [
                 'Dashboard',
-                'Centers',
-                'Subjects',
-                'Topics',
-                'Question Bank',
-                'Questions',
-                'Exams',
                 'Candidates',
-                'Assigned Exams',
-                'Supervisor Monitor',
-                'Candidate Activity',
+                'Question Bank',
+                'Exams',
+                'Recruitment Exams',
+                'Assessment Exams',
+                'Certification Exams',
+                'Adaptive Exams',
                 'Results',
                 'Reports',
             ],
             User::ROLE_SCHOOL_ADMIN => [
                 'Dashboard',
-                'My Schools',
-                'Subjects',
-                'Topics',
-                'Question Bank',
-                'Questions',
-                'Exams',
                 'Candidates',
+                'Question Bank',
+                'Exams',
+                'Recruitment Exams',
+                'Assessment Exams',
+                'Certification Exams',
+                'Adaptive Exams',
                 'Results',
                 'Reports',
             ],
@@ -177,7 +164,7 @@ class RbacTest extends TestCase
             $this->actingAs($user)
                 ->get('/dashboard')
                 ->assertInertia(fn (Assert $page) => $page
-                    ->component('Dashboard')
+                    ->component('Dashboard/Index')
                     ->where('auth.navigation', function ($navigation) use ($labels, $role) {
                         $this->assertSame($labels, $navigation->pluck('label')->all(), "Navigation mismatch for {$role}");
 
@@ -204,13 +191,13 @@ class RbacTest extends TestCase
             ->get('/dashboard')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('Dashboard')
+                ->component('Dashboard/Index')
                 ->where('role.scope', 'Organization scope')
                 ->where('metrics', function ($metrics) {
                     $values = $metrics->pluck('value', 'label');
 
-                    $this->assertSame(1, $values['Exams']);
-                    $this->assertSame(1, $values['Candidates']);
+                    $this->assertSame(1, $values['Total Exams']);
+                    $this->assertSame(1, $values['Total Candidates']);
 
                     return true;
                 })

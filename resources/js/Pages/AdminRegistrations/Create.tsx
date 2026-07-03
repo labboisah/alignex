@@ -6,7 +6,7 @@ import { Button } from '@/Components/ui/button';
 import { EntityType } from './types';
 
 type FormData = {
-    entity_type: 'organization' | 'school' | 'center';
+    entity_type: 'organization' | 'secondary_school' | 'professional_school' | 'cbt_center';
     admin_name: string;
     admin_email: string;
     password: string;
@@ -222,12 +222,16 @@ function ErrorText({ message }: { message?: string }) {
 }
 
 function typeLabel(type: FormData['entity_type']) {
-    if (type === 'school') {
-        return 'School';
+    if (type === 'secondary_school') {
+        return 'Secondary School';
     }
 
-    if (type === 'center') {
-        return 'Center';
+    if (type === 'professional_school') {
+        return 'Professional School';
+    }
+
+    if (type === 'cbt_center') {
+        return 'CBT Center';
     }
 
     return 'Organization';

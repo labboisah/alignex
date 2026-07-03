@@ -6,6 +6,19 @@ AlignEx is a hybrid Laravel and React CBT platform. Laravel owns the backend, au
 
 The platform supports secondary school examinations, professional certification examinations, recruitment examinations, traditional CBT, online examination, supervisor monitoring, anti-cheating controls, result management, and reports. It is designed to later support offline center-based examination through Electron + SQLite and adaptive assessment through a Python FastAPI service.
 
+## Active Context Model
+
+The corrected platform structure uses four current contexts:
+
+- Organization
+- Secondary School
+- Professional School
+- CBT Center
+
+Organization is separate from schools and CBT centers. Secondary school and professional school are separate entity types, not values of `school_type`. CBT center is also separate from the legacy `centers` module and owns center-based CBT candidates, question banks, and exams.
+
+The selected current context drives dashboard data, sidebar modules, quick actions, and terminology. Context data is shared through Inertia props as `current_context` and `available_contexts`.
+
 ## Architecture
 
 - Laravel web layer renders public/admin Inertia pages.
@@ -30,18 +43,24 @@ The platform supports secondary school examinations, professional certification 
 
 ## Exam Workflow
 
-1. Organization is configured.
-2. Subjects, topics, and question banks are prepared.
-3. Questions are authored, reviewed, and approved.
-4. Exam is created with category, duration, delivery mode, schedule, and security settings.
-5. Paper generation selects eligible questions without exposing answer keys to candidates.
-6. Candidates are assigned and receive access credentials.
-7. Candidate enters `/exam/login`, receives instructions, and starts the exam.
-8. Answers are saved through Laravel candidate APIs.
-9. Supervisor monitors live sessions and anti-cheating events.
-10. Candidate submits or is auto-submitted by server-side rules.
-11. Server scores objective items and queues subjective/manual review where needed.
-12. Results are reviewed, approved, released, and reported.
+1. Select the current context.
+2. Prepare the context's learners, subjects or training structures, and question bank.
+3. Create an exam allowed for that owner type.
+4. Assign candidates or students.
+5. Generate candidate papers with stored question and option order.
+6. Candidate enters `/exam/login`, receives instructions, and starts the exam.
+7. Answers are saved through Laravel candidate APIs.
+8. Supervisor monitors live sessions and anti-cheating events.
+9. Candidate submits or is auto-submitted by server-side rules.
+10. Server scores objective items and marks certificate eligibility where applicable.
+11. Results are reviewed, approved, released, and reported.
+
+Allowed ownership rules:
+
+- Organization: recruitment, assessment, certification, professional, practice, general; traditional or adaptive; requires candidates and question bank.
+- Secondary school: terminal only; traditional only; requires session, term, class, and subject.
+- Professional school: professional, certification, practice; traditional or adaptive; uses programme, course, and module.
+- CBT center: recruitment, assessment, certification, professional, practice, general; traditional or adaptive; requires center candidates and question bank.
 
 ## Core Boundaries
 

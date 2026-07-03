@@ -25,6 +25,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'negative_marks',
     'status',
     'scoring_metadata',
+    'tags',
     'reviewed_at',
 ])]
 class Question extends Model
@@ -48,6 +49,7 @@ class Question extends Model
             'marks' => 'decimal:2',
             'negative_marks' => 'decimal:2',
             'scoring_metadata' => 'array',
+            'tags' => 'array',
             'reviewed_at' => 'datetime',
         ];
     }

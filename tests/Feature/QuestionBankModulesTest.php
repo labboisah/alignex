@@ -100,9 +100,16 @@ class QuestionBankModulesTest extends TestCase
             ->get('/dashboard')
             ->assertInertia(fn (Assert $page) => $page
                 ->where('auth.permissions.manageQuestionBank', true)
-                ->where('auth.navigation', fn ($navigation) => in_array('Subjects', $navigation->pluck('label')->all(), true)
-                    && in_array('Topics', $navigation->pluck('label')->all(), true)
-                    && in_array('Question Bank', $navigation->pluck('label')->all(), true))
+                ->where('auth.navigation', function ($navigation) {
+                    $labels = collect($navigation)
+                        ->flatMap(fn ($item) => collect([data_get($item, 'label')])->merge(collect(data_get($item, 'children', []))->pluck('label')))
+                        ->all();
+
+                    return in_array('Exam', $labels, true)
+                        && in_array('Subjects', $labels, true)
+                        && in_array('Topics', $labels, true)
+                        && in_array('Question Bank', $labels, true);
+                })
             );
 
         $this->actingAs($admin)
@@ -145,9 +152,15 @@ class QuestionBankModulesTest extends TestCase
             ->get('/dashboard')
             ->assertInertia(fn (Assert $page) => $page
                 ->where('auth.permissions.manageQuestionBank', true)
-                ->where('auth.navigation', fn ($navigation) => in_array('Subjects', $navigation->pluck('label')->all(), true)
-                    && in_array('Topics', $navigation->pluck('label')->all(), true)
-                    && in_array('Question Bank', $navigation->pluck('label')->all(), true))
+                ->where('auth.navigation', function ($navigation) {
+                    $labels = collect($navigation)
+                        ->flatMap(fn ($item) => collect([data_get($item, 'label')])->merge(collect(data_get($item, 'children', []))->pluck('label')))
+                        ->all();
+
+                    return in_array('Question Bank', $labels, true)
+                        && ! in_array('Subjects', $labels, true)
+                        && ! in_array('Topics', $labels, true);
+                })
             );
 
         $this->actingAs($admin)

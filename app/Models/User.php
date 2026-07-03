@@ -226,20 +226,53 @@ class User extends Authenticatable
 
     public function canAccessSecondarySchool(int|string|null $secondarySchoolId): bool
     {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        if ($secondarySchoolId !== null && (string) ($this->secondary_school_id ?? $this->school_id) === (string) $secondarySchoolId) {
+            return true;
+        }
+
         return $this->isSuperAdmin()
-            || ($secondarySchoolId !== null && (string) ($this->secondary_school_id ?? $this->school_id) === (string) $secondarySchoolId);
+            || ($secondarySchoolId !== null && $this->organization_id !== null && SecondarySchool::query()
+                ->whereKey($secondarySchoolId)
+                ->where('organization_id', $this->organization_id)
+                ->exists());
     }
 
     public function canAccessProfessionalSchool(int|string|null $professionalSchoolId): bool
     {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        if ($professionalSchoolId !== null && (string) $this->professional_school_id === (string) $professionalSchoolId) {
+            return true;
+        }
+
         return $this->isSuperAdmin()
-            || ($professionalSchoolId !== null && (string) $this->professional_school_id === (string) $professionalSchoolId);
+            || ($professionalSchoolId !== null && $this->organization_id !== null && ProfessionalSchool::query()
+                ->whereKey($professionalSchoolId)
+                ->where('organization_id', $this->organization_id)
+                ->exists());
     }
 
     public function canAccessCbtCenter(int|string|null $cbtCenterId): bool
     {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        if ($cbtCenterId !== null && (string) ($this->cbt_center_id ?? $this->center_id) === (string) $cbtCenterId) {
+            return true;
+        }
+
         return $this->isSuperAdmin()
-            || ($cbtCenterId !== null && (string) ($this->cbt_center_id ?? $this->center_id) === (string) $cbtCenterId);
+            || ($cbtCenterId !== null && $this->organization_id !== null && CbtCenter::query()
+                ->whereKey($cbtCenterId)
+                ->where('organization_id', $this->organization_id)
+                ->exists());
     }
 
     public function currentContext(): ?array

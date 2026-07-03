@@ -8,6 +8,8 @@ use App\Http\Resources\SubjectResource;
 use App\Http\Resources\TopicResource;
 use App\Models\Subject;
 use App\Models\Topic;
+use App\Services\CurrentContextService;
+use App\Support\ReferenceCode;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +22,7 @@ class TopicController extends Controller
 {
     public function index(Request $request): Response
     {
+        $this->abortForSecondarySchool($request);
         Gate::authorize('viewAny', Topic::class);
 
         return Inertia::render('Topics/Index', [
@@ -34,6 +37,7 @@ class TopicController extends Controller
 
     public function create(Request $request): Response
     {
+        $this->abortForSecondarySchool($request);
         Gate::authorize('create', Topic::class);
 
         return Inertia::render('Topics/Create', [
@@ -45,9 +49,11 @@ class TopicController extends Controller
 
     public function store(StoreTopicRequest $request): RedirectResponse
     {
+        $this->abortForSecondarySchool($request);
         $data = $request->validated();
         $subject = $this->authorizedSubject($request, $data['subject_id']);
         $this->authorizeParent($request, $data['parent_id'] ?? null, $subject);
+        $data['code'] = $this->referenceCode($data['code'] ?? null, $data['name'], $subject);
         $this->ensureUniqueCode($data['code'], $subject);
 
         Topic::create($data);
@@ -57,6 +63,7 @@ class TopicController extends Controller
 
     public function edit(Request $request, Topic $topic): Response
     {
+        $this->abortForSecondarySchool($request);
         Gate::authorize('update', $topic);
 
         return Inertia::render('Topics/Edit', [
@@ -69,9 +76,11 @@ class TopicController extends Controller
 
     public function update(UpdateTopicRequest $request, Topic $topic): RedirectResponse
     {
+        $this->abortForSecondarySchool($request);
         $data = $request->validated();
         $subject = $this->authorizedSubject($request, $data['subject_id']);
         $this->authorizeParent($request, $data['parent_id'] ?? null, $subject, $topic);
+        $data['code'] = $this->referenceCode($data['code'] ?? null, $data['name'], $subject, $topic);
         $this->ensureUniqueCode($data['code'], $subject, $topic);
 
         $topic->update($data);
@@ -79,8 +88,9 @@ class TopicController extends Controller
         return redirect()->route('topics.index')->with('success', 'Topic updated.');
     }
 
-    public function destroy(Topic $topic): RedirectResponse
+    public function destroy(Request $request, Topic $topic): RedirectResponse
     {
+        $this->abortForSecondarySchool($request);
         Gate::authorize('delete', $topic);
 
         $topic->delete();
@@ -90,6 +100,7 @@ class TopicController extends Controller
 
     public function template()
     {
+        $this->abortForSecondarySchool(request());
         Gate::authorize('create', Topic::class);
 
         return response()->streamDownload(function (): void {
@@ -100,6 +111,7 @@ class TopicController extends Controller
 
     public function import(Request $request): RedirectResponse
     {
+        $this->abortForSecondarySchool($request);
         Gate::authorize('create', Topic::class);
 
         $request->validate([
@@ -138,6 +150,13 @@ class TopicController extends Controller
         return Topic::query()->whereHas('subject', fn ($query) => $this->applySubjectScope($query, $request));
     }
 
+    private function abortForSecondarySchool(Request $request): void
+    {
+        $context = app(CurrentContextService::class)->current($request->user());
+
+        abort_if(($context['type'] ?? null) === 'secondary_school' || $request->user()?->secondary_school_id !== null, 404);
+    }
+
     private function scopedSubjects(Request $request)
     {
         return Subject::query()->tap(fn ($query) => $this->applySubjectScope($query, $request));
@@ -150,7 +169,8 @@ class TopicController extends Controller
         $query
             ->when(! $user->isSuperAdmin() && $user->organization_id, fn ($subjectQuery) => $subjectQuery->where('organization_id', $user->organization_id))
             ->when(! $user->isSuperAdmin() && $user->school_id, fn ($subjectQuery) => $subjectQuery->where('school_id', $user->school_id))
-            ->when(! $user->isSuperAdmin() && $user->center_id, fn ($subjectQuery) => $subjectQuery->where('center_id', $user->center_id));
+            ->when(! $user->isSuperAdmin() && $user->center_id, fn ($subjectQuery) => $subjectQuery->where('center_id', $user->center_id))
+            ->when(! $user->isSuperAdmin() && $user->secondary_school_id, fn ($subjectQuery) => $subjectQuery->where('secondary_school_id', $user->secondary_school_id));
     }
 
     private function authorizedSubject(Request $request, string $subjectId): Subject
@@ -225,6 +245,15 @@ class TopicController extends Controller
             $prefix = $row ? "Row {$row}: " : '';
             throw ValidationException::withMessages(['code' => "{$prefix}The topic code is already in use for this subject."]);
         }
+    }
+
+    private function referenceCode(?string $code, string $name, Subject $subject, ?Topic $ignore = null): string
+    {
+        if (filled($code)) {
+            return strtoupper($code);
+        }
+
+        return ReferenceCode::unique($name, Topic::query()->where('subject_id', $subject->id), $ignore);
     }
 
     private function csvRows(string $path): array

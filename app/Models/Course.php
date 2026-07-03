@@ -30,4 +30,14 @@ class Course extends Model
     {
         return $this->hasMany(ProfessionalModule::class);
     }
+
+    public function candidates(): HasMany
+    {
+        return $this->hasMany(Candidate::class);
+    }
+
+    public function exams(): HasMany
+    {
+        return $this->hasMany(Exam::class);
+    }
 }

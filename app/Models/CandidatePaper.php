@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['attempt_id', 'question_id', 'question_order', 'option_order'])]
+#[Fillable(['attempt_id', 'exam_participant_id', 'question_id', 'question_order', 'option_order'])]
 class CandidatePaper extends Model
 {
     use HasFactory, HasUlids;
@@ -23,6 +23,11 @@ class CandidatePaper extends Model
     public function attempt(): BelongsTo
     {
         return $this->belongsTo(CandidateExamAttempt::class, 'attempt_id');
+    }
+
+    public function examParticipant(): BelongsTo
+    {
+        return $this->belongsTo(ExamParticipant::class);
     }
 
     public function question(): BelongsTo

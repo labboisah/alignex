@@ -127,12 +127,17 @@ class AdminRegistrationController extends Controller
                 'description' => 'NGOs, associations, companies, or groups that want to conduct exams.',
             ],
             [
-                'value' => AdminRegistrationRequest::TYPE_SCHOOL,
-                'label' => 'School',
-                'description' => 'Secondary schools, professional schools, bootcamps, online course providers, and certification schools.',
+                'value' => AdminRegistrationRequest::TYPE_SECONDARY_SCHOOL,
+                'label' => 'Secondary School',
+                'description' => 'Secondary schools that manage students, sessions, terms, classes, arms, subjects, and terminal exams.',
             ],
             [
-                'value' => AdminRegistrationRequest::TYPE_CENTER,
+                'value' => AdminRegistrationRequest::TYPE_PROFESSIONAL_SCHOOL,
+                'label' => 'Professional School',
+                'description' => 'Professional academies, bootcamps, and certification schools that manage programmes, courses, modules, and certificates.',
+            ],
+            [
+                'value' => AdminRegistrationRequest::TYPE_CBT_CENTER,
                 'label' => 'CBT Center',
                 'description' => 'Facilities capable of delivering online or local CBT exams.',
             ],

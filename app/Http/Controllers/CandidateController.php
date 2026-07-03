@@ -7,10 +7,14 @@ use App\Http\Requests\UpdateCandidateRequest;
 use App\Http\Resources\CandidateResource;
 use App\Http\Resources\ExamResource;
 use App\Models\Candidate;
+use App\Models\CandidateGroup;
 use App\Models\Center;
 use App\Models\Exam;
 use App\Models\Organization;
 use App\Models\School;
+use App\Models\Student;
+use App\Models\StudentGroup;
+use App\Services\ExamParticipantAssignmentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -37,6 +41,7 @@ class CandidateController extends Controller
                     ->get()
             ),
             'exams' => ExamResource::collection($this->scopedExams($request)->with('examType')->latest()->get()),
+            'candidateGroups' => $this->candidateGroupOptions($request),
             'importReport' => $request->session()->get('candidate_import_report'),
             'can' => ['create' => $request->user()->can('create', Candidate::class)],
         ]);
@@ -90,7 +95,7 @@ class CandidateController extends Controller
 
         $candidate->delete();
 
-        return redirect()->route('candidates.index')->with('success', 'Candidate deleted.');
+        return back()->with('success', 'Candidate deleted.');
     }
 
     public function template(): StreamedResponse
@@ -110,12 +115,12 @@ class CandidateController extends Controller
         Gate::authorize('create', Candidate::class);
 
         $data = $request->validate([
-            'exam_id' => ['required', 'exists:exams,id'],
+            'candidate_group_id' => ['required', 'exists:candidate_groups,id'],
             'file' => ['required', 'file', 'mimes:csv,txt', 'max:4096'],
         ]);
 
-        $exam = $this->scopedExams($request)->whereKey($data['exam_id'])->firstOrFail();
-        $tenant = $this->tenantForExam($exam);
+        $candidateGroup = $this->scopedCandidateGroups($request)->whereKey($data['candidate_group_id'])->firstOrFail();
+        $tenant = $this->tenantForCandidateGroup($candidateGroup);
         $rows = $this->csvRows($request->file('file')->getRealPath());
         $created = [];
         $failed = [];
@@ -131,7 +136,7 @@ class CandidateController extends Controller
                     throw ValidationException::withMessages(['registration_number' => 'Registration number is required.']);
                 }
 
-                $duplicateKey = implode(':', [$tenant['organization_id'] ?? '', $tenant['school_id'] ?? '', $tenant['center_id'] ?? '', $registrationNumber]);
+                $duplicateKey = implode(':', [$tenant['organization_id'] ?? '', $tenant['school_id'] ?? '', $tenant['center_id'] ?? '', $tenant['cbt_center_id'] ?? '', $registrationNumber]);
 
                 if (isset($seen[$duplicateKey])) {
                     $duplicates[] = ['row' => $line, 'registration_number' => $registrationNumber, 'reason' => 'Duplicate in uploaded file.'];
@@ -172,9 +177,7 @@ class CandidateController extends Controller
                     'metadata' => ['source' => 'csv_import'],
                 ]);
 
-                $exam->candidates()->syncWithoutDetaching([
-                    $candidate->id => ['status' => 'assigned'],
-                ]);
+                $candidateGroup->candidates()->syncWithoutDetaching([$candidate->id]);
 
                 $created[] = ['row' => $line, 'registration_number' => $registrationNumber, 'name' => trim($candidate->first_name.' '.$candidate->last_name)];
             } catch (\Throwable $exception) {
@@ -190,7 +193,7 @@ class CandidateController extends Controller
         ];
 
         return back()
-            ->with('success', count($created).' candidates imported and assigned to '.$exam->title.'.')
+            ->with('success', count($created).' candidates imported into '.$candidateGroup->name.'.')
             ->with('candidate_import_report', $report);
     }
 
@@ -207,6 +210,8 @@ class CandidateController extends Controller
             'selectedExam' => $exam ? ExamResource::make($exam->load('examType')) : null,
             'candidates' => CandidateResource::collection($this->scopedCandidates($request)->with(['organization', 'school', 'center'])->withCount('assignedExams')->orderBy('last_name')->get()),
             'assignedCandidates' => $exam ? CandidateResource::collection($exam->candidates()->with(['organization', 'school', 'center'])->withCount('assignedExams')->orderBy('last_name')->get()) : ['data' => []],
+            'studentGroups' => $exam?->effectiveOwnerType() === Exam::OWNER_SECONDARY_SCHOOL ? $this->secondaryStudentGroups($request, $exam) : [],
+            'assignedStudents' => $exam?->effectiveOwnerType() === Exam::OWNER_SECONDARY_SCHOOL ? $this->assignedStudents($exam) : [],
         ]);
     }
 
@@ -216,11 +221,35 @@ class CandidateController extends Controller
 
         $data = $request->validate([
             'exam_id' => ['required', 'exists:exams,id'],
+            'candidate_ids' => ['sometimes', 'array', 'min:1'],
+            'candidate_ids.*' => ['required', 'exists:candidates,id'],
+            'student_group_id' => ['sometimes', 'required', 'exists:student_groups,id'],
+        ]);
+
+        $exam = $this->scopedExams($request)->whereKey($data['exam_id'])->firstOrFail();
+
+        if ($exam->effectiveOwnerType() === Exam::OWNER_SECONDARY_SCHOOL) {
+            $request->validate(['student_group_id' => ['required', 'exists:student_groups,id']]);
+            $group = $this->secondaryStudentGroupScope($request, $exam)->whereKey($data['student_group_id'])->firstOrFail();
+            $studentIds = $group->students()->pluck('students.id')->map(fn ($id) => (string) $id)->all();
+
+            app(ExamParticipantAssignmentService::class)->syncStudents($exam, $studentIds);
+            $exam->forceFill([
+                'settings' => [
+                    ...($exam->settings ?? []),
+                    'secondary_student_group_id' => $group->id,
+                    'secondary_student_ids' => $studentIds,
+                ],
+            ])->save();
+
+            return back()->with('success', count($studentIds).' students assigned from '.$group->name.'.');
+        }
+
+        $request->validate([
             'candidate_ids' => ['required', 'array', 'min:1'],
             'candidate_ids.*' => ['required', 'exists:candidates,id'],
         ]);
 
-        $exam = $this->scopedExams($request)->whereKey($data['exam_id'])->firstOrFail();
         $candidateIds = $this->scopedCandidates($request)->whereIn('id', $data['candidate_ids'])->pluck('id');
 
         DB::transaction(function () use ($exam, $candidateIds): void {
@@ -304,7 +333,10 @@ class CandidateController extends Controller
             ->when($organization, fn ($query) => $query->where('organization_id', $organization->id))
             ->when(! $user->isSuperAdmin() && $user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
             ->when(! $user->isSuperAdmin() && $user->school_id, fn ($query) => $query->where('school_id', $user->school_id))
-            ->when(! $user->isSuperAdmin() && $user->center_id, fn ($query) => $query->where('center_id', $user->center_id));
+            ->when(! $user->isSuperAdmin() && $user->center_id, fn ($query) => $query->where('center_id', $user->center_id))
+            ->when(! $user->isSuperAdmin() && $user->secondary_school_id, fn ($query) => $query->where('secondary_school_id', $user->secondary_school_id))
+            ->when(! $user->isSuperAdmin() && $user->professional_school_id, fn ($query) => $query->where('professional_school_id', $user->professional_school_id))
+            ->when(! $user->isSuperAdmin() && $user->cbt_center_id, fn ($query) => $query->where('cbt_center_id', $user->cbt_center_id));
     }
 
     private function scopedExams(Request $request)
@@ -316,7 +348,66 @@ class CandidateController extends Controller
             ->when($organization, fn ($query) => $query->where('organization_id', $organization->id))
             ->when(! $user->isSuperAdmin() && $user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
             ->when(! $user->isSuperAdmin() && $user->school_id, fn ($query) => $query->where('school_id', $user->school_id))
-            ->when(! $user->isSuperAdmin() && $user->center_id, fn ($query) => $query->where('center_id', $user->center_id));
+            ->when(! $user->isSuperAdmin() && $user->center_id, fn ($query) => $query->where('center_id', $user->center_id))
+            ->when(! $user->isSuperAdmin() && $user->secondary_school_id, fn ($query) => $query->where('secondary_school_id', $user->secondary_school_id))
+            ->when(! $user->isSuperAdmin() && $user->professional_school_id, fn ($query) => $query->where('professional_school_id', $user->professional_school_id))
+            ->when(! $user->isSuperAdmin() && $user->cbt_center_id, fn ($query) => $query->where('cbt_center_id', $user->cbt_center_id));
+    }
+
+    private function secondaryStudentGroups(Request $request, Exam $exam): array
+    {
+        return $this->secondaryStudentGroupScope($request, $exam)
+            ->with(['schoolClass:id,name', 'students.schoolClass:id,name'])
+            ->withCount('students')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (StudentGroup $group) => [
+                'id' => $group->id,
+                'name' => $group->name,
+                'class_name' => $group->schoolClass?->name,
+                'students_count' => $group->students_count,
+                'students' => $group->students->map(fn (Student $student) => $this->studentAssignmentRow($student))->values(),
+            ])
+            ->all();
+    }
+
+    private function secondaryStudentGroupScope(Request $request, Exam $exam)
+    {
+        $user = $request->user();
+
+        return StudentGroup::query()
+            ->whereHas('schoolClass', fn ($query) => $query
+                ->when($exam->secondary_school_id, fn ($scope) => $scope->where('secondary_school_id', $exam->secondary_school_id))
+                ->when($exam->school_id, fn ($scope) => $scope->where('school_id', $exam->school_id))
+                ->when(! $user->isSuperAdmin() && $user->secondary_school_id, fn ($scope) => $scope->where('secondary_school_id', $user->secondary_school_id))
+                ->when(! $user->isSuperAdmin() && $user->school_id, fn ($scope) => $scope->where('school_id', $user->school_id)));
+    }
+
+    private function assignedStudents(Exam $exam): array
+    {
+        $studentIds = $exam->participants()
+            ->where('participant_type', 'student')
+            ->pluck('participant_id')
+            ->all();
+
+        return Student::query()
+            ->whereIn('id', $studentIds)
+            ->with('schoolClass:id,name')
+            ->orderBy('admission_number')
+            ->get()
+            ->map(fn (Student $student) => $this->studentAssignmentRow($student))
+            ->all();
+    }
+
+    private function studentAssignmentRow(Student $student): array
+    {
+        return [
+            'id' => $student->id,
+            'full_name' => trim($student->first_name.' '.$student->last_name),
+            'registration_number' => $student->admission_number,
+            'class_name' => $student->schoolClass?->name,
+            'status' => $student->status,
+        ];
     }
 
     private function tenantFor(Request $request, array $data): array
@@ -357,6 +448,26 @@ class CandidateController extends Controller
         ];
     }
 
+    private function tenantForCandidateGroup(CandidateGroup $candidateGroup): array
+    {
+        if ($candidateGroup->cbt_center_id) {
+            return [
+                'owner_type' => Exam::OWNER_CBT_CENTER,
+                'owner_id' => $candidateGroup->cbt_center_id,
+                'organization_id' => $candidateGroup->organization_id,
+                'school_id' => null,
+                'center_id' => null,
+                'cbt_center_id' => $candidateGroup->cbt_center_id,
+            ];
+        }
+
+        return [
+            'organization_id' => $candidateGroup->organization_id,
+            'school_id' => null,
+            'center_id' => null,
+        ];
+    }
+
     private function candidateExists(array $tenant, string $registrationNumber): bool
     {
         return Candidate::query()
@@ -364,7 +475,26 @@ class CandidateController extends Controller
             ->when($tenant['organization_id'] ?? null, fn ($query, $organizationId) => $query->where('organization_id', $organizationId))
             ->when($tenant['school_id'] ?? null, fn ($query, $schoolId) => $query->where('school_id', $schoolId))
             ->when($tenant['center_id'] ?? null, fn ($query, $centerId) => $query->where('center_id', $centerId))
+            ->when($tenant['cbt_center_id'] ?? null, fn ($query, $centerId) => $query->where('cbt_center_id', $centerId))
             ->exists();
+    }
+
+    private function scopedCandidateGroups(Request $request)
+    {
+        $user = $request->user();
+
+        return CandidateGroup::query()
+            ->when(! $user->isSuperAdmin() && $user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
+            ->when(! $user->isSuperAdmin() && $user->cbt_center_id, fn ($query) => $query->where('cbt_center_id', $user->cbt_center_id))
+            ->when(! $user->isSuperAdmin() && ! $user->cbt_center_id, fn ($query) => $query->whereNull('cbt_center_id'));
+    }
+
+    private function candidateGroupOptions(Request $request)
+    {
+        return $this->scopedCandidateGroups($request)
+            ->where('status', CandidateGroup::STATUS_ACTIVE)
+            ->orderBy('name')
+            ->get(['id', 'name', 'code']);
     }
 
     private function formOptions(Request $request): array

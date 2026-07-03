@@ -19,7 +19,7 @@ class StoreTopicRequest extends FormRequest
             'subject_id' => ['required', 'string', 'exists:subjects,id'],
             'parent_id' => ['nullable', 'string', 'exists:topics,id'],
             'name' => ['required', 'string', 'max:255'],
-            'code' => ['required', 'string', 'max:50', 'alpha_dash'],
+            'code' => ['nullable', 'string', 'max:50', 'alpha_dash'],
             'description' => ['nullable', 'string', 'max:2000'],
             'status' => ['required', Rule::in([Topic::STATUS_ACTIVE, Topic::STATUS_INACTIVE])],
         ];

@@ -3,7 +3,10 @@
 use App\Http\Controllers\AccessControlController;
 use App\Http\Controllers\AdminRegistrationController;
 use App\Http\Controllers\CandidateController;
+use App\Http\Controllers\CandidateGroupController;
 use App\Http\Controllers\CenterController;
+use App\Http\Controllers\CbtCenterController;
+use App\Http\Controllers\CurrentContextController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExamController;
 use App\Http\Controllers\ExamMonitorController;
@@ -12,6 +15,7 @@ use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicWelcomeController;
 use App\Http\Controllers\ProfessionalExamController;
+use App\Http\Controllers\ProfessionalSchoolController;
 use App\Http\Controllers\QuestionBankController;
 use App\Http\Controllers\QuestionController;
 use App\Http\Controllers\RecruitmentController;
@@ -42,6 +46,8 @@ Route::middleware('guest')->group(function (): void {
 
 Route::middleware(['auth', 'portal.user'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::patch('/current-context', [CurrentContextController::class, 'update'])->name('current-context.update');
+    Route::delete('/current-context', [CurrentContextController::class, 'destroy'])->name('current-context.destroy');
     Route::get('/access-denied', fn () => Inertia::render('AccessDenied'))->name('access-denied');
 
     Route::get('/organizations', [OrganizationController::class, 'index'])
@@ -87,6 +93,68 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
         ->middleware('role:super_admin,organization_admin')
         ->name('organizations.show');
 
+    Route::middleware(['role:super_admin,organization_admin,secondary_school_admin,school_admin,examiner', 'permission:manageSchools'])->group(function (): void {
+        Route::get('/secondary-schools', [SecondarySchoolController::class, 'list'])->name('secondary-schools.index');
+        Route::get('/secondary-schools/create', [SecondarySchoolController::class, 'create'])->name('secondary-schools.create');
+        Route::post('/secondary-schools', [SecondarySchoolController::class, 'store'])->name('secondary-schools.store');
+        Route::get('/secondary-schools/{secondarySchool}', [SecondarySchoolController::class, 'show'])->name('secondary-schools.show');
+        Route::get('/secondary-schools/{secondarySchool}/edit', [SecondarySchoolController::class, 'edit'])->name('secondary-schools.edit');
+        Route::patch('/secondary-schools/{secondarySchool}', [SecondarySchoolController::class, 'update'])->name('secondary-schools.update');
+        Route::get('/secondary-schools/{secondarySchool}/academic-sessions', [SecondarySchoolController::class, 'academicSessions'])->name('secondary-schools.academic-sessions.index');
+        Route::post('/secondary-schools/{secondarySchool}/academic-sessions', [SecondarySchoolController::class, 'storeAcademicSession'])->name('secondary-schools.academic-sessions.store');
+        Route::patch('/secondary-schools/{secondarySchool}/academic-sessions/{academicSession}', [SecondarySchoolController::class, 'updateAcademicSession'])->name('secondary-schools.academic-sessions.update');
+        Route::delete('/secondary-schools/{secondarySchool}/academic-sessions/{academicSession}', [SecondarySchoolController::class, 'destroyAcademicSession'])->name('secondary-schools.academic-sessions.destroy');
+        Route::patch('/secondary-schools/{secondarySchool}/academic-sessions/{academicSession}/active', [SecondarySchoolController::class, 'setActiveAcademicSession'])->name('secondary-schools.academic-sessions.active');
+        Route::get('/secondary-schools/{secondarySchool}/terms', [SecondarySchoolController::class, 'terms'])->name('secondary-schools.terms.index');
+        Route::post('/secondary-schools/{secondarySchool}/terms', [SecondarySchoolController::class, 'storeTermForSchool'])->name('secondary-schools.terms.store');
+        Route::patch('/secondary-schools/{secondarySchool}/terms/{academicTerm}', [SecondarySchoolController::class, 'updateTermForSchool'])->name('secondary-schools.terms.update');
+        Route::delete('/secondary-schools/{secondarySchool}/terms/{academicTerm}', [SecondarySchoolController::class, 'destroyTermForSchool'])->name('secondary-schools.terms.destroy');
+        Route::get('/secondary-schools/{secondarySchool}/classes', [SecondarySchoolController::class, 'classes'])->name('secondary-schools.classes.index');
+        Route::post('/secondary-schools/{secondarySchool}/classes', [SecondarySchoolController::class, 'storeClassForSchool'])->name('secondary-schools.classes.store');
+        Route::patch('/secondary-schools/{secondarySchool}/classes/{schoolClass}', [SecondarySchoolController::class, 'updateClassForSchool'])->name('secondary-schools.classes.update');
+        Route::delete('/secondary-schools/{secondarySchool}/classes/{schoolClass}', [SecondarySchoolController::class, 'destroyClassForSchool'])->name('secondary-schools.classes.destroy');
+        Route::get('/secondary-schools/{secondarySchool}/student-groups', [SecondarySchoolController::class, 'studentGroups'])->name('secondary-schools.student-groups.index');
+        Route::post('/secondary-schools/{secondarySchool}/student-groups', [SecondarySchoolController::class, 'storeStudentGroupForSchool'])->name('secondary-schools.student-groups.store');
+        Route::patch('/secondary-schools/{secondarySchool}/student-groups/{studentGroup}', [SecondarySchoolController::class, 'updateStudentGroupForSchool'])->name('secondary-schools.student-groups.update');
+        Route::delete('/secondary-schools/{secondarySchool}/student-groups/{studentGroup}', [SecondarySchoolController::class, 'destroyStudentGroupForSchool'])->name('secondary-schools.student-groups.destroy');
+        Route::get('/secondary-schools/{secondarySchool}/students', [SecondarySchoolController::class, 'students'])->name('secondary-schools.students.index');
+        Route::post('/secondary-schools/{secondarySchool}/students', [SecondarySchoolController::class, 'storeStudent'])->name('secondary-schools.students.store');
+        Route::patch('/secondary-schools/{secondarySchool}/students/{student}', [SecondarySchoolController::class, 'updateStudent'])->name('secondary-schools.students.update');
+        Route::delete('/secondary-schools/{secondarySchool}/students/{student}', [SecondarySchoolController::class, 'destroyStudent'])->name('secondary-schools.students.destroy');
+        Route::post('/secondary-schools/{secondarySchool}/subjects', [SecondarySchoolController::class, 'storeSubjectForSchool'])->name('secondary-schools.subjects.store');
+        Route::get('/secondary-schools/{secondarySchool}/{section}/template', [SecondarySchoolController::class, 'structureTemplate'])->name('secondary-schools.structure.template');
+        Route::post('/secondary-schools/{secondarySchool}/{section}/import', [SecondarySchoolController::class, 'importStructure'])->name('secondary-schools.structure.import');
+    });
+
+    Route::middleware(['role:super_admin,organization_admin,professional_school_admin,examiner', 'permission:manageSchools'])->group(function (): void {
+        Route::get('/professional-schools', [ProfessionalSchoolController::class, 'index'])->name('professional-schools.index');
+        Route::get('/professional-schools/create', [ProfessionalSchoolController::class, 'create'])->name('professional-schools.create');
+        Route::post('/professional-schools', [ProfessionalSchoolController::class, 'store'])->name('professional-schools.store');
+        Route::get('/professional-schools/{professionalSchool}', [ProfessionalSchoolController::class, 'show'])->name('professional-schools.show');
+        Route::get('/professional-schools/{professionalSchool}/edit', [ProfessionalSchoolController::class, 'edit'])->name('professional-schools.edit');
+        Route::patch('/professional-schools/{professionalSchool}', [ProfessionalSchoolController::class, 'update'])->name('professional-schools.update');
+        Route::get('/professional-schools/{professionalSchool}/programmes', [ProfessionalSchoolController::class, 'programmes'])->name('professional-schools.programmes.index');
+        Route::post('/professional-schools/{professionalSchool}/programmes', [ProfessionalSchoolController::class, 'storeProgramme'])->name('professional-schools.programmes.store');
+        Route::get('/professional-schools/{professionalSchool}/courses', [ProfessionalSchoolController::class, 'courses'])->name('professional-schools.courses.index');
+        Route::post('/professional-schools/{professionalSchool}/courses', [ProfessionalSchoolController::class, 'storeCourse'])->name('professional-schools.courses.store');
+        Route::get('/professional-schools/{professionalSchool}/modules', [ProfessionalSchoolController::class, 'modules'])->name('professional-schools.modules.index');
+        Route::post('/professional-schools/{professionalSchool}/modules', [ProfessionalSchoolController::class, 'storeModule'])->name('professional-schools.modules.store');
+        Route::get('/professional-schools/{professionalSchool}/training-batches', [ProfessionalSchoolController::class, 'batches'])->name('professional-schools.training-batches.index');
+        Route::post('/professional-schools/{professionalSchool}/training-batches', [ProfessionalSchoolController::class, 'storeBatch'])->name('professional-schools.training-batches.store');
+        Route::patch('/professional-schools/{professionalSchool}/training-batches/{trainingBatch}', [ProfessionalSchoolController::class, 'updateBatch'])->name('professional-schools.training-batches.update');
+        Route::delete('/professional-schools/{professionalSchool}/training-batches/{trainingBatch}', [ProfessionalSchoolController::class, 'destroyBatch'])->name('professional-schools.training-batches.destroy');
+        Route::get('/professional-schools/{professionalSchool}/question-banks', [ProfessionalSchoolController::class, 'questionBanks'])->name('professional-schools.question-banks.index');
+        Route::post('/professional-schools/{professionalSchool}/question-banks', [ProfessionalSchoolController::class, 'storeQuestionBank'])->name('professional-schools.question-banks.store');
+        Route::get('/professional-schools/{professionalSchool}/questions', [ProfessionalSchoolController::class, 'questions'])->name('professional-schools.questions.index');
+        Route::get('/professional-schools/{professionalSchool}/questions/template', [ProfessionalSchoolController::class, 'questionTemplate'])->name('professional-schools.questions.template');
+        Route::post('/professional-schools/{professionalSchool}/questions/import', [ProfessionalSchoolController::class, 'importQuestions'])->name('professional-schools.questions.import');
+        Route::get('/professional-schools/{professionalSchool}/certificates', [ProfessionalSchoolController::class, 'certificates'])->name('professional-schools.certificates.index');
+        Route::get('/professional-schools/{professionalSchool}/candidates', [ProfessionalSchoolController::class, 'candidates'])->name('professional-schools.candidates.index');
+        Route::get('/professional-schools/{professionalSchool}/candidates/template', [ProfessionalSchoolController::class, 'candidateTemplate'])->name('professional-schools.candidates.template');
+        Route::post('/professional-schools/{professionalSchool}/candidates', [ProfessionalSchoolController::class, 'storeCandidate'])->name('professional-schools.candidates.store');
+        Route::post('/professional-schools/{professionalSchool}/candidates/import', [ProfessionalSchoolController::class, 'importCandidates'])->name('professional-schools.candidates.import');
+    });
+
     Route::middleware(['role:super_admin,organization_admin,examiner', 'permission:manageExams'])->group(function (): void {
         Route::get('/organizations/{organization}/candidates', [CandidateController::class, 'index'])->name('organizations.candidates.index');
         Route::get('/organizations/{organization}/candidates/create', [CandidateController::class, 'create'])->name('organizations.candidates.create');
@@ -119,6 +187,22 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
         Route::patch('/centers/{center}/deactivate', [CenterController::class, 'deactivate'])->name('centers.deactivate');
     });
 
+    Route::middleware(['role:super_admin,organization_admin,cbt_center_admin,examiner', 'permission:manageCenters'])->group(function (): void {
+        Route::get('/cbt-centers', [CbtCenterController::class, 'index'])->name('cbt-centers.index');
+        Route::get('/cbt-centers/create', [CbtCenterController::class, 'create'])->name('cbt-centers.create');
+        Route::post('/cbt-centers', [CbtCenterController::class, 'store'])->name('cbt-centers.store');
+        Route::get('/cbt-centers/{cbtCenter}', [CbtCenterController::class, 'show'])->name('cbt-centers.show');
+        Route::get('/cbt-centers/{cbtCenter}/edit', [CbtCenterController::class, 'edit'])->name('cbt-centers.edit');
+        Route::patch('/cbt-centers/{cbtCenter}', [CbtCenterController::class, 'update'])->name('cbt-centers.update');
+        Route::get('/cbt-centers/{cbtCenter}/candidates', [CbtCenterController::class, 'candidates'])->name('cbt-centers.candidates.index');
+        Route::post('/cbt-centers/{cbtCenter}/candidates', [CbtCenterController::class, 'storeCandidate'])->name('cbt-centers.candidates.store');
+        Route::get('/cbt-centers/{cbtCenter}/candidates/template', [CbtCenterController::class, 'candidatesTemplate'])->name('cbt-centers.candidates.template');
+        Route::post('/cbt-centers/{cbtCenter}/candidates/import', [CbtCenterController::class, 'importCandidates'])->name('cbt-centers.candidates.import');
+        Route::get('/cbt-centers/{cbtCenter}/question-banks', [CbtCenterController::class, 'questionBanks'])->name('cbt-centers.question-banks.index');
+        Route::post('/cbt-centers/{cbtCenter}/question-banks', [CbtCenterController::class, 'storeQuestionBank'])->name('cbt-centers.question-banks.store');
+        Route::post('/cbt-centers/{cbtCenter}/external-exams', [CbtCenterController::class, 'assignExternalExam'])->name('cbt-centers.external-exams.store');
+    });
+
     Route::middleware(['role:super_admin,school_admin', 'permission:manageSchools'])->group(function (): void {
         Route::get('/schools', [SchoolController::class, 'index'])->name('schools.index');
         Route::get('/schools/create', [SchoolController::class, 'create'])->name('schools.create');
@@ -141,7 +225,7 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
         ]))->name('settings.index');
     });
 
-    Route::middleware('role:super_admin,organization_admin,examiner,school_admin,center_admin,supervisor')->group(function (): void {
+    Route::middleware('role:super_admin,organization_admin,examiner,school_admin,secondary_school_admin,professional_school_admin,center_admin,cbt_center_admin,supervisor')->group(function (): void {
         Route::middleware('permission:manageQuestionBank')->group(function (): void {
             Route::get('/subjects/template', [SubjectController::class, 'template'])->name('subjects.template');
             Route::post('/subjects/import', [SubjectController::class, 'import'])->name('subjects.import');
@@ -200,30 +284,52 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
             Route::get('/exams/{exam}/professional', [ProfessionalExamController::class, 'show'])->name('exams.professional.show');
             Route::patch('/exams/{exam}/professional/settings', [ProfessionalExamController::class, 'updateSettings'])->name('exams.professional.settings');
             Route::post('/exams/{exam}/professional/templates', [ProfessionalExamController::class, 'storeTemplate'])->name('exams.professional.templates.store');
+            Route::post('/exams/{exam}/professional/templates/{template}', [ProfessionalExamController::class, 'updateTemplate'])->name('exams.professional.templates.update-post');
             Route::patch('/exams/{exam}/professional/templates/{template}', [ProfessionalExamController::class, 'updateTemplate'])->name('exams.professional.templates.update');
             Route::delete('/exams/{exam}/professional/templates/{template}', [ProfessionalExamController::class, 'destroyTemplate'])->name('exams.professional.templates.destroy');
             Route::patch('/exams/{exam}/professional/attempts/{attempt}/payment', [ProfessionalExamController::class, 'updatePayment'])->name('exams.professional.payment');
             Route::post('/exams/{exam}/professional/certificates', [ProfessionalExamController::class, 'generateCertificates'])->name('exams.professional.certificates.generate');
+            Route::get('/exams/{exam}/professional/certificates/{certificate}/download', [ProfessionalExamController::class, 'downloadCertificate'])->name('exams.professional.certificates.download');
             Route::post('/exams/{exam}/professional/attempts/{attempt}/certificate', [ProfessionalExamController::class, 'generateCertificate'])->name('exams.professional.certificate.generate');
             Route::get('/exams/{exam}/certification', [ProfessionalExamController::class, 'show'])->name('exams.certification.show');
             Route::patch('/exams/{exam}/certification/settings', [ProfessionalExamController::class, 'updateSettings'])->name('exams.certification.settings');
             Route::post('/exams/{exam}/certification/templates', [ProfessionalExamController::class, 'storeTemplate'])->name('exams.certification.templates.store');
+            Route::post('/exams/{exam}/certification/templates/{template}', [ProfessionalExamController::class, 'updateTemplate'])->name('exams.certification.templates.update-post');
             Route::patch('/exams/{exam}/certification/templates/{template}', [ProfessionalExamController::class, 'updateTemplate'])->name('exams.certification.templates.update');
             Route::delete('/exams/{exam}/certification/templates/{template}', [ProfessionalExamController::class, 'destroyTemplate'])->name('exams.certification.templates.destroy');
             Route::patch('/exams/{exam}/certification/attempts/{attempt}/payment', [ProfessionalExamController::class, 'updatePayment'])->name('exams.certification.payment');
             Route::post('/exams/{exam}/certification/certificates', [ProfessionalExamController::class, 'generateCertificates'])->name('exams.certification.certificates.generate');
+            Route::get('/exams/{exam}/certification/certificates/{certificate}/download', [ProfessionalExamController::class, 'downloadCertificate'])->name('exams.certification.certificates.download');
             Route::post('/exams/{exam}/certification/attempts/{attempt}/certificate', [ProfessionalExamController::class, 'generateCertificate'])->name('exams.certification.certificate.generate');
         });
 
         Route::middleware('permission:manageExams')->group(function (): void {
             Route::get('/secondary-school', [SecondarySchoolController::class, 'index'])->name('secondary-school.index');
+            Route::get('/secondary-school/academic-sessions', [SecondarySchoolController::class, 'legacyAcademicSessions'])->name('secondary-school.academic-sessions.index');
+            Route::post('/secondary-school/academic-sessions', [SecondarySchoolController::class, 'storeLegacyAcademicSession'])->name('secondary-school.academic-sessions.store');
+            Route::patch('/secondary-school/academic-sessions/{academicSession}', [SecondarySchoolController::class, 'updateLegacyAcademicSession'])->name('secondary-school.academic-sessions.update');
+            Route::delete('/secondary-school/academic-sessions/{academicSession}', [SecondarySchoolController::class, 'destroyLegacyAcademicSession'])->name('secondary-school.academic-sessions.destroy');
+            Route::patch('/secondary-school/academic-sessions/{academicSession}/active', [SecondarySchoolController::class, 'setActiveLegacyAcademicSession'])->name('secondary-school.academic-sessions.active');
+            Route::get('/secondary-school/terms', [SecondarySchoolController::class, 'legacyTerms'])->name('secondary-school.terms.index');
+            Route::post('/secondary-school/terms', [SecondarySchoolController::class, 'storeLegacyTerm'])->name('secondary-school.terms.store');
+            Route::patch('/secondary-school/terms/{academicTerm}', [SecondarySchoolController::class, 'updateLegacyTerm'])->name('secondary-school.terms.update');
+            Route::delete('/secondary-school/terms/{academicTerm}', [SecondarySchoolController::class, 'destroyLegacyTerm'])->name('secondary-school.terms.destroy');
+            Route::get('/secondary-school/classes', [SecondarySchoolController::class, 'legacyClasses'])->name('secondary-school.classes.index');
+            Route::post('/secondary-school/classes', [SecondarySchoolController::class, 'storeLegacyClass'])->name('secondary-school.classes.store');
+            Route::patch('/secondary-school/classes/{schoolClass}', [SecondarySchoolController::class, 'updateLegacyClass'])->name('secondary-school.classes.update');
+            Route::delete('/secondary-school/classes/{schoolClass}', [SecondarySchoolController::class, 'destroyLegacyClass'])->name('secondary-school.classes.destroy');
+            Route::get('/secondary-school/students', [SecondarySchoolController::class, 'legacyStudents'])->name('secondary-school.students.index');
+            Route::post('/secondary-school/students', [SecondarySchoolController::class, 'storeLegacyStudent'])->name('secondary-school.students.store');
+            Route::patch('/secondary-school/students/{student}', [SecondarySchoolController::class, 'updateLegacyStudent'])->name('secondary-school.students.update');
+            Route::delete('/secondary-school/students/{student}', [SecondarySchoolController::class, 'destroyLegacyStudent'])->name('secondary-school.students.destroy');
+            Route::get('/secondary-school/student-groups', [SecondarySchoolController::class, 'legacyStudentGroups'])->name('secondary-school.student-groups.index');
+            Route::post('/secondary-school/student-groups', [SecondarySchoolController::class, 'storeLegacyStudentGroup'])->name('secondary-school.student-groups.store');
+            Route::patch('/secondary-school/student-groups/{studentGroup}', [SecondarySchoolController::class, 'updateLegacyStudentGroup'])->name('secondary-school.student-groups.update');
+            Route::delete('/secondary-school/student-groups/{studentGroup}', [SecondarySchoolController::class, 'destroyLegacyStudentGroup'])->name('secondary-school.student-groups.destroy');
+            Route::get('/secondary-school/{section}/template', [SecondarySchoolController::class, 'legacyStructureTemplate'])->name('secondary-school.structure.template');
+            Route::post('/secondary-school/{section}/import', [SecondarySchoolController::class, 'importLegacyStructure'])->name('secondary-school.structure.import');
             Route::post('/secondary-school/sessions', [SecondarySchoolController::class, 'storeSession'])->name('secondary-school.sessions.store');
-            Route::post('/secondary-school/terms', [SecondarySchoolController::class, 'storeTerm'])->name('secondary-school.terms.store');
-            Route::post('/secondary-school/classes', [SecondarySchoolController::class, 'storeClass'])->name('secondary-school.classes.store');
             Route::post('/secondary-school/groups', [SecondarySchoolController::class, 'storeGroup'])->name('secondary-school.groups.store');
-            Route::patch('/secondary-school/exams/{exam}/ca-setup', [SecondarySchoolController::class, 'setupAssessment'])->name('secondary-school.ca-setup');
-            Route::post('/secondary-school/exams/{exam}/assessments', [SecondarySchoolController::class, 'storeAssessment'])->name('secondary-school.assessments.store');
-            Route::get('/secondary-school/exams/{exam}/candidates/{candidate}/report-card.pdf', [SecondarySchoolController::class, 'reportCard'])->name('secondary-school.report-card');
         });
 
         Route::get('/exams/{exam}/monitor', [ExamMonitorController::class, 'show'])->name('exams.monitor.show');
@@ -231,6 +337,7 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
         Route::get('/exams/{exam}/monitor/rows', [ExamMonitorController::class, 'rows'])->name('exams.monitor.rows');
         Route::get('/exams/{exam}/monitor/feed', [ExamMonitorController::class, 'feed'])->name('exams.monitor.feed');
         Route::get('/exams/{exam}/monitor/events', [ExamMonitorController::class, 'events'])->name('exams.monitor.events');
+        Route::post('/exams/{exam}/monitor/end', [ExamMonitorController::class, 'end'])->name('exams.monitor.end');
         Route::post('/exams/{exam}/monitor/attempts/{attempt}/reset', [ExamMonitorController::class, 'reset'])->name('exams.monitor.reset');
 
         Route::middleware('permission:manageExams')->group(function (): void {
@@ -240,6 +347,10 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
             Route::get('/candidates/assignments', [CandidateController::class, 'assignments'])->name('candidates.assignments');
             Route::post('/candidates/assign', [CandidateController::class, 'assign'])->name('candidates.assign');
             Route::delete('/exams/{exam}/candidates/{candidate}', [CandidateController::class, 'unassign'])->name('candidates.unassign');
+            Route::get('/candidate-groups', [CandidateGroupController::class, 'index'])->name('candidate-groups.index');
+            Route::post('/candidate-groups', [CandidateGroupController::class, 'store'])->name('candidate-groups.store');
+            Route::patch('/candidate-groups/{candidateGroup}', [CandidateGroupController::class, 'update'])->name('candidate-groups.update');
+            Route::delete('/candidate-groups/{candidateGroup}', [CandidateGroupController::class, 'destroy'])->name('candidate-groups.destroy');
             Route::get('/candidates', [CandidateController::class, 'index'])->name('candidates.index');
             Route::get('/candidates/create', [CandidateController::class, 'create'])->name('candidates.create');
             Route::post('/candidates', [CandidateController::class, 'store'])->name('candidates.store');
@@ -259,10 +370,10 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
         });
     });
 
-    Route::middleware('role:super_admin,organization_admin,examiner,supervisor,center_admin,school_admin')->group(function (): void {
+    Route::middleware(['role:super_admin,organization_admin,examiner,supervisor,center_admin,school_admin,secondary_school_admin,professional_school_admin,cbt_center_admin', 'permission:viewReports'])->group(function (): void {
         Route::get('/reports', fn () => Inertia::render('Portal/Placeholder', [
             'title' => 'Reports',
-        ]))->middleware('permission:viewReports')->name('reports.index');
+        ]))->name('reports.index');
     });
 
     Route::middleware('role:super_admin,supervisor,center_admin')->group(function (): void {

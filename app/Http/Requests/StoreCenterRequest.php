@@ -17,7 +17,7 @@ class StoreCenterRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'code' => ['required', 'string', 'max:50', 'alpha_dash', 'unique:centers,code'],
+            'code' => ['nullable', 'string', 'max:50', 'alpha_dash', 'unique:centers,code'],
             'location' => ['required', 'string', 'max:1000'],
             'capacity' => ['required', 'integer', 'min:1', 'max:100000'],
             'contact_person' => ['required', 'string', 'max:255'],

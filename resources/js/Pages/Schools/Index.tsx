@@ -38,7 +38,6 @@ export default function SchoolsIndex({ schools, can }: Props) {
                 emptyTitle="No schools found"
                 columns={[
                     { key: 'name', header: 'Name', render: (school) => <span className="font-semibold text-slateDark">{school.name}</span> },
-                    { key: 'code', header: 'Code' },
                     { key: 'location', header: 'Location' },
                     { key: 'capacity', header: 'Capacity', render: (school) => String(school.capacity) },
                     { key: 'contact_person', header: 'Contact Person' },

@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'exam_id',
     'subject_id',
+    'question_bank_id',
     'display_order',
     'duration_minutes',
     'total_marks',
@@ -42,5 +43,10 @@ class ExamSubject extends Model
     public function subject(): BelongsTo
     {
         return $this->belongsTo(Subject::class);
+    }
+
+    public function questionBank(): BelongsTo
+    {
+        return $this->belongsTo(QuestionBank::class);
     }
 }

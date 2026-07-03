@@ -6,10 +6,11 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['secondary_school_id', 'school_class_id', 'class_arm_id', 'candidate_id', 'admission_number', 'first_name', 'last_name', 'email', 'phone', 'date_of_birth', 'metadata', 'status'])]
+#[Fillable(['secondary_school_id', 'school_class_id', 'class_arm_id', 'candidate_id', 'admission_number', 'first_name', 'last_name', 'gender', 'email', 'phone', 'guardian_name', 'guardian_phone', 'photo', 'date_of_birth', 'metadata', 'status'])]
 class Student extends Model
 {
     use HasFactory, SoftDeletes;
@@ -45,5 +46,10 @@ class Student extends Model
     public function reportCards(): HasMany
     {
         return $this->hasMany(ReportCard::class);
+    }
+
+    public function studentGroups(): BelongsToMany
+    {
+        return $this->belongsToMany(StudentGroup::class, 'student_group_student')->withTimestamps();
     }
 }

@@ -37,7 +37,6 @@ export default function TopicsIndex({ topics, can }: Props) {
                 emptyTitle="No topics found"
                 columns={[
                     { key: 'name', header: 'Name', render: (topic) => <span className="font-semibold text-slateDark">{topic.name}</span> },
-                    { key: 'code', header: 'Code' },
                     { key: 'subject_name', header: 'Subject', render: (topic) => topic.subject_name ?? 'N/A' },
                     { key: 'parent_name', header: 'Parent', render: (topic) => topic.parent_name ?? 'None' },
                     { key: 'status', header: 'Status', render: (topic) => <StatusBadge label={topic.status_label} tone={topic.status === 'active' ? 'success' : 'neutral'} /> },

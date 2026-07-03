@@ -10,14 +10,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['school_id', 'secondary_school_id', 'name', 'code', 'starts_on', 'ends_on', 'status'])]
+#[Fillable(['school_id', 'secondary_school_id', 'name', 'code', 'starts_on', 'ends_on', 'status', 'is_active'])]
 class AcademicSession extends Model
 {
     use HasFactory, HasUlids, SoftDeletes;
 
     protected function casts(): array
     {
-        return ['starts_on' => 'date', 'ends_on' => 'date'];
+        return ['starts_on' => 'date', 'ends_on' => 'date', 'is_active' => 'boolean'];
     }
 
     public function school(): BelongsTo { return $this->belongsTo(School::class); }

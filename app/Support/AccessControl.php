@@ -34,7 +34,7 @@ class AccessControl
             ],
             User::ROLE_SECONDARY_SCHOOL_ADMIN => [
                 'label' => 'Secondary School Admin',
-                'description' => 'Manages one secondary school, academic structure, terminal exams, students, results, and report cards.',
+                'description' => 'Manages one secondary school, academic structure, exams, students, and results.',
             ],
             User::ROLE_PROFESSIONAL_SCHOOL_ADMIN => [
                 'label' => 'Professional School Admin',
@@ -127,6 +127,8 @@ class AccessControl
         return [
             User::ROLE_SUPER_ADMIN => array_keys(self::permissions()),
             User::ROLE_ORGANIZATION_ADMIN => [
+                'manageCenters',
+                'manageSchools',
                 'manageUsers',
                 'manageQuestionBank',
                 'manageExams',
@@ -158,6 +160,7 @@ class AccessControl
                 'manageQuestionBank',
                 'manageExams',
                 'viewReports',
+                'manageSettings',
             ],
             User::ROLE_PROFESSIONAL_SCHOOL_ADMIN => [
                 'manageSchools',

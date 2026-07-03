@@ -17,7 +17,7 @@ class StoreOrganizationRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'code' => ['required', 'string', 'max:50', 'alpha_dash', 'unique:organizations,code'],
+            'code' => ['nullable', 'string', 'max:50', 'alpha_dash', 'unique:organizations,code'],
             'organization_type' => ['nullable', Rule::in(Organization::TYPES)],
             'description' => ['nullable', 'string', 'max:5000'],
             'logo' => ['nullable', 'string', 'max:255'],

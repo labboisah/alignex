@@ -19,6 +19,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'center_id',
     'secondary_school_id',
     'professional_school_id',
+    'programme_id',
+    'course_id',
     'cbt_center_id',
     'training_batch_id',
     'student_id',
@@ -28,6 +30,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'last_name',
     'email',
     'phone',
+    'nin',
+    'photo',
     'date_of_birth',
     'metadata',
     'status',
@@ -76,6 +80,16 @@ class Candidate extends Model
     public function trainingBatch(): BelongsTo
     {
         return $this->belongsTo(TrainingBatch::class);
+    }
+
+    public function programme(): BelongsTo
+    {
+        return $this->belongsTo(Programme::class);
+    }
+
+    public function course(): BelongsTo
+    {
+        return $this->belongsTo(Course::class);
     }
 
     public function student(): BelongsTo

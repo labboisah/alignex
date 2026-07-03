@@ -1,5 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
-import { Search } from 'lucide-react';
+import { Download, Search } from 'lucide-react';
 import { FormEvent, useEffect, useState } from 'react';
 import { StatusBadge } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
@@ -21,6 +21,10 @@ type Certificate = {
     accent_color?: string | null;
     background_color?: string | null;
     use_logo_watermark?: boolean;
+    theme?: string | null;
+    paper_size?: string | null;
+    orientation?: string | null;
+    template_key?: string | null;
     issued_at?: string | null;
     expires_at?: string | null;
 };
@@ -59,7 +63,9 @@ export default function VerifyCertificate() {
             <Head title="Verify Certificate" />
             <section className="mx-auto max-w-3xl">
                 <div className="mb-8 flex items-center justify-between gap-3">
-                    <Link href="/" className="font-bold text-primary">AlignEx</Link>
+                    <Link href="/" className="inline-flex items-center">
+                        <img src="/images/logo.png" alt="AlignEx" className="h-12 w-12 object-contain" />
+                    </Link>
                     <Link href="/exam/login" className="text-sm font-semibold text-slate-600">Candidate Exam</Link>
                 </div>
                 <div className="rounded-md border border-border bg-white p-6 shadow-sm">
@@ -71,15 +77,19 @@ export default function VerifyCertificate() {
                     </form>
                     {valid === false && <div className="mt-5 rounded-md border border-red-200 bg-red-50 p-4 text-sm font-semibold text-danger">Certificate was not found or is not valid.</div>}
                     {certificate && (
-                        <div className="mt-6 overflow-hidden rounded-md border bg-white p-2" style={{ borderColor: certificate.primary_color ?? '#0F7A3A', backgroundColor: certificate.background_color ?? '#FFFFFF' }}>
+                        <div className="mt-6">
+                            <div className="mb-3 flex justify-end">
+                                <Button type="button" variant="secondary" onClick={() => window.print()}><Download className="h-4 w-4" />Download / Print</Button>
+                            </div>
+                        <div className="overflow-hidden rounded-md border bg-white p-2" style={{ borderColor: certificate.primary_color ?? '#0F7A3A', backgroundColor: certificate.background_color ?? '#FFFFFF' }}>
                             <div className="relative border p-5" style={{ borderColor: certificate.accent_color ?? '#F59E0B' }}>
-                                {certificate.logo_url && certificate.use_logo_watermark !== false && (
-                                    <img src={certificate.logo_url} alt="" className="pointer-events-none absolute left-1/2 top-1/2 h-52 w-52 -translate-x-1/2 -translate-y-1/2 object-contain opacity-10" />
+                                {(certificate.logo_url ?? '/images/logo.png') && certificate.use_logo_watermark !== false && (
+                                    <img src={certificate.logo_url ?? '/images/logo.png'} alt="" className="pointer-events-none absolute left-1/2 top-1/2 h-52 w-52 -translate-x-1/2 -translate-y-1/2 object-contain opacity-10" />
                                 )}
                                 <div className="relative">
                                     <div className="flex flex-wrap items-center justify-between gap-3">
                                         <div className="flex items-center gap-3">
-                                            {certificate.logo_url && <img src={certificate.logo_url} alt={certificate.institution_name ?? 'Institution'} className="h-12 w-12 object-contain" />}
+                                            <img src={certificate.logo_url ?? '/images/logo.png'} alt={certificate.institution_name ?? 'AlignEx'} className="h-12 w-12 object-contain" />
                                             <div>
                                                 <div className="text-sm font-semibold uppercase" style={{ color: certificate.primary_color ?? '#0F7A3A' }}>{certificate.institution_name ?? 'AlignEx'}</div>
                                                 <h2 className="mt-1 text-xl font-bold">{certificate.candidate_name}</h2>
@@ -101,6 +111,7 @@ export default function VerifyCertificate() {
                                     </div>
                                 </div>
                             </div>
+                        </div>
                         </div>
                     )}
                 </div>

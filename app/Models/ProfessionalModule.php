@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['professional_school_id', 'programme_id', 'course_id', 'name', 'code', 'description', 'status'])]
 class ProfessionalModule extends Model
@@ -30,5 +31,15 @@ class ProfessionalModule extends Model
     public function course(): BelongsTo
     {
         return $this->belongsTo(Course::class);
+    }
+
+    public function questionBanks(): HasMany
+    {
+        return $this->hasMany(QuestionBank::class, 'module_id');
+    }
+
+    public function exams(): HasMany
+    {
+        return $this->hasMany(Exam::class, 'module_id');
     }
 }

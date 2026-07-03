@@ -12,6 +12,7 @@ use App\Models\Question;
 use App\Models\QuestionBank;
 use App\Models\Subject;
 use App\Models\Topic;
+use App\Services\CurrentContextService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -30,7 +31,7 @@ class QuestionController extends Controller
         return Inertia::render('Questions/Index', [
             'questions' => QuestionResource::collection(
                 $this->scopedQuestions($request)
-                    ->with(['questionBank', 'subject', 'topic', 'options'])
+                    ->with(['questionBank.course', 'questionBank.module', 'subject', 'topic', 'options'])
                     ->latest()
                     ->get()
             ),
@@ -55,15 +56,15 @@ class QuestionController extends Controller
         $data = $request->validated();
         $questionBank = $this->authorizedQuestionBank($request, $data['question_bank_id']);
         $this->ensureSubjectMatchesQuestionBank($data['subject_id'], $questionBank);
-        $this->ensureTopicBelongsToSubject($request, $data['topic_id'] ?? null, $data['subject_id']);
+        $topicId = $this->topicIdForQuestion($request, $data['topic_id'] ?? null, $data['subject_id']);
 
-        DB::transaction(function () use ($request, $data): void {
+        $question = DB::transaction(function () use ($request, $data, $topicId): Question {
             $imagePath = $request->file('image')?->store('question-images', 'public');
 
             $question = Question::create([
                 'question_bank_id' => $data['question_bank_id'],
                 'subject_id' => $data['subject_id'],
-                'topic_id' => $data['topic_id'] ?? null,
+                'topic_id' => $topicId,
                 'created_by' => $request->user()->id,
                 'question_type' => Question::TYPE_SINGLE_CHOICE,
                 'stem' => $data['stem'],
@@ -75,9 +76,11 @@ class QuestionController extends Controller
             ]);
 
             $this->syncOptions($question, $data['options']);
+
+            return $question;
         });
 
-        return redirect()->route('questions.index')->with('success', 'Question created.');
+        return redirect()->route('questions.edit', $question)->with('success', 'Question created. You can continue editing it here.');
     }
 
     public function show(Request $request, Question $question): Response
@@ -85,7 +88,7 @@ class QuestionController extends Controller
         Gate::authorize('view', $question);
 
         return Inertia::render('Questions/Show', [
-            'question' => QuestionResource::make($question->load(['questionBank', 'subject', 'topic', 'options'])),
+            'question' => QuestionResource::make($question->load(['questionBank.course', 'questionBank.module', 'subject', 'topic', 'options'])),
             'can' => [
                 'update' => $request->user()->can('update', $question),
                 'delete' => $request->user()->can('delete', $question),
@@ -98,7 +101,7 @@ class QuestionController extends Controller
         Gate::authorize('update', $question);
 
         return Inertia::render('Questions/Edit', [
-            'question' => QuestionResource::make($question->load(['questionBank', 'subject', 'topic', 'options'])),
+            'question' => QuestionResource::make($question->load(['questionBank.course', 'questionBank.module', 'subject', 'topic', 'options'])),
             ...$this->formOptions($request),
         ]);
     }
@@ -108,9 +111,9 @@ class QuestionController extends Controller
         $data = $request->validated();
         $questionBank = $this->authorizedQuestionBank($request, $data['question_bank_id']);
         $this->ensureSubjectMatchesQuestionBank($data['subject_id'], $questionBank);
-        $this->ensureTopicBelongsToSubject($request, $data['topic_id'] ?? null, $data['subject_id']);
+        $topicId = $this->topicIdForQuestion($request, $data['topic_id'] ?? null, $data['subject_id']);
 
-        DB::transaction(function () use ($request, $question, $data): void {
+        DB::transaction(function () use ($request, $question, $data, $topicId): void {
             $imagePath = $question->image_path;
 
             if ($request->boolean('remove_image') && $imagePath) {
@@ -129,7 +132,7 @@ class QuestionController extends Controller
             $question->update([
                 'question_bank_id' => $data['question_bank_id'],
                 'subject_id' => $data['subject_id'],
-                'topic_id' => $data['topic_id'] ?? null,
+                'topic_id' => $topicId,
                 'stem' => $data['stem'],
                 'image_path' => $imagePath,
                 'explanation' => $data['explanation'] ?? null,
@@ -156,7 +159,7 @@ class QuestionController extends Controller
             $question->delete();
         });
 
-        return redirect()->route('questions.index')->with('success', 'Question deleted.');
+        return back()->with('success', 'Question deleted.');
     }
 
     public function template()
@@ -182,19 +185,19 @@ class QuestionController extends Controller
 
         $questionBank = $this->authorizedQuestionBank($request, $request->string('question_bank_id')->toString());
         $this->ensureSubjectMatchesQuestionBank($request->string('subject_id')->toString(), $questionBank);
-        $this->ensureTopicBelongsToSubject($request, $request->input('topic_id'), $request->string('subject_id')->toString());
+        $topicId = $this->topicIdForQuestion($request, $request->input('topic_id'), $request->string('subject_id')->toString());
 
         $rows = $this->csvRows($request->file('file')->getRealPath());
         $created = 0;
 
-        DB::transaction(function () use ($request, $rows, $questionBank, &$created): void {
+        DB::transaction(function () use ($request, $rows, $questionBank, $topicId, &$created): void {
             foreach ($rows as $index => $row) {
                 $correctAnswer = strtoupper(trim($row['correct_answer'] ?? ''));
 
                 $data = [
                     'question_bank_id' => $questionBank->id,
                     'subject_id' => $questionBank->subject_id,
-                    'topic_id' => $request->input('topic_id') ?: null,
+                    'topic_id' => $topicId,
                     'difficulty' => trim($row['difficulty'] ?? 'medium') ?: 'medium',
                     'marks' => trim($row['marks'] ?? '1') ?: '1',
                     'stem' => trim($row['question_text'] ?? ''),
@@ -269,11 +272,43 @@ class QuestionController extends Controller
     private function applyQuestionBankScope($query, Request $request): void
     {
         $user = $request->user();
+        $context = app(CurrentContextService::class)->current($user);
+
+        if (($context['type'] ?? null) === 'organization') {
+            $query
+                ->where('organization_id', $context['id'])
+                ->whereNull('secondary_school_id')
+                ->whereNull('professional_school_id')
+                ->whereNull('cbt_center_id');
+
+            return;
+        }
+
+        if (($context['type'] ?? null) === 'secondary_school') {
+            $query->where('secondary_school_id', $context['id']);
+
+            return;
+        }
+
+        if (($context['type'] ?? null) === 'professional_school') {
+            $query->where('professional_school_id', $context['id']);
+
+            return;
+        }
+
+        if (($context['type'] ?? null) === 'cbt_center') {
+            $query->where('cbt_center_id', $context['id']);
+
+            return;
+        }
 
         $query
             ->when(! $user->isSuperAdmin() && $user->organization_id, fn ($bankQuery) => $bankQuery->where('organization_id', $user->organization_id))
             ->when(! $user->isSuperAdmin() && $user->school_id, fn ($bankQuery) => $bankQuery->where('school_id', $user->school_id))
-            ->when(! $user->isSuperAdmin() && $user->center_id, fn ($bankQuery) => $bankQuery->where('center_id', $user->center_id));
+            ->when(! $user->isSuperAdmin() && $user->center_id, fn ($bankQuery) => $bankQuery->where('center_id', $user->center_id))
+            ->when(! $user->isSuperAdmin() && $user->secondary_school_id, fn ($bankQuery) => $bankQuery->where('secondary_school_id', $user->secondary_school_id))
+            ->when(! $user->isSuperAdmin() && $user->professional_school_id, fn ($bankQuery) => $bankQuery->where('professional_school_id', $user->professional_school_id))
+            ->when(! $user->isSuperAdmin() && $user->cbt_center_id, fn ($bankQuery) => $bankQuery->where('cbt_center_id', $user->cbt_center_id));
     }
 
     private function authorizedQuestionBank(Request $request, string $questionBankId): QuestionBank
@@ -308,6 +343,29 @@ class QuestionController extends Controller
         if (! $topic) {
             throw ValidationException::withMessages(['topic_id' => 'Choose a topic under the selected subject.']);
         }
+    }
+
+    private function topicIdForQuestion(Request $request, ?string $topicId, string $subjectId): ?string
+    {
+        if ($this->isSecondaryContext($request)) {
+            if (filled($topicId)) {
+                throw ValidationException::withMessages(['topic_id' => 'Secondary school questions do not use topics. Choose only class, subject, bank, and question.']);
+            }
+
+            return null;
+        }
+
+        $this->ensureTopicBelongsToSubject($request, $topicId, $subjectId);
+
+        return filled($topicId) ? $topicId : null;
+    }
+
+    private function isSecondaryContext(Request $request): bool
+    {
+        $context = app(CurrentContextService::class)->current($request->user());
+
+        return ($context['type'] ?? null) === 'secondary_school'
+            || $request->user()?->secondary_school_id !== null;
     }
 
     private function syncOptions(Question $question, array $options): void
@@ -351,14 +409,18 @@ class QuestionController extends Controller
     {
         return [
             'questionBanks' => QuestionBankResource::collection(
-                $this->scopedQuestionBanks($request)->with('subject')->orderBy('name')->get()
+                $this->scopedQuestionBanks($request)
+                    ->whereNotNull('subject_id')
+                    ->with(['subject', 'course', 'module'])
+                    ->orderBy('name')
+                    ->get()
             ),
             'subjects' => SubjectResource::collection(
                 $this->scopedSubjects($request)->orderBy('name')->get()
             ),
-            'topics' => TopicResource::collection(
-                $this->scopedTopics($request)->with('subject')->orderBy('name')->get()
-            ),
+            'topics' => $this->isSecondaryContext($request)
+                ? ['data' => []]
+                : TopicResource::collection($this->scopedTopics($request)->with('subject')->orderBy('name')->get()),
             'difficulties' => [
                 ['value' => 'easy', 'label' => 'Easy'],
                 ['value' => 'medium', 'label' => 'Medium'],

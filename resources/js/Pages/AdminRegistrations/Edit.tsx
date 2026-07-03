@@ -6,7 +6,7 @@ import { Button } from '@/Components/ui/button';
 import { AdminRegistration, EntityType } from './types';
 
 type FormData = {
-    entity_type: 'organization' | 'school' | 'center';
+    entity_type: AdminRegistration['entity_type'];
     admin_name: string;
     admin_email: string;
     entity_name: string;
@@ -218,8 +218,20 @@ function typeLabel(type: FormData['entity_type']) {
         return 'School';
     }
 
+    if (type === 'secondary_school') {
+        return 'Secondary School';
+    }
+
     if (type === 'center') {
         return 'Center';
+    }
+
+    if (type === 'professional_school') {
+        return 'Professional School';
+    }
+
+    if (type === 'cbt_center') {
+        return 'CBT Center';
     }
 
     return 'Organization';

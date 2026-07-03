@@ -13,6 +13,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
     'candidate_id',
+    'exam_participant_id',
+    'participant_type',
+    'participant_id',
     'exam_id',
     'exam_session_id',
     'center_id',
@@ -31,6 +34,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'score',
     'total_questions',
     'total_marks',
+    'percentage',
+    'grade',
+    'duration_used_seconds',
+    'suspicious_event_count',
+    'certificate_eligible',
     'result_status',
     'result_hash',
     'device_fingerprint_hash',
@@ -65,6 +73,10 @@ class CandidateExamAttempt extends Model
             'score' => 'decimal:2',
             'total_questions' => 'integer',
             'total_marks' => 'decimal:2',
+            'percentage' => 'decimal:2',
+            'duration_used_seconds' => 'integer',
+            'suspicious_event_count' => 'integer',
+            'certificate_eligible' => 'boolean',
         ];
     }
 
@@ -76,6 +88,11 @@ class CandidateExamAttempt extends Model
     public function exam(): BelongsTo
     {
         return $this->belongsTo(Exam::class);
+    }
+
+    public function examParticipant(): BelongsTo
+    {
+        return $this->belongsTo(ExamParticipant::class);
     }
 
     public function examSession(): BelongsTo

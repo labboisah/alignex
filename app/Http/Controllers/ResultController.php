@@ -261,7 +261,10 @@ class ResultController extends Controller
                     $inner->whereRaw('1 = 0')
                         ->when($user->organization_id, fn ($scope) => $scope->orWhere('organization_id', $user->organization_id))
                         ->when($user->school_id, fn ($scope) => $scope->orWhere('school_id', $user->school_id))
-                        ->when($user->center_id, fn ($scope) => $scope->orWhere('center_id', $user->center_id));
+                        ->when($user->center_id, fn ($scope) => $scope->orWhere('center_id', $user->center_id))
+                        ->when($user->secondary_school_id, fn ($scope) => $scope->orWhere('secondary_school_id', $user->secondary_school_id))
+                        ->when($user->professional_school_id, fn ($scope) => $scope->orWhere('professional_school_id', $user->professional_school_id))
+                        ->when($user->cbt_center_id, fn ($scope) => $scope->orWhere('cbt_center_id', $user->cbt_center_id));
                 });
             });
     }

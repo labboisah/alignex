@@ -221,6 +221,8 @@ class OrganizationModuleTest extends TestCase
         $organization = Organization::factory()->create();
         $admin = $this->organizationAdmin($organization);
         $subject = Subject::factory()->create(['organization_id' => $organization->id, 'school_id' => null, 'center_id' => null]);
+        $bank = QuestionBank::factory()->create(['organization_id' => $organization->id, 'subject_id' => $subject->id, 'school_id' => null, 'center_id' => null]);
+        $candidate = Candidate::factory()->create(['organization_id' => $organization->id, 'school_id' => null, 'center_id' => null]);
 
         foreach ([
             ['code' => 'REC-001', 'category' => Exam::CATEGORY_RECRUITMENT, 'mode' => Exam::MODE_TRADITIONAL],
@@ -229,7 +231,10 @@ class OrganizationModuleTest extends TestCase
             ['code' => 'ADP-001', 'category' => Exam::CATEGORY_ASSESSMENT, 'mode' => Exam::MODE_ADAPTIVE],
         ] as $row) {
             $this->actingAs($admin)
-                ->post('/exams', $this->examPayload($subject->id, $row['code'], $row['category'], $row['mode']))
+                ->post('/exams', $this->examPayload($subject->id, $row['code'], $row['category'], $row['mode'], [
+                    'question_bank_id' => $bank->id,
+                    'candidate_ids' => [$candidate->id],
+                ]))
                 ->assertRedirect();
         }
 
@@ -244,10 +249,15 @@ class OrganizationModuleTest extends TestCase
         $organization = Organization::factory()->create();
         $admin = $this->organizationAdmin($organization);
         $subject = Subject::factory()->create(['organization_id' => $organization->id, 'school_id' => null, 'center_id' => null]);
+        $bank = QuestionBank::factory()->create(['organization_id' => $organization->id, 'subject_id' => $subject->id, 'school_id' => null, 'center_id' => null]);
+        $candidate = Candidate::factory()->create(['organization_id' => $organization->id, 'school_id' => null, 'center_id' => null]);
 
         $this->actingAs($admin)
             ->post('/exams', [
-                ...$this->examPayload($subject->id, 'BAD-001', Exam::CATEGORY_RECRUITMENT),
+                ...$this->examPayload($subject->id, 'BAD-001', Exam::CATEGORY_RECRUITMENT, Exam::MODE_TRADITIONAL, [
+                    'question_bank_id' => $bank->id,
+                    'candidate_ids' => [$candidate->id],
+                ]),
                 'academic_session_id' => '01J00000000000000000000000',
                 'term_id' => 'term-1',
                 'school_class_id' => '01J00000000000000000000001',
@@ -257,6 +267,17 @@ class OrganizationModuleTest extends TestCase
                 'training_batch_id' => 1,
             ])
             ->assertSessionHasErrors(['academic_session_id', 'term_id', 'school_class_id', 'programme_id', 'course_id', 'module_id', 'training_batch_id']);
+    }
+
+    public function test_organization_exam_requires_question_bank_and_candidates(): void
+    {
+        $organization = Organization::factory()->create();
+        $admin = $this->organizationAdmin($organization);
+        $subject = Subject::factory()->create(['organization_id' => $organization->id, 'school_id' => null, 'center_id' => null]);
+
+        $this->actingAs($admin)
+            ->post('/exams', $this->examPayload($subject->id, 'ORG-NO-PARTS', Exam::CATEGORY_RECRUITMENT))
+            ->assertSessionHasErrors(['question_bank_id', 'candidate_ids']);
     }
 
     public function test_organization_dashboard_returns_organization_metrics(): void
@@ -274,7 +295,7 @@ class OrganizationModuleTest extends TestCase
             ->get('/dashboard')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('Dashboard')
+                ->component('Dashboard/Index')
                 ->where('role.scope', 'Organization scope')
                 ->has('organization_charts.exams_by_category')
                 ->where('quick_actions.0.label', 'Create Recruitment Exam')
@@ -309,9 +330,9 @@ class OrganizationModuleTest extends TestCase
         ]);
     }
 
-    private function examPayload(string $subjectId, string $code, string $category, string $mode = Exam::MODE_TRADITIONAL): array
+    private function examPayload(string $subjectId, string $code, string $category, string $mode = Exam::MODE_TRADITIONAL, array $overrides = []): array
     {
-        return [
+        return array_replace_recursive([
             'title' => 'Organization Exam '.$code,
             'exam_code' => $code,
             'exam_type' => $category === Exam::CATEGORY_PROFESSIONAL ? 'professional' : 'recruitment',
@@ -345,6 +366,6 @@ class OrganizationModuleTest extends TestCase
                 'bind_device' => false,
                 'allow_retake' => false,
             ],
-        ];
+        ], $overrides);
     }
 }

@@ -1,5 +1,5 @@
 import { Head } from '@inertiajs/react';
-import { Activity, AlertTriangle, CheckCircle2, Clock, LogIn, RefreshCw, RotateCcw, Users, WifiOff } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle2, LogIn, RefreshCw, RotateCcw, StopCircle, Users, WifiOff } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { PageHeader, PortalAppShell, StatusBadge } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
@@ -80,6 +80,7 @@ export default function ExamMonitorShow({ exam, summary: initialSummary, rows: i
     const [loading, setLoading] = useState(false);
     const [flaggedOnly, setFlaggedOnly] = useState(false);
     const [resetting, setResetting] = useState<string | null>(null);
+    const [ending, setEnding] = useState(false);
 
     const refresh = async () => {
         setLoading(true);
@@ -157,6 +158,23 @@ export default function ExamMonitorShow({ exam, summary: initialSummary, rows: i
         }
     };
 
+    const endExam = async () => {
+        if (!window.confirm('End this exam now? Active attempts will be auto-submitted.')) {
+            return;
+        }
+
+        setEnding(true);
+
+        try {
+            const payload = await postJson<{ summary: Summary; rows: CandidateRow[]; feed: FeedItem[] }>(`/exams/${exam.id}/monitor/end`, {});
+            setSummary(payload.summary);
+            setRows(payload.rows);
+            setFeed(payload.feed);
+        } finally {
+            setEnding(false);
+        }
+    };
+
     return (
         <PortalAppShell title="Exam Monitor">
             <Head title={`${exam.title} Monitor`} />
@@ -165,7 +183,7 @@ export default function ExamMonitorShow({ exam, summary: initialSummary, rows: i
                     eyebrow="Supervisor Dashboard"
                     title={exam.title}
                     description={`${exam.exam_code} | ${liveStatus}`}
-                    actions={<Button type="button" variant="secondary" onClick={refresh} disabled={loading}><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh</Button>}
+                    actions={<div className="flex flex-wrap gap-2"><Button type="button" variant="danger" onClick={endExam} disabled={ending}><StopCircle className="h-4 w-4" />End Exam</Button><Button type="button" variant="secondary" onClick={refresh} disabled={loading}><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh</Button></div>}
                 />
                 <div className="grid gap-4 md:grid-cols-4 xl:grid-cols-7">
                     <Metric label="Total Candidates" value={summary.total_candidates} icon={Users} />
@@ -257,7 +275,7 @@ export default function ExamMonitorShow({ exam, summary: initialSummary, rows: i
                                         <td className="font-semibold text-slateDark">{event.candidate_name ?? 'N/A'}</td>
                                         <td>{event.registration_number ?? 'N/A'}</td>
                                         <td>{event.event_type.replaceAll('_', ' ')}</td>
-                                        <td><StatusBadge label={event.severity} tone={event.severity === 'critical' ? 'danger' : 'warning'} /></td>
+                                        <td><StatusBadge label={event.severity} tone={event.severity === 'critical' ? 'danger' : event.severity === 'info' ? 'neutral' : 'warning'} /></td>
                                         <td>
                                             {event.snapshot_url ? (
                                                 <a href={event.snapshot_url} target="_blank" rel="noreferrer" className="inline-block">

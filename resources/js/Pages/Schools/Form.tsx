@@ -63,9 +63,6 @@ export function SchoolForm({ school, statuses, submitLabel }: { school?: School;
                     <Field label="Name" error={errors.name}>
                         <input className={inputClass} value={data.name} onChange={(event) => setData('name', event.target.value)} required />
                     </Field>
-                    <Field label="Code" error={errors.code}>
-                        <input className={inputClass} value={data.code} onChange={(event) => setData('code', event.target.value)} required />
-                    </Field>
                     <Field label="Capacity" error={errors.capacity}>
                         <input className={inputClass} type="number" min="1" value={data.capacity} onChange={(event) => setData('capacity', event.target.value)} required />
                     </Field>

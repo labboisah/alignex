@@ -6,6 +6,7 @@ use App\Http\Requests\StoreCenterRequest;
 use App\Http\Requests\UpdateCenterRequest;
 use App\Http\Resources\CenterResource;
 use App\Models\Center;
+use App\Support\ReferenceCode;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -41,7 +42,9 @@ class CenterController extends Controller
 
     public function store(StoreCenterRequest $request): RedirectResponse
     {
-        $center = Center::create($request->validated());
+        $data = $request->validated();
+        $data['code'] = filled($data['code'] ?? null) ? strtoupper($data['code']) : ReferenceCode::unique($data['name'], Center::query());
+        $center = Center::create($data);
 
         return redirect()
             ->route('centers.show', $center)
@@ -73,7 +76,9 @@ class CenterController extends Controller
 
     public function update(UpdateCenterRequest $request, Center $center): RedirectResponse
     {
-        $center->update($request->validated());
+        $data = $request->validated();
+        $data['code'] = filled($data['code'] ?? null) ? strtoupper($data['code']) : ReferenceCode::unique($data['name'], Center::query(), $center);
+        $center->update($data);
 
         return redirect()
             ->route('centers.show', $center)

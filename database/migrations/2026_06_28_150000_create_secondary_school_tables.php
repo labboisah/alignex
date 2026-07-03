@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('academic_sessions', function (Blueprint $table): void {
             $table->ulid('id')->primary();
-            $table->foreignId('school_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('school_id')->nullable()->constrained()->nullOnDelete();
             $table->string('name');
             $table->string('code');
             $table->date('starts_on')->nullable();
@@ -38,7 +38,7 @@ return new class extends Migration
 
         Schema::create('school_classes', function (Blueprint $table): void {
             $table->ulid('id')->primary();
-            $table->foreignId('school_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('school_id')->nullable()->constrained()->nullOnDelete();
             $table->string('name');
             $table->string('code');
             $table->unsignedSmallInteger('level_order')->default(1);

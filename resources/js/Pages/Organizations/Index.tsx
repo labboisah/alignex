@@ -38,7 +38,6 @@ export default function OrganizationsIndex({ organizations, can }: Props) {
                 emptyTitle="No organizations found"
                 columns={[
                     { key: 'name', header: 'Name', render: (organization) => <span className="font-semibold text-slateDark">{organization.name}</span> },
-                    { key: 'code', header: 'Code' },
                     { key: 'organization_type', header: 'Organization Type', render: (organization) => organization.organization_type_label || 'N/A' },
                     { key: 'contact_person', header: 'Contact Person' },
                     { key: 'email', header: 'Email' },

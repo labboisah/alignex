@@ -22,7 +22,9 @@ class AdminRegistrationTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('AdminRegistrations/Create')
-                ->has('entityTypes', 3)
+                ->has('entityTypes', 4)
+                ->where('entityTypes.1.value', AdminRegistrationRequest::TYPE_SECONDARY_SCHOOL)
+                ->where('entityTypes.2.value', AdminRegistrationRequest::TYPE_PROFESSIONAL_SCHOOL)
             );
 
         $this->post('/register-admin', [

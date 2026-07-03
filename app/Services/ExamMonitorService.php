@@ -105,7 +105,7 @@ class ExamMonitorService
             ->get()
             ->map(fn ($event) => [
                 'id' => 'event-'.$event->id,
-                'type' => 'suspicious',
+                'type' => $event->event_type === 'webcam_heartbeat' ? 'webcam' : 'suspicious',
                 'candidate_name' => $event->candidate ? trim($event->candidate->first_name.' '.$event->candidate->last_name) : null,
                 'registration_number' => $event->candidate?->candidate_number,
                 'message' => str($event->event_type)->replace('_', ' ')->headline()->toString(),

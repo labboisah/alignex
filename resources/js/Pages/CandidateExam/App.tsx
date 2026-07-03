@@ -116,6 +116,7 @@ function CandidateLoginPage() {
             <div className="mx-auto flex min-h-screen max-w-md items-center px-4">
                 <form onSubmit={submit} className="w-full rounded-md border border-border bg-white p-6 shadow-sm">
                     <div className="mb-6">
+                        <img src="/images/logo.png" alt="AlignEx" className="mb-4 h-16 w-16 object-contain" />
                         <div className="text-sm font-semibold uppercase text-primary">Candidate Exam</div>
                         <h1 className="mt-1 text-2xl font-bold text-slateDark">Login</h1>
                     </div>
@@ -196,6 +197,7 @@ function ExamInstructionsPage() {
         <CandidateShell>
             <div className="mx-auto max-w-3xl px-4 py-10">
                 <div className="rounded-md border border-border bg-white p-6 shadow-sm">
+                    <img src="/images/logo.png" alt="AlignEx" className="mb-5 h-14 w-14 object-contain" />
                     <div className="text-sm font-semibold uppercase text-primary">{payload.exam.exam_code}</div>
                     <h1 className="mt-1 text-2xl font-bold text-slateDark">{payload.exam.title}</h1>
                     <div className="mt-4 grid gap-3 text-sm text-slate-600 md:grid-cols-2">
@@ -411,8 +413,10 @@ function ExamScreenPage() {
 
         lastEventAt.current[eventType] = now;
         const snapshot = captureVideoFrame(videoRef.current);
-        const prettyEvent = eventType.replaceAll('_', ' ');
-        setWarning(`${prettyEvent} detected. The supervisor has been notified.`);
+        if (eventType !== 'webcam_heartbeat') {
+            const prettyEvent = eventType.replaceAll('_', ' ');
+            setWarning(`${prettyEvent} detected. The supervisor has been notified.`);
+        }
 
         try {
             const response = await api<{ disqualified?: boolean }>('/api/candidate/event', {
@@ -438,6 +442,20 @@ function ExamScreenPage() {
             setWarning('A monitoring event could not sync. Keep working while the system retries normal answer saves.');
         }
     };
+
+    useEffect(() => {
+        if (!payload.exam.settings.require_webcam) {
+            return;
+        }
+
+        const timer = window.setInterval(() => {
+            if (webcamStreamRef.current && !submittedRef.current) {
+                reportProctoringEvent('webcam_heartbeat', { severity: 'info' });
+            }
+        }, 30000);
+
+        return () => window.clearInterval(timer);
+    }, [payload.exam.settings.require_webcam, current?.question_id, currentIndex]);
 
     const selectOption = (optionId: string) => {
         const answer = {
@@ -641,8 +659,13 @@ function ExamScreenPage() {
                 <div className="sticky top-0 z-10 border-b border-border bg-white px-4 py-3 shadow-sm">
                     <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
                         <div>
-                            <div className="font-bold text-slateDark">{payload.candidate.full_name}</div>
-                            <div className="text-xs text-slate-500">{payload.candidate.registration_number} | {payload.exam.title}</div>
+                            <div className="flex items-center gap-3">
+                                <img src="/images/logo.png" alt="AlignEx" className="h-10 w-10 object-contain" />
+                                <div>
+                                    <div className="font-bold text-slateDark">{payload.candidate.full_name}</div>
+                                    <div className="text-xs text-slate-500">{payload.candidate.registration_number} | {payload.exam.title}</div>
+                                </div>
+                            </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-3 text-sm font-semibold">
                             <span className="inline-flex items-center gap-1 text-slateDark"><Clock className="h-4 w-4" />{formatTime(remaining)}</span>
@@ -762,6 +785,7 @@ function SimpleScreen({ title, message, tone }: { title: string; message: string
         <CandidateShell>
             <div className="mx-auto flex min-h-screen max-w-lg items-center px-4">
                 <div className="w-full rounded-md border border-border bg-white p-6 text-center shadow-sm">
+                    <img src="/images/logo.png" alt="AlignEx" className="mx-auto mb-4 h-16 w-16 object-contain" />
                     {tone === 'success' ? <CheckCircle2 className="mx-auto h-12 w-12 text-success" /> : <AlertTriangle className="mx-auto h-12 w-12 text-danger" />}
                     <h1 className="mt-4 text-2xl font-bold text-slateDark">{title}</h1>
                     <p className="mt-2 text-sm text-slate-600">{message}</p>

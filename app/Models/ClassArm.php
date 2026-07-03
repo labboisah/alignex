@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['secondary_school_id', 'school_class_id', 'name', 'code', 'status'])]
+#[Fillable(['school_id', 'secondary_school_id', 'school_class_id', 'name', 'code', 'class_teacher_id', 'status'])]
 class ClassArm extends Model
 {
     use HasFactory;
@@ -26,5 +26,10 @@ class ClassArm extends Model
     public function students(): HasMany
     {
         return $this->hasMany(Student::class);
+    }
+
+    public function classTeacher(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'class_teacher_id');
     }
 }

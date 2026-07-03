@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Exam;
 use App\Models\Organization;
+use App\Models\Candidate;
+use App\Models\QuestionBank;
 use App\Models\Subject;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -26,8 +28,22 @@ class ExamModuleTest extends TestCase
             'school_id' => null,
             'center_id' => null,
         ]);
+        $bank = QuestionBank::factory()->create([
+            'organization_id' => $organization->id,
+            'subject_id' => $subject->id,
+            'school_id' => null,
+            'center_id' => null,
+        ]);
+        $candidate = Candidate::factory()->create([
+            'organization_id' => $organization->id,
+            'school_id' => null,
+            'center_id' => null,
+        ]);
 
-        $payload = $this->payload($subject->id);
+        $payload = $this->payload($subject->id, [
+            'question_bank_id' => $bank->id,
+            'candidate_ids' => [$candidate->id],
+        ]);
 
         $this->actingAs($admin)
             ->post('/exams', $payload)
@@ -59,6 +75,8 @@ class ExamModuleTest extends TestCase
             'title' => 'Updated Exam',
             'exam_code' => 'TERM-002',
             'pass_mark' => 30,
+            'question_bank_id' => $bank->id,
+            'candidate_ids' => [$candidate->id],
             'subjects' => [
                 [
                     'subject_id' => $subject->id,
@@ -97,9 +115,22 @@ class ExamModuleTest extends TestCase
             'school_id' => null,
             'center_id' => null,
         ]);
+        $bank = QuestionBank::factory()->create([
+            'organization_id' => $ownOrganization->id,
+            'school_id' => null,
+            'center_id' => null,
+        ]);
+        $candidate = Candidate::factory()->create([
+            'organization_id' => $ownOrganization->id,
+            'school_id' => null,
+            'center_id' => null,
+        ]);
 
         $this->actingAs($admin)
-            ->post('/exams', $this->payload($outsideSubject->id))
+            ->post('/exams', $this->payload($outsideSubject->id, [
+                'question_bank_id' => $bank->id,
+                'candidate_ids' => [$candidate->id],
+            ]))
             ->assertSessionHasErrors('subjects');
     }
 

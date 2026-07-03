@@ -3,9 +3,9 @@ import { ArrowLeft, Download, Eye, Pencil, Plus, Trash2, Upload, UserCircle2, Us
 import { FormEvent } from 'react';
 import { ActionDropdown, AlertBanner, DataTable, PageHeader, PortalAppShell, ProtectedAction, StatusBadge } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
-import { Candidate, ExamOption, ImportReport } from './types';
+import { Candidate, CandidateGroupOption, ExamOption, ImportReport } from './types';
 
-export default function CandidatesIndex({ candidates, exams, can, importReport }: { candidates: { data: Candidate[] }; exams: { data: ExamOption[] }; can: { create: boolean }; importReport?: ImportReport | null }) {
+export default function CandidatesIndex({ candidates, exams, candidateGroups, can, importReport }: { candidates: { data: Candidate[] }; exams: { data: ExamOption[] }; candidateGroups: CandidateGroupOption[]; can: { create: boolean }; importReport?: ImportReport | null }) {
     return (
         <PortalAppShell title="Candidates">
             <Head title="Candidates" />
@@ -24,7 +24,7 @@ export default function CandidatesIndex({ candidates, exams, can, importReport }
                 }
             />
 
-            <BulkTools exams={exams} />
+            <BulkTools candidateGroups={candidateGroups} />
             {importReport && <ImportReportPanel report={importReport} />}
 
             <DataTable<Candidate>
@@ -58,8 +58,8 @@ export default function CandidatesIndex({ candidates, exams, can, importReport }
     );
 }
 
-function BulkTools({ exams }: { exams: { data: ExamOption[] } }) {
-    const { data, setData, post, processing, errors, reset } = useForm<{ file: File | null; exam_id: string }>({ file: null, exam_id: '' });
+function BulkTools({ candidateGroups }: { candidateGroups: CandidateGroupOption[] }) {
+    const { data, setData, post, processing, errors, reset } = useForm<{ file: File | null; candidate_group_id: string }>({ file: null, candidate_group_id: '' });
 
     const submit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -70,19 +70,19 @@ function BulkTools({ exams }: { exams: { data: ExamOption[] } }) {
         <form onSubmit={submit} className="mb-5 grid gap-3 rounded-md border border-border bg-white p-4 shadow-sm lg:grid-cols-[auto_1fr_1fr_auto] lg:items-end">
             <Button asChild type="button" variant="secondary"><a href="/candidates/template"><Download className="h-4 w-4" />Template</a></Button>
             <label className="text-sm font-semibold text-slateDark">
-                Exam
-                <select className="mt-1 block h-10 w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm" value={data.exam_id} onChange={(event) => setData('exam_id', event.target.value)} required>
-                    <option value="">Choose exam</option>
-                    {exams.data.map((exam) => <option key={exam.id} value={exam.id}>{exam.title} ({exam.exam_code})</option>)}
+                Candidate Group
+                <select className="mt-1 block h-10 w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm" value={data.candidate_group_id} onChange={(event) => setData('candidate_group_id', event.target.value)} required>
+                    <option value="">Choose group</option>
+                    {candidateGroups.map((group) => <option key={group.id} value={group.id}>{group.name}{group.code ? ` (${group.code})` : ''}</option>)}
                 </select>
-                {errors.exam_id && <span className="mt-1 block text-sm text-danger">{errors.exam_id}</span>}
+                {errors.candidate_group_id && <span className="mt-1 block text-sm text-danger">{errors.candidate_group_id}</span>}
             </label>
             <label className="text-sm font-semibold text-slateDark">
                 Upload CSV
                 <input className="mt-1 block w-full rounded-md border border-border text-sm file:mr-3 file:h-10 file:border-0 file:bg-slate-100 file:px-3 file:text-sm file:font-semibold" type="file" accept=".csv,text/csv" onChange={(event) => setData('file', event.target.files?.[0] ?? null)} />
                 {errors.file && <span className="mt-1 block text-sm text-danger">{errors.file}</span>}
             </label>
-            <Button type="submit" disabled={processing || !data.file || !data.exam_id}><Upload className="h-4 w-4" />Upload</Button>
+            <Button type="submit" disabled={processing || !data.file || !data.candidate_group_id}><Upload className="h-4 w-4" />Upload</Button>
         </form>
     );
 }

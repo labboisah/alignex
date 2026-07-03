@@ -38,7 +38,6 @@ export default function CentersIndex({ centers, can }: Props) {
                 emptyTitle="No centers found"
                 columns={[
                     { key: 'name', header: 'Name', render: (center) => <span className="font-semibold text-slateDark">{center.name}</span> },
-                    { key: 'code', header: 'Code' },
                     { key: 'location', header: 'Location' },
                     { key: 'capacity', header: 'Capacity', render: (center) => String(center.capacity) },
                     { key: 'contact_person', header: 'Contact Person' },

@@ -31,8 +31,15 @@ export type ExamOption = {
     id: string;
     title: string;
     exam_code: string;
+    owner_context?: string | null;
     status: string;
     status_label: string;
+};
+
+export type CandidateGroupOption = {
+    id: string;
+    name: string;
+    code?: string | null;
 };
 
 export type ScopeOption = {

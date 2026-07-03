@@ -1,4 +1,4 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { Download, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { FormEvent } from 'react';
 import { ActionDropdown, DataTable, PageHeader, PortalAppShell, ProtectedAction, StatusBadge } from '@/Components/Platform';
@@ -11,6 +11,9 @@ type Props = {
 };
 
 export default function SubjectsIndex({ subjects, can }: Props) {
+    const currentContext = usePage().props.current_context as { type?: string } | undefined;
+    const isSecondary = currentContext?.type === 'secondary_school';
+
     return (
         <PortalAppShell title="Subjects">
             <Head title="Subjects" />
@@ -37,9 +40,9 @@ export default function SubjectsIndex({ subjects, can }: Props) {
                 emptyTitle="No subjects found"
                 columns={[
                     { key: 'name', header: 'Name', render: (subject) => <span className="font-semibold text-slateDark">{subject.name}</span> },
-                    { key: 'code', header: 'Code' },
-                    { key: 'scope', header: 'Scope', render: (subject) => subject.organization_name ?? subject.school_name ?? subject.center_name ?? 'Platform' },
-                    { key: 'topics_count', header: 'Topics', render: (subject) => String(subject.topics_count ?? 0) },
+                    { key: 'scope', header: 'Scope', render: (subject) => subject.secondary_school_name ?? subject.organization_name ?? subject.school_name ?? subject.center_name ?? 'Platform' },
+                    { key: 'school_class_name', header: 'Class', render: (subject) => subject.school_class_name ?? 'All classes' },
+                    ...(!isSecondary ? [{ key: 'topics_count', header: 'Topics', render: (subject: Subject) => String(subject.topics_count ?? 0) }] : []),
                     { key: 'question_banks_count', header: 'Banks', render: (subject) => String(subject.question_banks_count ?? 0) },
                     { key: 'status', header: 'Status', render: (subject) => <StatusBadge label={subject.status_label} tone={subject.status === 'active' ? 'success' : 'neutral'} /> },
                     {

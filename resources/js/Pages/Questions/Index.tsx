@@ -1,4 +1,4 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { Download, Eye, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { FormEvent } from 'react';
 import { ActionDropdown, DataTable, PageHeader, PortalAppShell, ProtectedAction, StatusBadge } from '@/Components/Platform';
@@ -14,6 +14,11 @@ type Props = {
 };
 
 export default function QuestionsIndex({ questions, can, questionBanks, subjects, topics }: Props) {
+    const currentContext = usePage().props.current_context as { type?: string } | undefined;
+    const isSecondary = currentContext?.type === 'secondary_school';
+    const isProfessional = currentContext?.type === 'professional_school' || questions.data.some((question) => question.professional_school_id);
+    const isCbt = currentContext?.type === 'cbt_center';
+
     return (
         <PortalAppShell title="Questions">
             <Head title="Questions" />
@@ -33,7 +38,7 @@ export default function QuestionsIndex({ questions, can, questionBanks, subjects
                 }
             />
 
-            <BulkTools templateHref="/questions/template" uploadHref="/questions/import" questionBanks={questionBanks} subjects={subjects} topics={topics} />
+            <BulkTools templateHref="/questions/template" uploadHref="/questions/import" questionBanks={questionBanks} subjects={subjects} topics={topics} isSecondary={isSecondary} isProfessional={isProfessional} isCbt={isCbt} />
 
             <DataTable<Question>
                 rows={questions.data}
@@ -41,7 +46,7 @@ export default function QuestionsIndex({ questions, can, questionBanks, subjects
                 columns={[
                     { key: 'stem', header: 'Question', render: (question) => <span className="line-clamp-2 font-semibold text-slateDark">{question.stem}</span> },
                     { key: 'question_bank_name', header: 'Bank', render: (question) => question.question_bank_name ?? 'N/A' },
-                    { key: 'subject_name', header: 'Subject', render: (question) => question.subject_name ?? 'N/A' },
+                    { key: 'structure', header: isProfessional ? 'Course / Module' : 'Subject', render: (question) => isProfessional ? [question.question_bank_course_name, question.question_bank_module_name].filter(Boolean).join(' / ') || question.subject_name || 'N/A' : question.subject_name ?? 'N/A' },
                     { key: 'difficulty', header: 'Difficulty', render: (question) => question.difficulty },
                     { key: 'marks', header: 'Marks', render: (question) => String(question.marks) },
                     { key: 'status', header: 'Status', render: (question) => <StatusBadge label={question.status_label} tone={question.status === 'approved' ? 'success' : question.status === 'rejected' ? 'danger' : question.status === 'review' ? 'warning' : 'neutral'} /> },
@@ -69,7 +74,7 @@ export default function QuestionsIndex({ questions, can, questionBanks, subjects
     );
 }
 
-function BulkTools({ templateHref, uploadHref, questionBanks, subjects, topics }: { templateHref: string; uploadHref: string; questionBanks: { data: QuestionBankOption[] }; subjects: { data: SubjectOption[] }; topics: { data: TopicOption[] } }) {
+function BulkTools({ templateHref, uploadHref, questionBanks, subjects, topics, isSecondary, isProfessional, isCbt }: { templateHref: string; uploadHref: string; questionBanks: { data: QuestionBankOption[] }; subjects: { data: SubjectOption[] }; topics: { data: TopicOption[] }; isSecondary: boolean; isProfessional: boolean; isCbt: boolean }) {
     const { data, setData, post, processing, errors, reset } = useForm<{ file: File | null; subject_id: string; question_bank_id: string; topic_id: string }>({
         file: null,
         subject_id: '',
@@ -77,16 +82,27 @@ function BulkTools({ templateHref, uploadHref, questionBanks, subjects, topics }
         topic_id: '',
     });
 
-    const availableBanks = questionBanks.data.filter((bank) => !data.subject_id || bank.subject_id === data.subject_id);
+    const availableBanks = data.subject_id
+        ? questionBanks.data.filter((bank) => bank.subject_id === data.subject_id)
+        : [];
     const availableTopics = topics.data.filter((topic) => !data.subject_id || topic.subject_id === data.subject_id);
 
     const submit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        post(uploadHref, { forceFormData: true, preserveScroll: true, onSuccess: () => reset('file') });
+        post(uploadHref, {
+            forceFormData: true,
+            preserveScroll: true,
+            onBefore: () => {
+                if (isSecondary) {
+                    setData('topic_id', '');
+                }
+            },
+            onSuccess: () => reset('file'),
+        });
     };
 
     return (
-        <form onSubmit={submit} className="mb-5 grid gap-3 rounded-md border border-border bg-white p-4 shadow-sm lg:grid-cols-[auto_1fr_1fr_1fr_1fr_auto] lg:items-end">
+        <form onSubmit={submit} className={`mb-5 grid gap-3 rounded-md border border-border bg-white p-4 shadow-sm lg:items-end ${isCbt || isSecondary ? 'lg:grid-cols-[auto_1fr_1fr_1fr_auto]' : 'lg:grid-cols-[auto_1fr_1fr_1fr_1fr_auto]'}`}>
             <Button asChild type="button" variant="secondary">
                 <a href={templateHref}>
                     <Download className="h-4 w-4" />
@@ -94,14 +110,14 @@ function BulkTools({ templateHref, uploadHref, questionBanks, subjects, topics }
                 </a>
             </Button>
             <label className="text-sm font-semibold text-slateDark">
-                Subject
+                {isProfessional ? 'Course / Module Mapping' : 'Subject'}
                 <select
                     className="mt-1 block h-10 w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
                     value={data.subject_id}
                     onChange={(event) => setData({ ...data, subject_id: event.target.value, question_bank_id: '', topic_id: '' })}
                     required
                 >
-                    <option value="">Choose subject</option>
+                    <option value="">{isProfessional ? 'Choose mapping' : 'Choose subject'}</option>
                     {subjects.data.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}
                 </select>
                 {errors.subject_id && <span className="mt-1 block text-sm text-danger">{errors.subject_id}</span>}
@@ -109,19 +125,21 @@ function BulkTools({ templateHref, uploadHref, questionBanks, subjects, topics }
             <label className="text-sm font-semibold text-slateDark">
                 Question Bank
                 <select className="mt-1 block h-10 w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm" value={data.question_bank_id} onChange={(event) => setData('question_bank_id', event.target.value)} required>
-                    <option value="">Choose bank</option>
+                    <option value="">{data.subject_id ? 'Choose bank' : 'Choose subject first'}</option>
                     {availableBanks.map((bank) => <option key={bank.id} value={bank.id}>{bank.name}</option>)}
                 </select>
                 {errors.question_bank_id && <span className="mt-1 block text-sm text-danger">{errors.question_bank_id}</span>}
             </label>
-            <label className="text-sm font-semibold text-slateDark">
-                Topic
-                <select className="mt-1 block h-10 w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm" value={data.topic_id} onChange={(event) => setData('topic_id', event.target.value)}>
-                    <option value="">None</option>
-                    {availableTopics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}
-                </select>
-                {errors.topic_id && <span className="mt-1 block text-sm text-danger">{errors.topic_id}</span>}
-            </label>
+            {!isCbt && !isSecondary && (
+                <label className="text-sm font-semibold text-slateDark">
+                    {isProfessional ? 'Module Detail' : 'Topic'}
+                    <select className="mt-1 block h-10 w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm" value={data.topic_id} onChange={(event) => setData('topic_id', event.target.value)}>
+                        <option value="">None</option>
+                        {availableTopics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}
+                    </select>
+                    {errors.topic_id && <span className="mt-1 block text-sm text-danger">{errors.topic_id}</span>}
+                </label>
+            )}
             <label className="text-sm font-semibold text-slateDark">
                 Upload CSV
                 <input className="mt-1 block w-full rounded-md border border-border text-sm file:mr-3 file:h-10 file:border-0 file:bg-slate-100 file:px-3 file:text-sm file:font-semibold" type="file" accept=".csv,text/csv" onChange={(event) => setData('file', event.target.files?.[0] ?? null)} />

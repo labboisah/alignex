@@ -6,6 +6,7 @@ use App\Http\Requests\StoreSchoolRequest;
 use App\Http\Requests\UpdateSchoolRequest;
 use App\Http\Resources\SchoolResource;
 use App\Models\School;
+use App\Support\ReferenceCode;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -39,7 +40,9 @@ class SchoolController extends Controller
 
     public function store(StoreSchoolRequest $request): RedirectResponse
     {
-        $school = School::create($request->validated());
+        $data = $request->validated();
+        $data['code'] = filled($data['code'] ?? null) ? strtoupper($data['code']) : ReferenceCode::unique($data['name'], School::query());
+        $school = School::create($data);
 
         return redirect()
             ->route('schools.show', $school)
@@ -71,7 +74,9 @@ class SchoolController extends Controller
 
     public function update(UpdateSchoolRequest $request, School $school): RedirectResponse
     {
-        $school->update($request->validated());
+        $data = $request->validated();
+        $data['code'] = filled($data['code'] ?? null) ? strtoupper($data['code']) : ReferenceCode::unique($data['name'], School::query(), $school);
+        $school->update($data);
 
         return redirect()
             ->route('schools.show', $school)

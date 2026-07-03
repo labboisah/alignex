@@ -6,6 +6,7 @@ use App\Http\Requests\StoreOrganizationRequest;
 use App\Http\Requests\UpdateOrganizationRequest;
 use App\Http\Resources\OrganizationResource;
 use App\Models\Organization;
+use App\Support\ReferenceCode;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -43,7 +44,9 @@ class OrganizationController extends Controller
 
     public function store(StoreOrganizationRequest $request): RedirectResponse
     {
-        $organization = Organization::create($request->validated());
+        $data = $request->validated();
+        $data['code'] = filled($data['code'] ?? null) ? strtoupper($data['code']) : ReferenceCode::unique($data['name'], Organization::query());
+        $organization = Organization::create($data);
 
         return redirect()
             ->route('organizations.show', $organization)
@@ -83,7 +86,9 @@ class OrganizationController extends Controller
 
     public function update(UpdateOrganizationRequest $request, Organization $organization): RedirectResponse
     {
-        $organization->update($request->validated());
+        $data = $request->validated();
+        $data['code'] = filled($data['code'] ?? null) ? strtoupper($data['code']) : ReferenceCode::unique($data['name'], Organization::query(), $organization);
+        $organization->update($data);
 
         return redirect()
             ->route('organizations.show', $organization)

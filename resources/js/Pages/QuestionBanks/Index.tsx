@@ -1,4 +1,4 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { Download, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { FormEvent } from 'react';
 import { ActionDropdown, DataTable, PageHeader, PortalAppShell, ProtectedAction, StatusBadge } from '@/Components/Platform';
@@ -11,13 +11,16 @@ type Props = {
 };
 
 export default function QuestionBanksIndex({ questionBanks, can }: Props) {
+    const currentContext = usePage().props.current_context as { type?: string } | undefined;
+    const isProfessional = currentContext?.type === 'professional_school' || questionBanks.data.some((bank) => bank.professional_school_id);
+
     return (
         <PortalAppShell title="Question Bank">
             <Head title="Question Bank" />
             <PageHeader
                 eyebrow="Assessment"
                 title="Question Bank"
-                description="Manage question-bank containers by subject and scope."
+                description={isProfessional ? 'Manage question-bank containers by course, module, and scope.' : 'Manage question-bank containers by subject and scope.'}
                 actions={
                     <ProtectedAction allowed={can.create}>
                         <Button asChild type="button">
@@ -37,9 +40,8 @@ export default function QuestionBanksIndex({ questionBanks, can }: Props) {
                 emptyTitle="No question banks found"
                 columns={[
                     { key: 'name', header: 'Name', render: (bank) => <span className="font-semibold text-slateDark">{bank.name}</span> },
-                    { key: 'code', header: 'Code' },
-                    { key: 'subject_name', header: 'Subject', render: (bank) => bank.subject_name ?? 'N/A' },
-                    { key: 'scope', header: 'Scope', render: (bank) => bank.organization_name ?? bank.school_name ?? bank.center_name ?? 'Platform' },
+                    { key: 'structure', header: isProfessional ? 'Course / Module' : 'Subject', render: (bank) => isProfessional ? [bank.course_name, bank.module_name].filter(Boolean).join(' / ') || bank.subject_name || 'N/A' : bank.subject_name ?? 'N/A' },
+                    { key: 'scope', header: 'Scope', render: (bank) => bank.organization_name ?? bank.professional_school_name ?? bank.secondary_school_name ?? bank.cbt_center_name ?? bank.school_name ?? bank.center_name ?? 'Platform' },
                     { key: 'questions_count', header: 'Questions', render: (bank) => String(bank.questions_count ?? 0) },
                     { key: 'status', header: 'Status', render: (bank) => <StatusBadge label={bank.status_label} tone={bank.status === 'active' ? 'success' : bank.status === 'archived' ? 'neutral' : 'warning'} /> },
                     {

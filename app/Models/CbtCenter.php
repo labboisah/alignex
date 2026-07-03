@@ -45,4 +45,9 @@ class CbtCenter extends Model
     {
         return $this->hasMany(Result::class);
     }
+
+    public function examCenterAssignments(): HasMany
+    {
+        return $this->hasMany(ExamCenterAssignment::class);
+    }
 }

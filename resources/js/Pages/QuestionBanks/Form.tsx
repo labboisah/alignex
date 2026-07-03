@@ -51,14 +51,11 @@ export function QuestionBankForm({ questionBank, subjects, statuses, submitLabel
                     <Field label="Subject" error={errors.subject_id}>
                         <select className={inputClass} value={data.subject_id} onChange={(event) => setData('subject_id', event.target.value)} required>
                             <option value="">Choose subject</option>
-                            {subjects.data.map((subject) => <option key={subject.id} value={subject.id}>{subject.name} ({subject.code})</option>)}
+                            {subjects.data.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}
                         </select>
                     </Field>
                     <Field label="Name" error={errors.name}>
                         <input className={inputClass} value={data.name} onChange={(event) => setData('name', event.target.value)} required />
-                    </Field>
-                    <Field label="Code" error={errors.code}>
-                        <input className={inputClass} value={data.code} onChange={(event) => setData('code', event.target.value.toUpperCase())} required />
                     </Field>
                     <Field label="Status" error={errors.status}>
                         <select className={inputClass} value={data.status} onChange={(event) => setData('status', event.target.value)}>

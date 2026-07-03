@@ -1,4 +1,4 @@
-import { Link, useForm } from '@inertiajs/react';
+import { Link, useForm, usePage } from '@inertiajs/react';
 import { ImageOff, Save } from 'lucide-react';
 import { FormEvent, ReactNode } from 'react';
 import { FormSection } from '@/Components/Platform';
@@ -24,6 +24,11 @@ const inputClass = 'mt-1 block w-full rounded-md border-border shadow-sm focus:b
 const labelClass = 'text-sm font-semibold text-slateDark';
 
 export function QuestionForm({ question, questionBanks, subjects, topics, difficulties, statuses, submitLabel }: { question?: Question; questionBanks: { data: QuestionBankOption[] }; subjects: { data: SubjectOption[] }; topics: { data: TopicOption[] }; difficulties: SelectOption[]; statuses: SelectOption[]; submitLabel: string }) {
+    const currentContext = usePage().props.current_context as { type?: string } | undefined;
+    const isSecondary = currentContext?.type === 'secondary_school';
+    const isProfessional = currentContext?.type === 'professional_school' || questionBanks.data.some((bank) => bank.professional_school_id);
+    const isCbt = currentContext?.type === 'cbt_center';
+    const showTopic = !isSecondary && !isProfessional && !isCbt;
     const initialOptions = labels.map((label) => {
         const option = question?.options?.find((choice) => choice.label === label);
         return {
@@ -55,6 +60,7 @@ export function QuestionForm({ question, questionBanks, subjects, topics, diffic
 
         transform((values) => ({
             ...values,
+            topic_id: showTopic ? values.topic_id : '',
             _method: question ? 'patch' : undefined,
         }));
 
@@ -110,19 +116,31 @@ export function QuestionForm({ question, questionBanks, subjects, topics, diffic
                             {questionBanks.data.map((bank) => <option key={bank.id} value={bank.id}>{bank.name} ({bank.code})</option>)}
                         </select>
                     </Field>
-                    <Field label="Subject" error={errors.subject_id}>
-                        <select className={inputClass} value={data.subject_id} onChange={(event) => setData({ ...data, subject_id: event.target.value, topic_id: '' })} required>
-                            <option value="">Choose subject</option>
-                            {subjects.data.map((subject) => <option key={subject.id} value={subject.id}>{subject.name} ({subject.code})</option>)}
-                        </select>
-                        {selectedQuestionBank && <span className="mt-1 block text-xs text-slate-500">Expected: {selectedQuestionBank.subject_name}</span>}
-                    </Field>
-                    <Field label="Topic" error={errors.topic_id}>
-                        <select className={inputClass} value={data.topic_id} onChange={(event) => setData('topic_id', event.target.value)}>
-                            <option value="">None</option>
-                            {availableTopics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name} ({topic.code})</option>)}
-                        </select>
-                    </Field>
+                    {isProfessional ? (
+                        <Field label="Course / Module" error={errors.subject_id}>
+                            <div className="mt-1 rounded-md border border-border bg-slate-50 px-3 py-2 text-sm font-semibold text-slateDark">
+                                {selectedQuestionBank ? [selectedQuestionBank.course_name, selectedQuestionBank.module_name].filter(Boolean).join(' / ') || selectedQuestionBank.subject_name || 'Selected bank mapping' : 'Choose a question bank'}
+                            </div>
+                        </Field>
+                    ) : (
+                        <>
+                            <Field label="Subject" error={errors.subject_id}>
+                                <select className={inputClass} value={data.subject_id} onChange={(event) => setData({ ...data, subject_id: event.target.value, topic_id: '' })} required>
+                                    <option value="">Choose subject</option>
+                                    {subjects.data.map((subject) => <option key={subject.id} value={subject.id}>{subject.name} ({subject.code})</option>)}
+                                </select>
+                                {selectedQuestionBank && <span className="mt-1 block text-xs text-slate-500">Expected: {selectedQuestionBank.subject_name}</span>}
+                            </Field>
+                            {showTopic && (
+                                <Field label="Topic" error={errors.topic_id}>
+                                    <select className={inputClass} value={data.topic_id} onChange={(event) => setData('topic_id', event.target.value)}>
+                                        <option value="">None</option>
+                                        {availableTopics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name} ({topic.code})</option>)}
+                                    </select>
+                                </Field>
+                            )}
+                        </>
+                    )}
                     <Field label="Difficulty" error={errors.difficulty}>
                         <select className={inputClass} value={data.difficulty} onChange={(event) => setData('difficulty', event.target.value)}>
                             {difficulties.map((difficulty) => <option key={difficulty.value} value={difficulty.value}>{difficulty.label}</option>)}

@@ -156,13 +156,7 @@ function Navbar() {
         <header className="sticky top-0 z-30 border-b border-border bg-white/95 backdrop-blur">
             <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 lg:px-8">
                 <Link href="/" className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-white">
-                        <GraduationCap className="h-6 w-6" />
-                    </span>
-                    <span>
-                        <span className="block text-lg font-bold text-primaryDark">AlignEx</span>
-                        <span className="block text-xs font-semibold uppercase text-slate-500">CBT Platform</span>
-                    </span>
+                    <img src="/images/brand-logo.png" alt="AlignEx" className="h-12 w-auto max-w-[190px] object-contain" />
                 </Link>
                 <div className="hidden items-center gap-6 text-sm font-semibold text-slate-600 md:flex">
                     <a href="#solutions" className="hover:text-primary">Solutions</a>
@@ -194,6 +188,7 @@ function HeroSection({ hero, metrics, activity, candidateMockup }: { hero: Requi
         <section className="border-b border-border bg-white">
             <div className="mx-auto grid max-w-7xl gap-10 px-6 py-16 lg:grid-cols-[0.95fr_1.05fr] lg:px-8 lg:py-20">
                 <div className="flex flex-col justify-center">
+                    <img src="/images/brand-logo.png" alt="AlignEx" className="mb-8 h-20 w-fit max-w-full object-contain" />
                     <div className="mb-5 inline-flex w-fit items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-1 text-sm font-semibold text-primary">
                         <ShieldCheck className="h-4 w-4" />
                         {hero.eyebrow}

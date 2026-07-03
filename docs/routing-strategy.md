@@ -12,7 +12,9 @@ Examples:
 - `/login`
 - `/dashboard`
 - `/organizations`
-- `/centers`
+- `/secondary-schools`
+- `/professional-schools`
+- `/cbt-centers`
 - `/users`
 - `/subjects`
 - `/topics`
@@ -32,6 +34,7 @@ Rules:
 - Use Inertia props for initial page data.
 - Use Laravel middleware and policies for authorization.
 - Do not use React Router for admin or public CRUD pages.
+- Dashboard, organization, secondary school, professional school, CBT center, exam, result, and report screens are all Laravel web routes.
 
 ## Candidate Exam Routing
 
@@ -86,3 +89,13 @@ Routing tests should prove:
 - Candidate app is served only through `/exam/{any?}`.
 - React Router routes are not registered as separate Laravel admin pages.
 - Candidate API endpoints require the correct candidate session authorization.
+
+## Audit Result
+
+The routing audit command:
+
+```bash
+rg "react-router|BrowserRouter|createBrowserRouter|useNavigate|<Routes" resources/js
+```
+
+should return only `resources/js/Pages/CandidateExam/App.tsx`. Any React Router usage in admin pages is a routing violation.

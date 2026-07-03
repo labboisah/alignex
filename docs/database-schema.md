@@ -4,6 +4,38 @@ This document defines the planned normalized database schema for AlignEx. It is 
 
 Laravel and MySQL remain the source of truth for identity, exam configuration, candidate eligibility, timing, answer state, scoring inputs, proctoring evidence, and audit history. The candidate frontend must never receive answer keys, correctness flags, scoring rubrics, or internal proctoring risk calculations.
 
+## Corrected Active Entity Model
+
+The active implementation separates:
+
+- `organizations`
+- `secondary_schools`
+- `professional_schools`
+- `cbt_centers`
+
+Legacy `schools` and `centers` records may still exist for older modules, but new corrected workflows should use the explicit secondary/professional/CBT center tables. `organizations` must not contain a `school_type` column.
+
+`users` may hold context references:
+
+- `organization_id`
+- `secondary_school_id`
+- `professional_school_id`
+- `cbt_center_id`
+- `active_context_type`
+- `active_context_id`
+
+`exams` store explicit ownership:
+
+- `exam_owner_type`
+- `exam_owner_id`
+- `organization_id`
+- `secondary_school_id`
+- `professional_school_id`
+- `cbt_center_id`
+- context-specific academic or training fields
+
+Question banks and candidates also carry corrected ownership fields so exam creation and paper generation can be scoped to the selected context.
+
 ## Design Rules
 
 - Use `id` big integer primary keys unless a table has a clear composite uniqueness requirement.

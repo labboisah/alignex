@@ -3,14 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Models\CandidateExamAttempt;
+use App\Models\Certificate;
 use App\Models\CertificateTemplate;
 use App\Models\Exam;
 use App\Models\User;
 use App\Services\ProfessionalExamService;
+use App\Services\ResultManagementService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Response;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
@@ -42,10 +46,14 @@ class ProfessionalExamController extends Controller
                 'name' => $template->name,
                 'title' => $template->title,
                 'institution_name' => $template->institution_name,
-                'logo_url' => $template->logo_url,
+                'logo_url' => $this->professional->normalizeLogoUrl($template->logo_url),
                 'primary_color' => $template->primary_color,
                 'accent_color' => $template->accent_color,
                 'background_color' => $template->background_color,
+                'theme' => $template->theme,
+                'paper_size' => $template->paper_size,
+                'orientation' => $template->orientation,
+                'template_key' => $template->template_key,
                 'use_logo_watermark' => $template->use_logo_watermark,
                 'body' => $template->body,
                 'signatory_name' => $template->signatory_name,
@@ -149,6 +157,34 @@ class ProfessionalExamController extends Controller
         return back()->with($certificate ? 'success' : 'error', $certificate ? 'Certificate generated.' : 'Certificate could not be generated. Confirm pass and payment status.');
     }
 
+    public function downloadCertificate(Request $request, Exam $exam, Certificate $certificate)
+    {
+        $this->authorizeExam($request->user(), $exam);
+        abort_unless($certificate->exam_id === $exam->id, 404);
+
+        $row = $this->professional->certificateRows($exam)->firstWhere('id', $certificate->id);
+        abort_unless($row, 404);
+
+        $lines = [
+            $row['institution_name'] ?? $this->professional->institutionName($exam),
+            $row['template_title'] ?? 'Certificate of Achievement',
+            'Candidate: '.$row['candidate_name'],
+            'Registration Number: '.$row['registration_number'],
+            'Exam: '.$row['exam_title'].' ('.$row['exam_code'].')',
+            'Score: '.$row['score'].'/'.$row['total_marks'].' ('.$row['percentage'].'%)',
+            'Serial Number: '.$row['serial_number'],
+            'Verification Hash: '.$row['verification_hash'],
+            'Verification URL: '.$row['verification_url'],
+            'Issued At: '.($row['issued_at'] ? \Illuminate\Support\Carbon::parse($row['issued_at'])->toDateTimeString() : 'N/A'),
+            'Expires At: '.($row['expires_at'] ? \Illuminate\Support\Carbon::parse($row['expires_at'])->toDateTimeString() : 'No expiry'),
+        ];
+
+        return Response::make(app(ResultManagementService::class)->pdf('AlignEx Certificate', $lines), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$row['serial_number'].'-certificate.pdf"',
+        ]);
+    }
+
     public function verifyPage(): InertiaResponse
     {
         return Inertia::render('Public/VerifyCertificate');
@@ -167,20 +203,35 @@ class ProfessionalExamController extends Controller
 
     private function templateData(Request $request): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'title' => ['required', 'string', 'max:255'],
             'institution_name' => ['nullable', 'string', 'max:255'],
-            'logo_url' => ['nullable', 'url', 'max:2048'],
+            'logo_url' => ['nullable', 'string', 'max:2048'],
+            'logo' => ['nullable', 'image', 'max:2048'],
             'primary_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'accent_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'background_color' => ['nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'theme' => ['nullable', Rule::in(['classic', 'modern', 'emerald', 'mono'])],
+            'paper_size' => ['nullable', Rule::in(['a4', 'letter'])],
+            'orientation' => ['nullable', Rule::in(['landscape', 'portrait'])],
+            'template_key' => ['nullable', Rule::in(['formal', 'compact', 'bordered'])],
             'use_logo_watermark' => ['boolean'],
             'body' => ['required', 'string'],
             'signatory_name' => ['nullable', 'string', 'max:255'],
             'signatory_title' => ['nullable', 'string', 'max:255'],
             'is_active' => ['boolean'],
         ]);
+
+        if ($request->hasFile('logo')) {
+            $data['logo_url'] = $this->professional->normalizeLogoUrl(Storage::disk('public')->url($request->file('logo')->store('certificate-logos', 'public')));
+        } elseif (array_key_exists('logo_url', $data)) {
+            $data['logo_url'] = $this->professional->normalizeLogoUrl($data['logo_url']);
+        }
+
+        unset($data['logo']);
+
+        return $data;
     }
 
     private function authorizeExam(User $user, Exam $exam): void
@@ -199,7 +250,10 @@ class ProfessionalExamController extends Controller
                     $inner->whereRaw('1 = 0')
                         ->when($user->organization_id, fn ($scope) => $scope->orWhere('organization_id', $user->organization_id))
                         ->when($user->school_id, fn ($scope) => $scope->orWhere('school_id', $user->school_id))
-                        ->when($user->center_id, fn ($scope) => $scope->orWhere('center_id', $user->center_id));
+                        ->when($user->center_id, fn ($scope) => $scope->orWhere('center_id', $user->center_id))
+                        ->when($user->secondary_school_id, fn ($scope) => $scope->orWhere('secondary_school_id', $user->secondary_school_id))
+                        ->when($user->professional_school_id, fn ($scope) => $scope->orWhere('professional_school_id', $user->professional_school_id))
+                        ->when($user->cbt_center_id, fn ($scope) => $scope->orWhere('cbt_center_id', $user->cbt_center_id));
                 });
             });
     }

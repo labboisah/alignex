@@ -69,9 +69,6 @@ export function OrganizationForm({ organization, statuses, organizationTypes = [
                     <Field label="Name" error={errors.name}>
                         <input className={inputClass} value={data.name} onChange={(event) => setData('name', event.target.value)} required />
                     </Field>
-                    <Field label="Code" error={errors.code}>
-                        <input className={inputClass} value={data.code} onChange={(event) => setData('code', event.target.value)} required />
-                    </Field>
                     <Field label="Organization Type" error={errors.organization_type}>
                         <select className={inputClass} value={data.organization_type} onChange={(event) => setData('organization_type', event.target.value)}>
                             <option value="">Not specified</option>

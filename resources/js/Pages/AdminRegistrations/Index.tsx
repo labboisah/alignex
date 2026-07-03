@@ -25,7 +25,6 @@ export default function AdminRegistrationsIndex({ registrations }: Props) {
                 columns={[
                     { key: 'entity_name', header: 'Name', render: (registration) => <span className="font-semibold text-slateDark">{registration.entity_name}</span> },
                     { key: 'entity_type_label', header: 'Type' },
-                    { key: 'entity_code', header: 'Code' },
                     { key: 'contact_person', header: 'Contact Person' },
                     { key: 'entity_email', header: 'Email' },
                     { key: 'phone', header: 'Phone', render: (registration) => registration.phone || 'N/A' },

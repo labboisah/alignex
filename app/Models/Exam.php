@@ -22,6 +22,16 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'owner_id',
     'exam_owner_type',
     'exam_owner_id',
+    'academic_session_id',
+    'academic_term_id',
+    'school_class_id',
+    'class_arm_id',
+    'subject_id',
+    'question_bank_id',
+    'programme_id',
+    'course_id',
+    'module_id',
+    'training_batch_id',
     'exam_type_id',
     'created_by',
     'title',
@@ -138,6 +148,26 @@ class Exam extends Model
         return $this->belongsTo(ProfessionalSchool::class);
     }
 
+    public function programme(): BelongsTo
+    {
+        return $this->belongsTo(Programme::class);
+    }
+
+    public function course(): BelongsTo
+    {
+        return $this->belongsTo(Course::class);
+    }
+
+    public function professionalModule(): BelongsTo
+    {
+        return $this->belongsTo(ProfessionalModule::class, 'module_id');
+    }
+
+    public function trainingBatch(): BelongsTo
+    {
+        return $this->belongsTo(TrainingBatch::class);
+    }
+
     public function cbtCenter(): BelongsTo
     {
         return $this->belongsTo(CbtCenter::class);
@@ -151,6 +181,11 @@ class Exam extends Model
     public function examType(): BelongsTo
     {
         return $this->belongsTo(ExamType::class);
+    }
+
+    public function questionBank(): BelongsTo
+    {
+        return $this->belongsTo(QuestionBank::class);
     }
 
     public function creator(): BelongsTo
@@ -180,6 +215,11 @@ class Exam extends Model
             ->withTimestamps();
     }
 
+    public function participants(): HasMany
+    {
+        return $this->hasMany(ExamParticipant::class);
+    }
+
     public function auditLogs(): HasMany
     {
         return $this->hasMany(ExamAuditLog::class);
@@ -203,5 +243,10 @@ class Exam extends Model
     public function certificates(): HasMany
     {
         return $this->hasMany(Certificate::class);
+    }
+
+    public function centerAssignments(): HasMany
+    {
+        return $this->hasMany(ExamCenterAssignment::class);
     }
 }
