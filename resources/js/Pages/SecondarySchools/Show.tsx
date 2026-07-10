@@ -51,6 +51,7 @@ export default function ShowSecondarySchool({ secondarySchool, dashboard }: { se
                             <Button asChild variant="secondary"><Link href={`/secondary-schools/${secondarySchool.id}/classes`}>Classes</Link></Button>
                             <Button asChild variant="secondary"><Link href={`/secondary-schools/${secondarySchool.id}/student-groups`}>Student Groups</Link></Button>
                             <Button asChild variant="secondary"><Link href={`/secondary-schools/${secondarySchool.id}/students`}>Students</Link></Button>
+                            <Button asChild variant="secondary"><Link href={`/secondary-schools/${secondarySchool.id}/teachers`}>Teachers</Link></Button>
                             <Button asChild variant="secondary"><Link href="/exams/create">Create Exam</Link></Button>
                             <Button asChild variant="secondary"><Link href="/results">Results</Link></Button>
                         </div>

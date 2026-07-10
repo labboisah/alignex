@@ -69,6 +69,19 @@ class QuestionBankController extends Controller
         return redirect()->route('question-bank.index')->with('success', 'Question bank created.');
     }
 
+    public function show(Request $request, QuestionBank $questionBank): Response
+    {
+        Gate::authorize('view', $questionBank);
+
+        return Inertia::render('QuestionBanks/Show', [
+            'questionBank' => QuestionBankResource::make($questionBank->load(['organization', 'school', 'center', 'subject', 'secondarySchool', 'professionalSchool', 'cbtCenter', 'programme', 'course', 'module'])->loadCount('questions')),
+            'can' => [
+                'update' => $request->user()->can('update', $questionBank),
+                'delete' => $request->user()->can('delete', $questionBank),
+            ],
+        ]);
+    }
+
     public function edit(Request $request, QuestionBank $questionBank): Response
     {
         Gate::authorize('update', $questionBank);
@@ -158,6 +171,7 @@ class QuestionBankController extends Controller
 
         return QuestionBank::query()
             ->when($organization, fn ($query) => $query->where('organization_id', $organization->id))
+            ->when($user->isTeacher(), fn ($query) => $query->whereIn('subject_id', $user->assignedSubjects()->select('subjects.id')))
             ->when(! $user->isSuperAdmin() && $user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
             ->when(! $user->isSuperAdmin() && $user->school_id, fn ($query) => $query->where('school_id', $user->school_id))
             ->when(! $user->isSuperAdmin() && $user->center_id, fn ($query) => $query->where('center_id', $user->center_id))
@@ -173,6 +187,7 @@ class QuestionBankController extends Controller
 
         return Subject::query()
             ->when($organization, fn ($query) => $query->where('organization_id', $organization->id))
+            ->when($user->isTeacher(), fn ($query) => $query->whereIn('id', $user->assignedSubjects()->select('subjects.id')))
             ->when(! $user->isSuperAdmin() && $user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
             ->when(! $user->isSuperAdmin() && $user->school_id, fn ($query) => $query->where('school_id', $user->school_id))
             ->when(! $user->isSuperAdmin() && $user->center_id, fn ($query) => $query->where('center_id', $user->center_id))

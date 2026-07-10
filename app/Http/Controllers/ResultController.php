@@ -78,7 +78,7 @@ class ResultController extends Controller
 
         return Inertia::render('Results/Candidate', [
             'result' => $this->results->row($attempt),
-            'answers' => $this->markedPaperRows($attempt),
+            'answers' => $this->markedPaperRows($attempt, $request->user()),
             'adaptive' => $this->candidateAdaptiveAnalysis($attempt),
         ]);
     }
@@ -163,7 +163,7 @@ class ResultController extends Controller
             '',
         ];
 
-        foreach ($this->markedPaperRows($attempt) as $index => $row) {
+        foreach ($this->markedPaperRows($attempt, $request->user()) as $index => $row) {
             $lines[] = 'Q'.($index + 1).' ['.$row['subject'].'] Score: '.($row['score_awarded'] ?? '0.00').'/'.$row['marks'];
             $lines[] = 'Question: '.$row['question'];
             foreach ($row['options'] as $option) {
@@ -266,7 +266,8 @@ class ResultController extends Controller
                         ->when($user->professional_school_id, fn ($scope) => $scope->orWhere('professional_school_id', $user->professional_school_id))
                         ->when($user->cbt_center_id, fn ($scope) => $scope->orWhere('cbt_center_id', $user->cbt_center_id));
                 });
-            });
+            })
+            ->when($user->isTeacher(), fn (Builder $query) => $query->whereHas('examSubjects', fn (Builder $subjectQuery) => $subjectQuery->whereIn('subject_id', $user->assignedSubjects()->select('subjects.id'))));
     }
 
     private function authorizeExam(User $user, Exam $exam): void
@@ -409,12 +410,17 @@ class ResultController extends Controller
     /**
      * @return \Illuminate\Support\Collection<int, array<string, mixed>>
      */
-    private function markedPaperRows(CandidateExamAttempt $attempt)
+    private function markedPaperRows(CandidateExamAttempt $attempt, ?User $user = null)
     {
         $answers = $attempt->answers->keyBy('question_id');
+        $assignedSubjectIds = $user?->isTeacher()
+            ? $user->assignedSubjects()->pluck('subjects.id')->map(fn ($id) => (string) $id)->all()
+            : null;
 
         return $attempt->papers
             ->sortBy('question_order')
+            ->values()
+            ->filter(fn ($paper) => $assignedSubjectIds === null || in_array((string) $paper->question?->subject_id, $assignedSubjectIds, true))
             ->values()
             ->map(function ($paper) use ($answers) {
                 $question = $paper->question;

@@ -146,6 +146,73 @@ class SecondarySchoolFeatureTest extends TestCase
         $this->assertDatabaseHas('question_banks', ['secondary_school_id' => $school->id, 'code' => 'MATH-TERM']);
     }
 
+    public function test_secondary_school_admin_can_create_teacher_with_assigned_subjects(): void
+    {
+        [$school, $admin] = $this->secondarySchoolAdmin();
+        $class = SchoolClass::query()->create(['secondary_school_id' => $school->id, 'name' => 'JSS 1', 'code' => 'JSS1', 'level' => 'JSS 1', 'level_order' => 1, 'status' => 'active']);
+        $subject = Subject::factory()->create(['secondary_school_id' => $school->id, 'school_class_id' => $class->id, 'organization_id' => null, 'school_id' => null]);
+
+        $this->actingAs($admin)
+            ->post("/secondary-schools/{$school->id}/teachers", [
+                'name' => 'Ada Teacher',
+                'email' => 'ada.teacher@example.test',
+                'password' => 'password123',
+                'school_class_id' => $class->id,
+                'subject_ids' => [$subject->id],
+            ])
+            ->assertRedirect();
+
+        $teacher = User::query()->where('email', 'ada.teacher@example.test')->firstOrFail();
+        $this->assertSame(User::ROLE_TEACHER, $teacher->role);
+        $this->assertSame($school->id, $teacher->secondary_school_id);
+        $this->assertDatabaseHas('subject_teacher', [
+            'user_id' => $teacher->id,
+            'subject_id' => $subject->id,
+            'school_class_id' => $class->id,
+            'secondary_school_id' => $school->id,
+        ]);
+    }
+
+    public function test_teacher_can_only_use_assigned_secondary_subject_question_banks(): void
+    {
+        [$school] = $this->secondarySchoolAdmin();
+        $class = SchoolClass::query()->create(['secondary_school_id' => $school->id, 'name' => 'JSS 1', 'code' => 'JSS1', 'level' => 'JSS 1', 'level_order' => 1, 'status' => 'active']);
+        $assigned = Subject::factory()->create(['secondary_school_id' => $school->id, 'school_class_id' => $class->id, 'organization_id' => null, 'school_id' => null]);
+        $unassigned = Subject::factory()->create(['secondary_school_id' => $school->id, 'school_class_id' => $class->id, 'organization_id' => null, 'school_id' => null]);
+        $assignedBank = QuestionBank::factory()->create(['secondary_school_id' => $school->id, 'organization_id' => null, 'school_id' => null, 'subject_id' => $assigned->id, 'status' => QuestionBank::STATUS_ACTIVE]);
+        $unassignedBank = QuestionBank::factory()->create(['secondary_school_id' => $school->id, 'organization_id' => null, 'school_id' => null, 'subject_id' => $unassigned->id, 'status' => QuestionBank::STATUS_ACTIVE]);
+        $teacher = User::factory()->create([
+            'role' => User::ROLE_TEACHER,
+            'secondary_school_id' => $school->id,
+            'active_context_type' => 'secondary_school',
+            'active_context_id' => $school->id,
+        ]);
+        $teacher->assignedSubjects()->attach($assigned->id, ['school_class_id' => $class->id, 'secondary_school_id' => $school->id]);
+
+        $questionPayload = [
+            'question_bank_id' => $assignedBank->id,
+            'subject_id' => $assigned->id,
+            'difficulty' => 'medium',
+            'marks' => 1,
+            'stem' => 'What is 2 + 2?',
+            'status' => Question::STATUS_DRAFT,
+            'options' => [
+                ['label' => 'A', 'option_text' => '3', 'is_correct' => false],
+                ['label' => 'B', 'option_text' => '4', 'is_correct' => true],
+            ],
+        ];
+
+        $this->actingAs($teacher)->post('/questions', $questionPayload)->assertRedirect();
+
+        $this->actingAs($teacher)
+            ->post('/questions', [
+                ...$questionPayload,
+                'question_bank_id' => $unassignedBank->id,
+                'subject_id' => $unassigned->id,
+            ])
+            ->assertSessionHasErrors('question_bank_id');
+    }
+
     public function test_secondary_school_can_create_terminal_traditional_exam(): void
     {
         [$school, $admin, $subject, $session, $term, $class] = $this->terminalExamSetup();

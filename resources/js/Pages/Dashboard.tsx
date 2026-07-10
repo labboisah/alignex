@@ -13,6 +13,7 @@ import {
     ShieldCheck,
     Users,
 } from 'lucide-react';
+import { Children, type ReactNode } from 'react';
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { DashboardCard, PageHeader, PortalAppShell, StatusBadge } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
@@ -48,6 +49,14 @@ type NamedValue = {
     value: number;
 };
 
+type TeacherPanel = {
+    metrics: Metric[];
+    subjects: { id: string; name: string; code?: string | null; class_name?: string | null }[];
+    classes: { id: string; name: string; level?: string | null; students_count: number; groups_count: number }[];
+    student_groups: { id: string; name: string; code?: string | null; class_name?: string | null; students_count: number; status?: string | null }[];
+    students: { id: string; name: string; registration_number: string; status: string }[];
+};
+
 const iconMap = {
     Activity,
     AlertTriangle,
@@ -76,6 +85,7 @@ export default function Dashboard({
     recent_exams,
     work_queue,
     quick_actions,
+    teacher_panel,
 }: {
     role: { name: string; label: string; scope: string };
     metrics: Metric[];
@@ -93,6 +103,7 @@ export default function Dashboard({
     recent_exams: RecentExam[];
     work_queue: WorkItem[];
     quick_actions: { label: string; href: string }[];
+    teacher_panel?: TeacherPanel | null;
 }) {
     const currentContext = (usePage().props.current_context ?? null) as { type: string; name: string } | null;
     const terms = getContextTerminology(currentContext?.type);
@@ -127,6 +138,8 @@ export default function Dashboard({
                         />
                     ))}
                 </div>
+
+                {teacher_panel && <TeacherDashboardPanel panel={teacher_panel} />}
 
                 <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_360px]">
                     <div className="rounded-md border border-border bg-white p-5 shadow-sm">
@@ -272,6 +285,64 @@ export default function Dashboard({
                 )}
             </section>
         </PortalAppShell>
+    );
+}
+
+function TeacherDashboardPanel({ panel }: { panel: TeacherPanel }) {
+    return (
+        <section className="mt-6 space-y-6">
+            <div className="grid gap-6 xl:grid-cols-2">
+                <SimplePanel title="Assigned Subjects" empty="No assigned subjects found.">
+                    {panel.subjects.map((subject) => (
+                        <InfoRow key={subject.id} title={subject.name} meta={[subject.code, subject.class_name].filter(Boolean).join(' / ')} />
+                    ))}
+                </SimplePanel>
+
+                <SimplePanel title="Assigned Classes" empty="No assigned classes found.">
+                    {panel.classes.map((schoolClass) => (
+                        <InfoRow
+                            key={schoolClass.id}
+                            title={schoolClass.name}
+                            meta={[schoolClass.level, `${schoolClass.students_count} students`, `${schoolClass.groups_count} groups`].filter(Boolean).join(' / ')}
+                        />
+                    ))}
+                </SimplePanel>
+
+                <SimplePanel title="Student Groups" empty="No student groups found for assigned classes.">
+                    {panel.student_groups.map((group) => (
+                        <InfoRow key={group.id} title={group.name} meta={[group.code, group.class_name, `${group.students_count} students`, group.status].filter(Boolean).join(' / ')} />
+                    ))}
+                </SimplePanel>
+
+                <SimplePanel title="Students" empty="No students found in assigned classes.">
+                    {panel.students.map((student) => (
+                        <InfoRow key={student.id} title={student.name} meta={[student.registration_number, student.status].filter(Boolean).join(' / ')} />
+                    ))}
+                </SimplePanel>
+            </div>
+        </section>
+    );
+}
+
+function SimplePanel({ title, empty, children }: { title: string; empty: string; children: ReactNode }) {
+    const hasChildren = Children.count(children) > 0;
+
+    return (
+        <section className="rounded-md border border-border bg-white p-5 shadow-sm">
+            <h2 className="font-semibold text-slateDark">{title}</h2>
+            <div className="mt-4 space-y-3">
+                {!hasChildren ? <div className="rounded-md border border-dashed border-border p-4 text-sm text-slate-500">{empty}</div> : children}
+            </div>
+        </section>
+    );
+}
+
+function InfoRow({ title, meta }: { title: string; meta: string }) {
+    return (
+        <div className="rounded-md border border-border p-3">
+            <div className="text-sm font-semibold text-slateDark">{title}</div>
+            {meta && <div className="mt-1 text-xs text-slate-500">{meta}</div>}
+        </div>
     );
 }
 

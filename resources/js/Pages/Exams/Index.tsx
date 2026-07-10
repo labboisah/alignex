@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { Eye, Pencil, Plus, XCircle } from 'lucide-react';
+import { Eye, Pencil, Plus, Trash2, XCircle } from 'lucide-react';
 import { ActionDropdown, DataTable, PageHeader, PortalAppShell, ProtectedAction, StatusBadge } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
 import { Exam } from './types';
@@ -35,9 +35,10 @@ export default function ExamsIndex({ exams, can }: { exams: { data: Exam[] }; ca
                         render: (exam) => (
                             <ActionDropdown
                                 items={[
-                                    { label: 'View', icon: Eye, onSelect: () => router.visit(`/exams/${exam.id}`) },
-                                    { label: 'Edit', icon: Pencil, onSelect: () => router.visit(`/exams/${exam.id}/edit`) },
-                                    { label: 'Cancel Exam', icon: XCircle, destructive: true, disabled: exam.status === 'cancelled', onSelect: () => window.confirm('Cancel this exam?') && router.patch(`/exams/${exam.id}/cancel`, {}, { preserveScroll: true }) },
+                                    { label: 'View', icon: Eye, disabled: exam.can?.view === false, onSelect: () => router.visit(`/exams/${exam.id}`) },
+                                    { label: 'Edit', icon: Pencil, disabled: exam.can?.update === false, onSelect: () => router.visit(`/exams/${exam.id}/edit`) },
+                                    { label: 'Cancel Exam', icon: XCircle, destructive: true, disabled: exam.can?.cancel === false, onSelect: () => window.confirm('Cancel this exam?') && router.patch(`/exams/${exam.id}/cancel`, {}, { preserveScroll: true }) },
+                                    { label: 'Delete', icon: Trash2, destructive: true, disabled: exam.can?.delete === false, onSelect: () => window.confirm('Delete this exam?') && router.delete(`/exams/${exam.id}`, { preserveScroll: true }) },
                                 ]}
                             />
                         ),

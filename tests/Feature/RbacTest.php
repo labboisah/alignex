@@ -6,6 +6,7 @@ use App\Models\Center;
 use App\Models\Candidate;
 use App\Models\Exam;
 use App\Models\Organization;
+use App\Models\Role;
 use App\Models\School;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -94,67 +95,82 @@ class RbacTest extends TestCase
         $expected = [
             User::ROLE_SUPER_ADMIN => [
                 'Dashboard',
+                'Platform',
                 'Organizations',
-                'Access Controls',
                 'Applications',
                 'CBT Centers',
+                'Admin',
                 'Users',
+                'Access Controls',
                 'Reports',
             ],
             User::ROLE_ORGANIZATION_ADMIN => [
                 'Dashboard',
                 'Candidates',
+                'Candidate Groups',
+                'Questions',
+                'Subjects',
                 'Question Bank',
                 'Exams',
                 'Recruitment Exams',
                 'Assessment Exams',
                 'Certification Exams',
                 'Adaptive Exams',
-                'Results',
                 'Reports',
+                'Results',
+                'Admin',
                 'Users',
                 'Settings',
             ],
             User::ROLE_EXAMINER => [
                 'Dashboard',
                 'Candidates',
+                'Candidate Groups',
+                'Questions',
+                'Subjects',
                 'Question Bank',
                 'Exams',
                 'Recruitment Exams',
                 'Assessment Exams',
                 'Certification Exams',
                 'Adaptive Exams',
-                'Results',
                 'Reports',
+                'Results',
             ],
             User::ROLE_SUPERVISOR => [
                 'Dashboard',
-                'Results',
                 'Reports',
+                'Results',
             ],
             User::ROLE_CENTER_ADMIN => [
                 'Dashboard',
                 'Candidates',
+                'Candidate Groups',
+                'Questions',
+                'Subjects',
                 'Question Bank',
                 'Exams',
                 'Recruitment Exams',
                 'Assessment Exams',
                 'Certification Exams',
                 'Adaptive Exams',
-                'Results',
                 'Reports',
+                'Results',
             ],
             User::ROLE_SCHOOL_ADMIN => [
                 'Dashboard',
                 'Candidates',
+                'Candidate Groups',
+                'Questions',
+                'Subjects',
                 'Question Bank',
                 'Exams',
                 'Recruitment Exams',
                 'Assessment Exams',
                 'Certification Exams',
                 'Adaptive Exams',
-                'Results',
                 'Reports',
+                'Results',
             ],
         ];
 
@@ -166,12 +182,63 @@ class RbacTest extends TestCase
                 ->assertInertia(fn (Assert $page) => $page
                     ->component('Dashboard/Index')
                     ->where('auth.navigation', function ($navigation) use ($labels, $role) {
-                        $this->assertSame($labels, $navigation->pluck('label')->all(), "Navigation mismatch for {$role}");
+                        $actual = $navigation
+                            ->flatMap(fn ($item) => collect([data_get($item, 'label')])
+                                ->merge(collect(data_get($item, 'children', []))->pluck('label')))
+                            ->unique()
+                            ->values()
+                            ->all();
+
+                        $this->assertSame($labels, $actual, "Navigation mismatch for {$role}");
 
                         return true;
                     })
                 );
         }
+    }
+
+    public function test_teacher_sidebar_uses_default_permissions_when_role_permissions_are_empty(): void
+    {
+        Role::query()->updateOrCreate(
+            ['name' => User::ROLE_TEACHER],
+            [
+                'label' => 'Teacher',
+                'description' => 'Uploads questions and creates assessments for assigned secondary school subjects.',
+                'is_system' => true,
+            ]
+        )->permissions()->detach();
+
+        $teacher = User::factory()->create(['role' => User::ROLE_TEACHER]);
+
+        $this->actingAs($teacher)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Dashboard/Index')
+                ->where('auth.permissions.manageQuestionBank', true)
+                ->where('auth.permissions.manageExams', true)
+                ->where('auth.permissions.viewReports', true)
+                ->where('auth.navigation', function ($navigation) {
+                    $labels = collect($navigation)
+                        ->flatMap(fn ($item) => collect([data_get($item, 'label')])
+                            ->merge(collect(data_get($item, 'children', []))->pluck('label')))
+                        ->values()
+                        ->all();
+
+                    $this->assertSame([
+                        'Dashboard',
+                        'Question Management',
+                        'Subjects',
+                        'Question Bank',
+                        'Questions',
+                        'Exam',
+                        'Assessments',
+                        'Results',
+                    ], $labels);
+
+                    return true;
+                })
+            );
     }
 
     public function test_dashboard_metrics_are_scoped_to_user_role(): void

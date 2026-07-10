@@ -34,6 +34,11 @@ class QuestionResource extends JsonResource
             'negative_marks' => $this->negative_marks,
             'status' => $this->status,
             'status_label' => str($this->status)->replace('_', ' ')->title()->toString(),
+            'can' => [
+                'view' => $request->user()?->can('view', $this->resource) ?? false,
+                'update' => $request->user()?->can('update', $this->resource) ?? false,
+                'delete' => $request->user()?->can('delete', $this->resource) ?? false,
+            ],
             'options' => $this->whenLoaded('options', fn () => $this->options
                 ->sortBy('display_order')
                 ->values()

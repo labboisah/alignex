@@ -112,8 +112,8 @@ class StoreExamRequest extends FormRequest
     {
         $validator->after(function (Validator $validator): void {
             if ($this->isSecondaryExamRequest()) {
-                if ($this->input('exam_category') !== Exam::CATEGORY_TERMINAL) {
-                    $validator->errors()->add('exam_category', 'Secondary school exams must be terminal exams.');
+                if (! in_array($this->input('exam_category'), [Exam::CATEGORY_TERMINAL, Exam::CATEGORY_ASSESSMENT], true)) {
+                    $validator->errors()->add('exam_category', 'Secondary school exams must be terminal exams or assessments.');
                 }
 
                 if (($this->input('exam_mode') ?? $this->input('mode')) !== Exam::MODE_TRADITIONAL) {

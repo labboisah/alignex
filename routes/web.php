@@ -121,6 +121,10 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
         Route::post('/secondary-schools/{secondarySchool}/students', [SecondarySchoolController::class, 'storeStudent'])->name('secondary-schools.students.store');
         Route::patch('/secondary-schools/{secondarySchool}/students/{student}', [SecondarySchoolController::class, 'updateStudent'])->name('secondary-schools.students.update');
         Route::delete('/secondary-schools/{secondarySchool}/students/{student}', [SecondarySchoolController::class, 'destroyStudent'])->name('secondary-schools.students.destroy');
+        Route::get('/secondary-schools/{secondarySchool}/teachers', [SecondarySchoolController::class, 'teachers'])->name('secondary-schools.teachers.index');
+        Route::post('/secondary-schools/{secondarySchool}/teachers', [SecondarySchoolController::class, 'storeTeacher'])->name('secondary-schools.teachers.store');
+        Route::patch('/secondary-schools/{secondarySchool}/teachers/{teacher}', [SecondarySchoolController::class, 'updateTeacher'])->name('secondary-schools.teachers.update');
+        Route::delete('/secondary-schools/{secondarySchool}/teachers/{teacher}', [SecondarySchoolController::class, 'destroyTeacher'])->name('secondary-schools.teachers.destroy');
         Route::post('/secondary-schools/{secondarySchool}/subjects', [SecondarySchoolController::class, 'storeSubjectForSchool'])->name('secondary-schools.subjects.store');
         Route::get('/secondary-schools/{secondarySchool}/{section}/template', [SecondarySchoolController::class, 'structureTemplate'])->name('secondary-schools.structure.template');
         Route::post('/secondary-schools/{secondarySchool}/{section}/import', [SecondarySchoolController::class, 'importStructure'])->name('secondary-schools.structure.import');
@@ -225,7 +229,7 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
         ]))->name('settings.index');
     });
 
-    Route::middleware('role:super_admin,organization_admin,examiner,school_admin,secondary_school_admin,professional_school_admin,center_admin,cbt_center_admin,supervisor')->group(function (): void {
+    Route::middleware('role:super_admin,organization_admin,examiner,teacher,school_admin,secondary_school_admin,professional_school_admin,center_admin,cbt_center_admin,supervisor')->group(function (): void {
         Route::middleware('permission:manageQuestionBank')->group(function (): void {
             Route::get('/subjects/template', [SubjectController::class, 'template'])->name('subjects.template');
             Route::post('/subjects/import', [SubjectController::class, 'import'])->name('subjects.import');
@@ -250,6 +254,7 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
             Route::get('/question-bank', [QuestionBankController::class, 'index'])->name('question-bank.index');
             Route::get('/question-bank/create', [QuestionBankController::class, 'create'])->name('question-bank.create');
             Route::post('/question-bank', [QuestionBankController::class, 'store'])->name('question-bank.store');
+            Route::get('/question-bank/{questionBank}', [QuestionBankController::class, 'show'])->name('question-bank.show');
             Route::get('/question-bank/{questionBank}/edit', [QuestionBankController::class, 'edit'])->name('question-bank.edit');
             Route::patch('/question-bank/{questionBank}', [QuestionBankController::class, 'update'])->name('question-bank.update');
             Route::delete('/question-bank/{questionBank}', [QuestionBankController::class, 'destroy'])->name('question-bank.destroy');
@@ -273,6 +278,8 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
             Route::get('/exams/{exam}/edit', [ExamController::class, 'edit'])->name('exams.edit');
             Route::patch('/exams/{exam}', [ExamController::class, 'update'])->name('exams.update');
             Route::patch('/exams/{exam}/cancel', [ExamController::class, 'cancel'])->name('exams.cancel');
+            Route::delete('/exams/{exam}', [ExamController::class, 'destroy'])->name('exams.destroy');
+            Route::post('/exams/{exam}/participants/refresh', [ExamController::class, 'refreshParticipants'])->name('exams.participants.refresh');
             Route::get('/exams/{exam}/papers', [ExamPaperController::class, 'show'])->name('exams.papers.show');
             Route::post('/exams/{exam}/papers/generate', [ExamPaperController::class, 'generate'])->name('exams.papers.generate');
             Route::get('/exams/{exam}/recruitment', [RecruitmentController::class, 'show'])->name('exams.recruitment.show');
@@ -318,10 +325,18 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
             Route::post('/secondary-school/classes', [SecondarySchoolController::class, 'storeLegacyClass'])->name('secondary-school.classes.store');
             Route::patch('/secondary-school/classes/{schoolClass}', [SecondarySchoolController::class, 'updateLegacyClass'])->name('secondary-school.classes.update');
             Route::delete('/secondary-school/classes/{schoolClass}', [SecondarySchoolController::class, 'destroyLegacyClass'])->name('secondary-school.classes.destroy');
+            Route::get('/secondary-school/arms', [SecondarySchoolController::class, 'legacyArms'])->name('secondary-school.arms.index');
+            Route::post('/secondary-school/arms', [SecondarySchoolController::class, 'storeLegacyArm'])->name('secondary-school.arms.store');
+            Route::patch('/secondary-school/arms/{classArm}', [SecondarySchoolController::class, 'updateLegacyArm'])->name('secondary-school.arms.update');
+            Route::delete('/secondary-school/arms/{classArm}', [SecondarySchoolController::class, 'destroyLegacyArm'])->name('secondary-school.arms.destroy');
             Route::get('/secondary-school/students', [SecondarySchoolController::class, 'legacyStudents'])->name('secondary-school.students.index');
             Route::post('/secondary-school/students', [SecondarySchoolController::class, 'storeLegacyStudent'])->name('secondary-school.students.store');
             Route::patch('/secondary-school/students/{student}', [SecondarySchoolController::class, 'updateLegacyStudent'])->name('secondary-school.students.update');
             Route::delete('/secondary-school/students/{student}', [SecondarySchoolController::class, 'destroyLegacyStudent'])->name('secondary-school.students.destroy');
+            Route::get('/secondary-school/teachers', [SecondarySchoolController::class, 'legacyTeachers'])->middleware('permission:manageSchools')->name('secondary-school.teachers.index');
+            Route::post('/secondary-school/teachers', [SecondarySchoolController::class, 'storeLegacyTeacher'])->middleware('permission:manageSchools')->name('secondary-school.teachers.store');
+            Route::patch('/secondary-school/teachers/{teacher}', [SecondarySchoolController::class, 'updateLegacyTeacher'])->middleware('permission:manageSchools')->name('secondary-school.teachers.update');
+            Route::delete('/secondary-school/teachers/{teacher}', [SecondarySchoolController::class, 'destroyLegacyTeacher'])->middleware('permission:manageSchools')->name('secondary-school.teachers.destroy');
             Route::get('/secondary-school/student-groups', [SecondarySchoolController::class, 'legacyStudentGroups'])->name('secondary-school.student-groups.index');
             Route::post('/secondary-school/student-groups', [SecondarySchoolController::class, 'storeLegacyStudentGroup'])->name('secondary-school.student-groups.store');
             Route::patch('/secondary-school/student-groups/{studentGroup}', [SecondarySchoolController::class, 'updateLegacyStudentGroup'])->name('secondary-school.student-groups.update');

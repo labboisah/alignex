@@ -17,6 +17,11 @@ class QuestionBankPolicy
 
     public function view(User $user, QuestionBank $questionBank): bool
     {
+        if ($user->isTeacher()) {
+            return $questionBank->subject_id !== null
+                && $user->assignedSubjects()->whereKey($questionBank->subject_id)->exists();
+        }
+
         return $this->viewAny($user) && $this->canAccessTenant($user, $questionBank);
     }
 
@@ -32,6 +37,10 @@ class QuestionBankPolicy
 
     public function delete(User $user, QuestionBank $questionBank): bool
     {
+        if ($user->isTeacher()) {
+            return $this->view($user, $questionBank);
+        }
+
         return $user->hasPermission('manageQuestionBank')
             && $this->canAccessTenant($user, $questionBank);
     }

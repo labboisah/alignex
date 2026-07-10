@@ -12,7 +12,7 @@ class ExamOwnershipRules
     public static function allowedCategories(string $ownerType): array
     {
         return match ($ownerType) {
-            Exam::OWNER_SECONDARY_SCHOOL => [Exam::CATEGORY_TERMINAL],
+            Exam::OWNER_SECONDARY_SCHOOL => [Exam::CATEGORY_TERMINAL, Exam::CATEGORY_ASSESSMENT],
             Exam::OWNER_PROFESSIONAL_SCHOOL => [Exam::CATEGORY_PROFESSIONAL, Exam::CATEGORY_CERTIFICATION, Exam::CATEGORY_PRACTICE],
             Exam::OWNER_CBT_CENTER,
             Exam::OWNER_ORGANIZATION => [

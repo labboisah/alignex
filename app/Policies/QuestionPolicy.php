@@ -17,6 +17,11 @@ class QuestionPolicy
 
     public function view(User $user, Question $question): bool
     {
+        if ($user->isTeacher()) {
+            return $question->subject_id !== null
+                && $user->assignedSubjects()->whereKey($question->subject_id)->exists();
+        }
+
         return $this->viewAny($user) && $this->canAccessTenant($user, $question->loadMissing('questionBank'));
     }
 

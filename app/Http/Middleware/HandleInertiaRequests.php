@@ -128,6 +128,19 @@ class HandleInertiaRequests extends Middleware
                     ['label' => 'Reports', 'href' => '/reports', 'permission' => 'viewReports'],
                 ]],
             ]);
+        } elseif ($user->isTeacher()) {
+            $navigation = collect([
+                ['label' => 'Dashboard', 'href' => '/dashboard'],
+                ['label' => 'Question Management', 'children' => [
+                    ['label' => 'Subjects', 'href' => '/subjects', 'permission' => 'manageQuestionBank'],
+                    ['label' => 'Question Bank', 'href' => '/question-bank', 'permission' => 'manageQuestionBank'],
+                    ['label' => 'Questions', 'href' => '/questions', 'permission' => 'manageQuestionBank'],
+                ]],
+                ['label' => 'Exam', 'children' => [
+                    ['label' => 'Assessments', 'href' => '/exams?category=assessment', 'permission' => 'manageExams'],
+                ]],
+                ['label' => 'Results', 'href' => '/results', 'permission' => 'viewReports'],
+            ]);
         } else {
             $navigation = collect(match ($contextType) {
                 'secondary_school' => [
@@ -138,14 +151,16 @@ class HandleInertiaRequests extends Middleware
                         ['label' => 'Classes', 'href' => $secondaryHref('/classes'), 'permission' => 'manageSchools'],
                         ['label' => 'Students', 'href' => $secondaryHref('/students')],
                         ['label' => 'Student Groups', 'href' => $secondaryHref('/student-groups'), 'permission' => 'manageSchools'],
+                        ['label' => 'Teachers', 'href' => $secondaryHref('/teachers'), 'permission' => 'manageSchools'],
                     ]],
                     ['label' => 'Exam', 'children' => [
                         ['label' => 'Subjects', 'href' => '/subjects', 'permission' => 'manageQuestionBank'],
                         ['label' => 'Question Bank', 'href' => '/question-bank', 'permission' => 'manageQuestionBank'],
                         ['label' => 'Questions', 'href' => '/questions', 'permission' => 'manageQuestionBank'],
                         ['label' => 'Exams', 'href' => '/exams?category=terminal', 'permission' => 'manageExams'],
+                        ['label' => 'Assessments', 'href' => '/exams?category=assessment', 'permission' => 'manageExams'],
                     ]],
-                    ['label' => 'Results', 'href' => '/results'],
+                    ['label' => 'Results', 'href' => '/results', 'permission' => 'viewReports'],
                     ['label' => 'Reports', 'href' => '/reports', 'permission' => 'viewReports'],
                     ['label' => 'Settings', 'href' => '/settings', 'permission' => 'manageSettings'],
                 ],

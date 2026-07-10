@@ -29,6 +29,7 @@ class User extends Authenticatable
     public const ROLE_PROFESSIONAL_SCHOOL_ADMIN = 'professional_school_admin';
     public const ROLE_CBT_CENTER_ADMIN = 'cbt_center_admin';
     public const ROLE_EXAMINER = 'examiner';
+    public const ROLE_TEACHER = 'teacher';
     public const ROLE_SUPERVISOR = 'supervisor';
     public const ROLE_CANDIDATE = 'candidate';
     public const ROLE_STUDENT = 'student';
@@ -42,6 +43,7 @@ class User extends Authenticatable
         self::ROLE_PROFESSIONAL_SCHOOL_ADMIN,
         self::ROLE_CBT_CENTER_ADMIN,
         self::ROLE_EXAMINER,
+        self::ROLE_TEACHER,
         self::ROLE_SUPERVISOR,
     ];
 
@@ -106,6 +108,13 @@ class User extends Authenticatable
     public function createdQuestions(): HasMany
     {
         return $this->hasMany(Question::class, 'created_by');
+    }
+
+    public function assignedSubjects(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Subject::class, 'subject_teacher', 'user_id', 'subject_id')
+            ->withPivot('school_id', 'secondary_school_id', 'school_class_id')
+            ->withTimestamps();
     }
 
     public function reviewedQuestions(): HasMany
@@ -173,6 +182,11 @@ class User extends Authenticatable
         return $this->role === self::ROLE_SUPERVISOR;
     }
 
+    public function isTeacher(): bool
+    {
+        return $this->role === self::ROLE_TEACHER;
+    }
+
     public function isCandidate(): bool
     {
         return $this->role === self::ROLE_CANDIDATE;
@@ -194,10 +208,24 @@ class User extends Authenticatable
             return false;
         }
 
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
         if (Schema::hasTable('roles') && Schema::hasTable('permissions')) {
-            return $this->systemRole()
-                ->whereHas('permissions', fn ($query) => $query->where('name', $permission))
-                ->exists();
+            $role = $this->systemRole()
+                ->with('permissions:id,name')
+                ->first();
+
+            if ($role) {
+                if ($role->permissions->contains('name', $permission)) {
+                    return true;
+                }
+
+                if ($role->permissions->isNotEmpty()) {
+                    return false;
+                }
+            }
         }
 
         return in_array($permission, AccessControl::defaults()[$this->role] ?? [], true);
@@ -303,6 +331,7 @@ class User extends Authenticatable
             self::ROLE_PROFESSIONAL_SCHOOL_ADMIN,
             self::ROLE_CBT_CENTER_ADMIN,
             self::ROLE_EXAMINER,
+            self::ROLE_TEACHER,
             self::ROLE_SUPERVISOR => 'dashboard',
             default => 'dashboard',
         };

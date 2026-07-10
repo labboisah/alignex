@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\Exam;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -77,6 +78,12 @@ class ExamResource extends JsonResource
                 'submitted' => $this->attempts()->whereIn('status', ['submitted', 'auto_submitted'])->count(),
                 'passed' => $this->attempts()->where('result_status', 'passed')->count(),
                 'failed' => $this->attempts()->where('result_status', 'failed')->count(),
+            ],
+            'can' => [
+                'view' => $request->user()?->can('view', $this->resource) ?? false,
+                'update' => $request->user()?->can('update', $this->resource) ?? false,
+                'delete' => $request->user()?->can('delete', $this->resource) ?? false,
+                'cancel' => ($request->user()?->can('update', $this->resource) ?? false) && $this->status !== Exam::STATUS_CANCELLED,
             ],
             'candidate_ids' => $this->whenLoaded('candidates', fn () => $this->candidates->pluck('id')->values()),
             'student_ids' => data_get($this->settings ?? [], 'secondary_student_ids', []),

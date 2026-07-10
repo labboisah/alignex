@@ -114,4 +114,10 @@ export type Exam = Record<string, unknown> & {
     settings: ExamSettings;
     subjects?: ExamSubject[];
     subjects_count?: number;
+    can?: {
+        view: boolean;
+        update: boolean;
+        delete: boolean;
+        cancel: boolean;
+    };
 };

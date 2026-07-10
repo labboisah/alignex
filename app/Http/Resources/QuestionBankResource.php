@@ -41,6 +41,11 @@ class QuestionBankResource extends JsonResource
             'status' => $this->status,
             'status_label' => str($this->status)->replace('_', ' ')->title()->toString(),
             'questions_count' => $this->whenCounted('questions'),
+            'can' => [
+                'view' => $request->user()?->can('view', $this->resource) ?? false,
+                'update' => $request->user()?->can('update', $this->resource) ?? false,
+                'delete' => $request->user()?->can('delete', $this->resource) ?? false,
+            ],
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

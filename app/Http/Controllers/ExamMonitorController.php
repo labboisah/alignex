@@ -155,6 +155,7 @@ class ExamMonitorController extends Controller
                         ->when($user->professional_school_id, fn ($scope) => $scope->orWhere('professional_school_id', $user->professional_school_id))
                         ->when($user->cbt_center_id, fn ($scope) => $scope->orWhere('cbt_center_id', $user->cbt_center_id));
                 });
-            });
+            })
+            ->when($user->isTeacher(), fn (Builder $query) => $query->whereHas('examSubjects', fn (Builder $subjectQuery) => $subjectQuery->whereIn('subject_id', $user->assignedSubjects()->select('subjects.id'))));
     }
 }

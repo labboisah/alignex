@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
@@ -537,6 +538,83 @@ class SecondarySchoolController extends Controller
         return back()->with('success', 'Student deleted.');
     }
 
+    public function teachers(Request $request, SecondarySchool $secondarySchool): InertiaResponse
+    {
+        $this->authorizeSecondarySchoolRecord($request->user(), $secondarySchool);
+
+        return Inertia::render('SecondarySchools/Teachers', [
+            'secondarySchool' => $this->secondarySchoolRow($secondarySchool),
+            'classes' => $secondarySchool->schoolClasses()->orderBy('level_order')->get(['id', 'name', 'level']),
+            'subjects' => $secondarySchool->subjects()->whereNotNull('school_class_id')->orderBy('name')->get(['id', 'school_class_id', 'name', 'code']),
+            'teachers' => User::query()
+                ->where('role', User::ROLE_TEACHER)
+                ->where('secondary_school_id', $secondarySchool->id)
+                ->with('assignedSubjects:id,school_class_id,name,code')
+                ->orderBy('name')
+                ->get()
+                ->map(fn (User $teacher) => $this->teacherRow($teacher)),
+        ]);
+    }
+
+    public function storeTeacher(Request $request, SecondarySchool $secondarySchool): RedirectResponse
+    {
+        $this->authorizeSecondarySchoolRecord($request->user(), $secondarySchool, update: true);
+        $data = $request->validate($this->teacherRulesForUser());
+        $this->authorizeTeacherSubjectIds($secondarySchool, $data['school_class_id'], $data['subject_ids']);
+
+        DB::transaction(function () use ($secondarySchool, $data): void {
+            $teacher = User::query()->create([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'password' => Hash::make($data['password']),
+                'role' => User::ROLE_TEACHER,
+                'organization_id' => $secondarySchool->organization_id,
+                'secondary_school_id' => $secondarySchool->id,
+                'active_context_type' => 'secondary_school',
+                'active_context_id' => $secondarySchool->id,
+            ]);
+
+            $this->syncTeacherSubjects($teacher, $secondarySchool, $data['school_class_id'], $data['subject_ids']);
+        });
+
+        return back()->with('success', 'Teacher account created.');
+    }
+
+    public function updateTeacher(Request $request, SecondarySchool $secondarySchool, User $teacher): RedirectResponse
+    {
+        $this->authorizeSecondarySchoolRecord($request->user(), $secondarySchool, update: true);
+        $this->authorizeTeacherRecord($secondarySchool, $teacher);
+
+        $data = $request->validate($this->teacherRulesForUser($teacher));
+        $this->authorizeTeacherSubjectIds($secondarySchool, $data['school_class_id'], $data['subject_ids']);
+
+        DB::transaction(function () use ($teacher, $secondarySchool, $data): void {
+            $payload = [
+                'name' => $data['name'],
+                'email' => $data['email'],
+            ];
+
+            if (filled($data['password'] ?? null)) {
+                $payload['password'] = Hash::make($data['password']);
+            }
+
+            $teacher->update($payload);
+            $this->syncTeacherSubjects($teacher, $secondarySchool, $data['school_class_id'], $data['subject_ids']);
+        });
+
+        return back()->with('success', 'Teacher account updated.');
+    }
+
+    public function destroyTeacher(Request $request, SecondarySchool $secondarySchool, User $teacher): RedirectResponse
+    {
+        $this->authorizeSecondarySchoolRecord($request->user(), $secondarySchool, update: true);
+        $this->authorizeTeacherRecord($secondarySchool, $teacher);
+
+        $teacher->delete();
+
+        return back()->with('success', 'Teacher account deleted.');
+    }
+
     public function storeSubjectForSchool(Request $request, SecondarySchool $secondarySchool): RedirectResponse
     {
         $this->authorizeSecondarySchoolRecord($request->user(), $secondarySchool, update: true);
@@ -951,6 +1029,81 @@ class SecondarySchoolController extends Controller
         $student->delete();
 
         return back()->with('success', 'Student deleted.');
+    }
+
+    public function legacyTeachers(Request $request): InertiaResponse
+    {
+        $school = $this->legacySchool($request->user());
+
+        return Inertia::render('SecondarySchools/Teachers', [
+            'secondarySchool' => $this->legacySchoolRow($school),
+            'basePath' => '/secondary-school/teachers',
+            'classes' => SchoolClass::query()->where('school_id', $school->id)->orderBy('level_order')->get(['id', 'name', 'level']),
+            'subjects' => Subject::query()->where('school_id', $school->id)->whereNotNull('school_class_id')->orderBy('name')->get(['id', 'school_class_id', 'name', 'code']),
+            'teachers' => User::query()
+                ->where('role', User::ROLE_TEACHER)
+                ->where('school_id', $school->id)
+                ->with('assignedSubjects:id,school_class_id,name,code')
+                ->orderBy('name')
+                ->get()
+                ->map(fn (User $teacher) => $this->teacherRow($teacher)),
+        ]);
+    }
+
+    public function storeLegacyTeacher(Request $request): RedirectResponse
+    {
+        $school = $this->legacySchool($request->user(), update: true);
+        $data = $request->validate($this->teacherRulesForUser());
+        $this->authorizeLegacyTeacherSubjectIds($school, $data['school_class_id'], $data['subject_ids']);
+
+        DB::transaction(function () use ($school, $data): void {
+            $teacher = User::query()->create([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'password' => Hash::make($data['password']),
+                'role' => User::ROLE_TEACHER,
+                'organization_id' => $school->organization_id,
+                'school_id' => $school->id,
+                'active_context_type' => 'secondary_school',
+                'active_context_id' => $school->id,
+            ]);
+
+            $this->syncLegacyTeacherSubjects($teacher, $school, $data['school_class_id'], $data['subject_ids']);
+        });
+
+        return back()->with('success', 'Teacher account created.');
+    }
+
+    public function updateLegacyTeacher(Request $request, User $teacher): RedirectResponse
+    {
+        $school = $this->legacySchool($request->user(), update: true);
+        $this->authorizeLegacyTeacherRecord($school, $teacher);
+
+        $data = $request->validate($this->teacherRulesForUser($teacher));
+        $this->authorizeLegacyTeacherSubjectIds($school, $data['school_class_id'], $data['subject_ids']);
+
+        DB::transaction(function () use ($teacher, $school, $data): void {
+            $payload = ['name' => $data['name'], 'email' => $data['email']];
+
+            if (filled($data['password'] ?? null)) {
+                $payload['password'] = Hash::make($data['password']);
+            }
+
+            $teacher->update($payload);
+            $this->syncLegacyTeacherSubjects($teacher, $school, $data['school_class_id'], $data['subject_ids']);
+        });
+
+        return back()->with('success', 'Teacher account updated.');
+    }
+
+    public function destroyLegacyTeacher(Request $request, User $teacher): RedirectResponse
+    {
+        $school = $this->legacySchool($request->user(), update: true);
+        $this->authorizeLegacyTeacherRecord($school, $teacher);
+
+        $teacher->delete();
+
+        return back()->with('success', 'Teacher account deleted.');
     }
 
     public function legacyStudentGroups(Request $request): InertiaResponse
@@ -1481,6 +1634,82 @@ class SecondarySchoolController extends Controller
         ];
     }
 
+    private function teacherRulesForUser(?User $teacher = null): array
+    {
+        return [
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($teacher)],
+            'password' => [$teacher ? 'nullable' : 'required', 'string', 'min:8', 'max:255'],
+            'school_class_id' => ['required', 'string', 'exists:school_classes,id'],
+            'subject_ids' => ['required', 'array', 'min:1'],
+            'subject_ids.*' => ['string', 'exists:subjects,id', 'distinct'],
+        ];
+    }
+
+    private function authorizeTeacherRecord(SecondarySchool $secondarySchool, User $teacher): void
+    {
+        abort_unless($teacher->role === User::ROLE_TEACHER && (string) $teacher->secondary_school_id === (string) $secondarySchool->id, 404);
+    }
+
+    private function authorizeTeacherSubjectIds(SecondarySchool $secondarySchool, string $schoolClassId, array $subjectIds): void
+    {
+        abort_unless($secondarySchool->schoolClasses()->whereKey($schoolClassId)->exists(), 422, 'Choose a class within this secondary school.');
+
+        $subjectIds = collect($subjectIds)->filter()->unique()->values();
+        $count = $secondarySchool->subjects()
+            ->where('school_class_id', $schoolClassId)
+            ->whereIn('id', $subjectIds)
+            ->count();
+
+        abort_unless($count === $subjectIds->count(), 422, 'Choose subjects within the selected class.');
+    }
+
+    private function syncTeacherSubjects(User $teacher, SecondarySchool $secondarySchool, string $schoolClassId, array $subjectIds): void
+    {
+        $teacher->assignedSubjects()->sync(
+            collect($subjectIds)
+                ->filter()
+                ->unique()
+                ->mapWithKeys(fn (string $subjectId) => [$subjectId => [
+                    'school_class_id' => $schoolClassId,
+                    'secondary_school_id' => $secondarySchool->id,
+                ]])
+                ->all()
+        );
+    }
+
+    private function authorizeLegacyTeacherRecord(School $school, User $teacher): void
+    {
+        abort_unless($teacher->role === User::ROLE_TEACHER && (string) $teacher->school_id === (string) $school->id, 404);
+    }
+
+    private function authorizeLegacyTeacherSubjectIds(School $school, string $schoolClassId, array $subjectIds): void
+    {
+        $this->authorizeLegacyClass($school, $schoolClassId);
+        $subjectIds = collect($subjectIds)->filter()->unique()->values();
+        $count = Subject::query()
+            ->where('school_id', $school->id)
+            ->where('school_class_id', $schoolClassId)
+            ->whereIn('id', $subjectIds)
+            ->count();
+
+        abort_unless($count === $subjectIds->count(), 422, 'Choose subjects within the selected class.');
+    }
+
+    private function syncLegacyTeacherSubjects(User $teacher, School $school, string $schoolClassId, array $subjectIds): void
+    {
+        $teacher->assignedSubjects()->sync(
+            collect($subjectIds)
+                ->filter()
+                ->unique()
+                ->mapWithKeys(fn (string $subjectId) => [$subjectId => [
+                    'school_class_id' => $schoolClassId,
+                    'school_id' => $school->id,
+                ]])
+                ->all()
+        );
+    }
+
     private function authorizeStudentGroupRecord(SecondarySchool $secondarySchool, StudentGroup $studentGroup): void
     {
         $studentGroup->loadMissing('schoolClass');
@@ -1577,6 +1806,34 @@ class SecondarySchoolController extends Controller
             'photo' => $student->photo,
             'class_name' => $student->schoolClass?->name,
             'status' => $student->status,
+        ];
+    }
+
+    private function teacherRow(User $teacher): array
+    {
+        $classIds = $teacher->assignedSubjects
+            ->pluck('pivot.school_class_id')
+            ->filter()
+            ->unique()
+            ->values();
+        $classes = SchoolClass::query()
+            ->whereIn('id', $classIds)
+            ->get(['id', 'name', 'level'])
+            ->keyBy('id');
+
+        return [
+            'id' => $teacher->id,
+            'name' => $teacher->name,
+            'email' => $teacher->email,
+            'school_class_id' => $classIds->first(),
+            'subject_ids' => $teacher->assignedSubjects->pluck('id')->values()->all(),
+            'subjects' => $teacher->assignedSubjects->map(fn (Subject $subject) => [
+                'id' => $subject->id,
+                'school_class_id' => $subject->pivot?->school_class_id,
+                'class_name' => $classes->get($subject->pivot?->school_class_id)?->name,
+                'name' => $subject->name,
+                'code' => $subject->code,
+            ])->values()->all(),
         ];
     }
 

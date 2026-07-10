@@ -44,4 +44,9 @@ export type QuestionBank = Record<string, unknown> & {
     status: 'draft' | 'active' | 'archived';
     status_label: string;
     questions_count?: number;
+    can?: {
+        view: boolean;
+        update: boolean;
+        delete: boolean;
+    };
 };

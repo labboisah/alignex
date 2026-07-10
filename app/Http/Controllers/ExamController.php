@@ -77,6 +77,7 @@ class ExamController extends Controller
             'can' => [
                 'update' => $request->user()->can('update', $exam),
                 'cancel' => $request->user()->can('update', $exam) && $exam->status !== Exam::STATUS_CANCELLED,
+                'delete' => $request->user()->can('delete', $exam),
             ],
         ]);
     }
@@ -106,6 +107,115 @@ class ExamController extends Controller
         $exam->update(['status' => Exam::STATUS_CANCELLED]);
 
         return back()->with('success', 'Exam cancelled.');
+    }
+
+    public function destroy(Exam $exam): RedirectResponse
+    {
+        Gate::authorize('delete', $exam);
+        abort_if($exam->attempts()->exists(), 422, 'Exams with candidate attempts cannot be deleted.');
+
+        $exam->delete();
+
+        return redirect()->route('exams.index')->with('success', 'Exam deleted.');
+    }
+
+    public function refreshParticipants(Request $request, Exam $exam): RedirectResponse
+    {
+        Gate::authorize('update', $exam);
+
+        $summary = DB::transaction(fn () => $this->refreshExamParticipants($exam->fresh()));
+
+        return back()->with('success', $summary);
+    }
+
+    private function refreshExamParticipants(Exam $exam): string
+    {
+        $ownerType = $exam->effectiveOwnerType();
+        $settings = $exam->settings ?? [];
+        $assignment = app(ExamParticipantAssignmentService::class);
+
+        if ($ownerType === Exam::OWNER_SECONDARY_SCHOOL) {
+            $groupId = data_get($settings, 'secondary_student_group_id');
+
+            if (! $groupId) {
+                throw ValidationException::withMessages(['student_group_id' => 'This exam has no student group to refresh from.']);
+            }
+
+            $studentIds = $this->secondaryStudentIdsForExam($this->tenantForExam($exam), ['student_group_id' => $groupId]);
+            $exam->forceFill([
+                'settings' => [
+                    ...$settings,
+                    'secondary_student_group_id' => $groupId,
+                    'secondary_student_ids' => $studentIds,
+                ],
+            ])->save();
+            $assignment->syncStudents($exam, $studentIds);
+
+            return count($studentIds).' students refreshed from the selected group.';
+        }
+
+        if ($ownerType === Exam::OWNER_PROFESSIONAL_SCHOOL) {
+            $batchId = data_get($settings, 'professional_training_batch_id') ?? $exam->training_batch_id;
+
+            if (! $batchId) {
+                $candidateIds = collect(data_get($settings, 'participant_candidate_ids', []))->filter()->map(fn ($id) => (string) $id)->unique()->values()->all();
+                $assignment->syncCandidates($exam, $candidateIds);
+
+                return count($candidateIds).' candidates refreshed from saved exam participants.';
+            }
+
+            $candidateIds = $this->professionalBatchCandidateIds($this->tenantForExam($exam), ['training_batch_id' => $batchId]);
+            $exam->forceFill([
+                'training_batch_id' => $batchId,
+                'settings' => [
+                    ...$settings,
+                    'professional_training_batch_id' => $batchId,
+                    'participant_candidate_ids' => $candidateIds,
+                ],
+            ])->save();
+            $assignment->syncCandidates($exam, $candidateIds);
+
+            return count($candidateIds).' candidates refreshed from the selected batch.';
+        }
+
+        if (in_array($ownerType, [Exam::OWNER_CBT_CENTER, Exam::OWNER_ORGANIZATION], true)) {
+            $groupIds = collect(
+                data_get($settings, $ownerType === Exam::OWNER_CBT_CENTER ? 'cbt_candidate_group_ids' : 'participant_candidate_group_ids', [])
+            )
+                ->merge([data_get($settings, $ownerType === Exam::OWNER_CBT_CENTER ? 'cbt_candidate_group_id' : 'participant_candidate_group_id')])
+                ->filter()
+                ->map(fn ($id) => (string) $id)
+                ->unique()
+                ->values()
+                ->all();
+
+            $candidateIds = $groupIds !== []
+                ? $this->resolveCandidateIds($this->tenantForExam($exam), ['candidate_group_ids' => $groupIds])
+                : collect(data_get($settings, 'participant_candidate_ids', data_get($settings, 'cbt_candidate_ids', [])))->filter()->map(fn ($id) => (string) $id)->unique()->values()->all();
+
+            $nextSettings = [
+                ...$settings,
+                'participant_candidate_ids' => $candidateIds,
+                'participant_candidate_group_id' => $groupIds[0] ?? data_get($settings, 'participant_candidate_group_id'),
+                'participant_candidate_group_ids' => $groupIds,
+            ];
+
+            if ($ownerType === Exam::OWNER_CBT_CENTER) {
+                $nextSettings = [
+                    ...$nextSettings,
+                    'cbt_candidate_ids' => $candidateIds,
+                    'cbt_candidate_group_id' => $groupIds[0] ?? data_get($settings, 'cbt_candidate_group_id'),
+                    'cbt_candidate_group_ids' => $groupIds,
+                ];
+            }
+
+            $exam->forceFill(['settings' => $nextSettings])->save();
+            $assignment->syncCandidates($exam, $candidateIds);
+
+            return count($candidateIds).' candidates refreshed from '.($groupIds === [] ? 'saved exam participants.' : 'the selected group(s).');
+        }
+
+        throw ValidationException::withMessages(['exam' => 'This exam owner type does not support participant refresh.']);
     }
 
     private function persistExam(StoreExamRequest $request, ?Exam $exam = null): Exam
@@ -298,6 +408,7 @@ class ExamController extends Controller
             ->when($cbtCenter, fn ($query) => $query->where('cbt_center_id', $cbtCenter->id))
             ->when($request->filled('category'), fn ($query) => $query->where('exam_category', $request->query('category')))
             ->when($request->filled('mode'), fn ($query) => $query->where(fn ($inner) => $inner->where('exam_mode', $request->query('mode'))->orWhere('mode', $request->query('mode'))))
+            ->when($user->isTeacher(), fn ($query) => $query->whereHas('examSubjects', fn ($subjectQuery) => $subjectQuery->whereIn('subject_id', $user->assignedSubjects()->select('subjects.id'))))
             ->when(! $user->isSuperAdmin() && $user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
             ->when(! $user->isSuperAdmin() && $user->school_id, fn ($query) => $query->where('school_id', $user->school_id))
             ->when(! $user->isSuperAdmin() && $user->center_id, fn ($query) => $query->where('center_id', $user->center_id))
@@ -319,6 +430,7 @@ class ExamController extends Controller
             ->when($secondarySchool, fn ($query) => $query->where('secondary_school_id', $secondarySchool->id))
             ->when($professionalSchool, fn ($query) => $query->where('professional_school_id', $professionalSchool->id))
             ->when($cbtCenter, fn ($query) => $query->where('cbt_center_id', $cbtCenter->id))
+            ->when($user->isTeacher(), fn ($query) => $query->whereIn('id', $user->assignedSubjects()->select('subjects.id')))
             ->when(! $user->isSuperAdmin() && $user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
             ->when(! $user->isSuperAdmin() && $user->school_id, fn ($query) => $query->where('school_id', $user->school_id))
             ->when(! $user->isSuperAdmin() && $user->center_id, fn ($query) => $query->where('center_id', $user->center_id))
@@ -403,7 +515,7 @@ class ExamController extends Controller
             return $this->tenantPayload(Exam::OWNER_ORGANIZATION, $user->organization_id);
         }
 
-        if ($user->isSecondarySchoolAdmin() || ($user->isExaminer() && ($user->secondary_school_id || $user->school_id))) {
+        if ($user->isSecondarySchoolAdmin() || (($user->isExaminer() || $user->isTeacher()) && ($user->secondary_school_id || $user->school_id))) {
             return $user->secondary_school_id
                 ? $this->tenantPayload(Exam::OWNER_SECONDARY_SCHOOL, $user->secondary_school_id)
                 : $this->tenantPayload(Exam::OWNER_SECONDARY_SCHOOL, $user->school_id, ['school_id' => $user->school_id]);
@@ -431,6 +543,27 @@ class ExamController extends Controller
         }
 
         throw ValidationException::withMessages(['organization_id' => 'Choose exactly one organization, secondary school, professional school, or CBT center scope.']);
+    }
+
+    private function tenantForExam(Exam $exam): array
+    {
+        return [
+            'organization_id' => $exam->organization_id,
+            'school_id' => $exam->school_id,
+            'center_id' => $exam->center_id,
+            'secondary_school_id' => $exam->secondary_school_id,
+            'professional_school_id' => $exam->professional_school_id,
+            'cbt_center_id' => $exam->cbt_center_id,
+            'exam_owner_type' => $exam->exam_owner_type ?? $exam->owner_type ?? $exam->effectiveOwnerType(),
+            'exam_owner_id' => $exam->exam_owner_id ?? $exam->owner_id ?? $this->ownerIdFor($exam->effectiveOwnerType(), [
+                'organization_id' => $exam->organization_id,
+                'school_id' => $exam->school_id,
+                'center_id' => $exam->center_id,
+                'secondary_school_id' => $exam->secondary_school_id,
+                'professional_school_id' => $exam->professional_school_id,
+                'cbt_center_id' => $exam->cbt_center_id,
+            ]),
+        ];
     }
 
     private function examTypeFor(string $code): ExamType
@@ -672,6 +805,7 @@ class ExamController extends Controller
         $user = $request->user();
 
         return QuestionBank::query()
+            ->when($user->isTeacher(), fn ($query) => $query->whereIn('subject_id', $user->assignedSubjects()->select('subjects.id')))
             ->when(! $user->isSuperAdmin(), function ($query) use ($user): void {
                 $query->where(function ($inner) use ($user): void {
                     $inner->whereRaw('1 = 0')

@@ -44,6 +44,10 @@ class AccessControl
                 'label' => 'Examiner',
                 'description' => 'Builds subjects, question banks, exams, candidates, results, and reports.',
             ],
+            User::ROLE_TEACHER => [
+                'label' => 'Teacher',
+                'description' => 'Uploads questions and creates assessments for assigned secondary school subjects.',
+            ],
             User::ROLE_SUPERVISOR => [
                 'label' => 'Supervisor',
                 'description' => 'Monitors assigned exams, candidate activity, incidents, and reports.',
@@ -170,6 +174,11 @@ class AccessControl
                 'manageSettings',
             ],
             User::ROLE_EXAMINER => [
+                'manageQuestionBank',
+                'manageExams',
+                'viewReports',
+            ],
+            User::ROLE_TEACHER => [
                 'manageQuestionBank',
                 'manageExams',
                 'viewReports',

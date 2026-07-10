@@ -19,10 +19,12 @@ use App\Models\Organization;
 use App\Models\SecondarySchool;
 use App\Models\SchoolClass;
 use App\Models\Student;
+use App\Models\StudentGroup;
 use App\Models\Subject;
 use App\Models\User;
 use App\Support\AccessControl;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 class DashboardSummaryService
 {
@@ -30,9 +32,15 @@ class DashboardSummaryService
     {
         $context ??= app(CurrentContextService::class)->current($user);
         $examScope = $this->examScope($context);
+
+        if ($user->isTeacher()) {
+            $examScope = $this->teacherExamScope($user, $examScope);
+        }
+
         $attemptScope = CandidateExamAttempt::query()->whereIn('exam_id', (clone $examScope)->select('id'));
         $submittedScope = (clone $attemptScope)->whereIn('status', [CandidateExamAttempt::STATUS_SUBMITTED, CandidateExamAttempt::STATUS_AUTO_SUBMITTED]);
         $result = $this->resultSummary($submittedScope);
+        $teacherPanel = $user->isTeacher() ? $this->teacherPanel($user, $examScope, $submittedScope) : null;
 
         return [
             'role' => [
@@ -47,7 +55,7 @@ class DashboardSummaryService
                 },
             ],
             'current_context' => $context,
-            'metrics' => $this->metrics($context, $examScope, $submittedScope, $result),
+            'metrics' => $teacherPanel['metrics'] ?? $this->metrics($context, $examScope, $submittedScope, $result),
             'exam_status' => $this->examStatus($examScope),
             'result_summary' => $result,
             'charts' => $this->charts($context, $examScope, $submittedScope, $result),
@@ -57,6 +65,7 @@ class DashboardSummaryService
             'recent_exams' => $this->recentExams($examScope),
             'work_queue' => $this->workQueue($examScope, $attemptScope),
             'quick_actions' => $this->quickActions($user, $context),
+            'teacher_panel' => $teacherPanel,
         ];
     }
 
@@ -144,6 +153,110 @@ class DashboardSummaryService
             ->when($type === 'secondary_school', fn ($query) => $query->where('secondary_school_id', $id))
             ->when($type === 'professional_school', fn ($query) => $query->where('professional_school_id', $id))
             ->when($type === 'cbt_center', fn ($query) => $query->where('cbt_center_id', $id));
+    }
+
+    private function teacherExamScope(User $user, Builder $examScope): Builder
+    {
+        return $examScope
+            ->whereHas('examSubjects', fn (Builder $query) => $query->whereIn('subject_id', $user->assignedSubjects()->select('subjects.id')))
+            ->when($user->secondary_school_id, fn (Builder $query) => $query->where('secondary_school_id', $user->secondary_school_id))
+            ->when($user->school_id, fn (Builder $query) => $query->where('school_id', $user->school_id));
+    }
+
+    private function teacherPanel(User $user, Builder $examScope, Builder $submittedScope): array
+    {
+        $assignments = $user->assignedSubjects()
+            ->with('schoolClass:id,name,level')
+            ->orderBy('name')
+            ->get();
+        $subjectIds = $assignments->pluck('id')->unique()->values();
+        $classIds = $assignments->pluck('pivot.school_class_id')->filter()->unique()->values();
+        $students = Student::query()
+            ->whereIn('school_class_id', $classIds)
+            ->when($user->secondary_school_id, fn (Builder $query) => $query->where('secondary_school_id', $user->secondary_school_id))
+            ->latest()
+            ->limit(8)
+            ->get();
+
+        return [
+            'metrics' => [
+                $this->metric('Assigned Subjects', $subjectIds->count(), 'Subjects this teacher can manage.', 'BookOpen'),
+                $this->metric('Assigned Classes', $classIds->count(), 'Classes linked to assigned subjects.', 'GraduationCap'),
+                $this->metric('Students', $this->teacherStudentCount($user, $classIds), 'Students in assigned classes.', 'Users'),
+                $this->metric('Student Groups', $this->teacherGroupCount($user, $classIds), 'Groups in assigned classes.', 'Users'),
+                $this->metric('Assessments', (clone $examScope)->where('exam_category', Exam::CATEGORY_ASSESSMENT)->count(), 'Assessments using assigned subjects.', 'ClipboardList'),
+                $this->metric('Submitted Results', (clone $submittedScope)->count(), 'Submitted attempts for assigned-subject exams.', 'CheckCircle2'),
+            ],
+            'subjects' => $assignments->map(fn (Subject $subject) => [
+                'id' => $subject->id,
+                'name' => $subject->name,
+                'code' => $subject->code,
+                'class_name' => $subject->schoolClass?->name,
+            ])->values()->all(),
+            'classes' => $this->teacherClasses($classIds),
+            'student_groups' => $this->teacherGroups($classIds),
+            'students' => $students->map(fn (Student $student) => [
+                'id' => (string) $student->id,
+                'name' => trim($student->first_name.' '.$student->last_name),
+                'registration_number' => $student->admission_number,
+                'status' => $student->status,
+            ])->all(),
+        ];
+    }
+
+    private function teacherStudentCount(User $user, Collection $classIds): int
+    {
+        return Student::query()
+            ->whereIn('school_class_id', $classIds)
+            ->when($user->secondary_school_id, fn (Builder $query) => $query->where('secondary_school_id', $user->secondary_school_id))
+            ->count();
+    }
+
+    private function teacherGroupCount(User $user, Collection $classIds): int
+    {
+        return StudentGroup::query()
+            ->whereIn('school_class_id', $classIds)
+            ->whereHas('schoolClass', fn (Builder $query) => $query
+                ->when($user->secondary_school_id, fn (Builder $scope) => $scope->where('secondary_school_id', $user->secondary_school_id))
+                ->when($user->school_id, fn (Builder $scope) => $scope->where('school_id', $user->school_id)))
+            ->count();
+    }
+
+    private function teacherClasses(Collection $classIds): array
+    {
+        return SchoolClass::query()
+            ->whereIn('id', $classIds)
+            ->withCount(['students', 'groups'])
+            ->orderBy('level_order')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (SchoolClass $class) => [
+                'id' => $class->id,
+                'name' => $class->name,
+                'level' => $class->level,
+                'students_count' => $class->students_count,
+                'groups_count' => $class->groups_count,
+            ])
+            ->all();
+    }
+
+    private function teacherGroups(Collection $classIds): array
+    {
+        return StudentGroup::query()
+            ->whereIn('school_class_id', $classIds)
+            ->with('schoolClass:id,name')
+            ->withCount('students')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (StudentGroup $group) => [
+                'id' => $group->id,
+                'name' => $group->name,
+                'code' => $group->code,
+                'class_name' => $group->schoolClass?->name,
+                'students_count' => $group->students_count,
+                'status' => $group->status,
+            ])
+            ->all();
     }
 
     private function charts(?array $context, Builder $examScope, Builder $submittedScope, array $result): array
@@ -256,7 +369,8 @@ class DashboardSummaryService
                 ['label' => 'Manage Terms', 'href' => $secondaryBase.'/terms', 'permission' => 'manageSchools'],
                 ['label' => 'Manage Classes', 'href' => $secondaryBase.'/classes', 'permission' => 'manageSchools'],
                 ['label' => 'Upload Students', 'href' => $secondaryBase.'/students', 'permission' => 'manageExams'],
-                ['label' => 'Create Terminal Exam', 'href' => '/exams/create', 'permission' => 'manageExams'],
+                ['label' => 'Create Assessment', 'href' => '/exams/create?category=assessment', 'permission' => 'manageExams'],
+                ['label' => 'Monitor Assessments', 'href' => '/exams?category=assessment', 'permission' => 'manageExams'],
                 ['label' => 'View Result Sheet', 'href' => '/results', 'permission' => 'viewReports'],
                 ['label' => 'Generate Report Cards', 'href' => '/results', 'permission' => 'viewReports'],
             ],

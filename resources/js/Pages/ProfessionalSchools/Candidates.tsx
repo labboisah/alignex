@@ -7,15 +7,15 @@ import { Button } from '@/Components/ui/button';
 const inputClass = 'mt-1 block w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm';
 
 export default function Candidates({ professionalSchool, programmes, courses, batches, candidates, importSummary }: { professionalSchool: any; programmes: any[]; courses: any[]; batches: any[]; candidates: any[]; importSummary?: any }) {
-    const { data, setData, post, processing, errors, reset } = useForm({ programme_id: '', course_id: '', training_batch_id: '', registration_number: '', full_name: '', email: '', phone: '', status: 'active' });
-    const importForm = useForm<{ file: File | null }>({ file: null });
+    const { data, setData, post, processing, errors, reset } = useForm({ training_batch_id: '', registration_number: '', full_name: '', email: '', phone: '', status: 'active' });
+    const importForm = useForm<{ file: File | null; training_batch_id: string }>({ file: null, training_batch_id: '' });
     const submit = (event: FormEvent) => {
         event.preventDefault();
         post(`/professional-schools/${professionalSchool.id}/candidates`, { onSuccess: () => reset() });
     };
     const submitImport = (event: FormEvent) => {
         event.preventDefault();
-        importForm.post(`/professional-schools/${professionalSchool.id}/candidates/import`, { onSuccess: () => importForm.reset() });
+        importForm.post(`/professional-schools/${professionalSchool.id}/candidates/import`, { forceFormData: true, onSuccess: () => importForm.reset('file') });
     };
     return (
         <PortalAppShell title="Candidates">
@@ -24,12 +24,15 @@ export default function Candidates({ professionalSchool, programmes, courses, ba
             <form onSubmit={submitImport} className="mb-6">
                 <FormSection
                     title="Import Candidates"
-                    description="Upload a CSV with candidate names, registration numbers, and optional programme, course, and batch names."
-                    footer={<div className="flex flex-wrap gap-2"><Button asChild type="button" variant="secondary"><a href={`/professional-schools/${professionalSchool.id}/candidates/template`}>Download Template</a></Button><Button disabled={importForm.processing}>Import Candidates</Button></div>}
+                    description="Choose the training batch, then upload a CSV with candidate names and registration numbers."
+                    footer={<div className="flex flex-wrap gap-2"><Button asChild type="button" variant="secondary"><a href={`/professional-schools/${professionalSchool.id}/candidates/template`}>Download Template</a></Button><Button disabled={importForm.processing || !importForm.data.file || !importForm.data.training_batch_id}>Import Candidates</Button></div>}
                 >
-                    <Field label="CSV File" error={importForm.errors.file}>
-                        <input required type="file" accept=".csv,text/csv" className={inputClass} onChange={(event) => importForm.setData('file', event.target.files?.[0] ?? null)} />
-                    </Field>
+                    <Grid>
+                        <Field label="Training Batch" error={importForm.errors.training_batch_id}><select required className={inputClass} value={importForm.data.training_batch_id} onChange={(event) => importForm.setData('training_batch_id', event.target.value)}><option value="">Select batch</option>{batches.map((batch) => <option key={batch.id} value={batch.id}>{batch.name}</option>)}</select></Field>
+                        <Field label="CSV File" error={importForm.errors.file}>
+                            <input required type="file" accept=".csv,text/csv" className={inputClass} onChange={(event) => importForm.setData('file', event.target.files?.[0] ?? null)} />
+                        </Field>
+                    </Grid>
                     {importSummary && (
                         <div className="mt-4 rounded-md border border-border bg-white p-3 text-sm text-slate-600">
                             Imported {importSummary.created ?? 0}. Skipped {importSummary.skipped ?? 0} duplicates. Failed {importSummary.failed?.length ?? 0}.
@@ -40,8 +43,6 @@ export default function Candidates({ professionalSchool, programmes, courses, ba
             <form onSubmit={submit} className="mb-6">
                 <FormSection title="New Candidate" description="Add a trainee or professional certification candidate." footer={<Button disabled={processing}>Register Candidate</Button>}>
                     <Grid>
-                        <Field label="Programme" error={errors.programme_id}><select className={inputClass} value={data.programme_id} onChange={(event) => setData('programme_id', event.target.value)}><option value="">Optional</option>{programmes.map((programme) => <option key={programme.id} value={programme.id}>{programme.name}</option>)}</select></Field>
-                        <Field label="Course" error={errors.course_id}><select className={inputClass} value={data.course_id} onChange={(event) => setData('course_id', event.target.value)}><option value="">Optional</option>{courses.map((course) => <option key={course.id} value={course.id}>{course.name}</option>)}</select></Field>
                         <Field label="Training Batch" error={errors.training_batch_id}><select className={inputClass} value={data.training_batch_id} onChange={(event) => setData('training_batch_id', event.target.value)}><option value="">Optional</option>{batches.map((batch) => <option key={batch.id} value={batch.id}>{batch.name}</option>)}</select></Field>
                         <Field label="Status" error={errors.status}><select className={inputClass} value={data.status} onChange={(event) => setData('status', event.target.value)}><option value="active">Active</option><option value="inactive">Inactive</option><option value="suspended">Suspended</option></select></Field>
                         <Field label="Registration No." error={errors.registration_number}><input required className={inputClass} value={data.registration_number} onChange={(event) => setData('registration_number', event.target.value)} /></Field>

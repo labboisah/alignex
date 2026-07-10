@@ -501,8 +501,6 @@ class ProfessionalSchoolController extends Controller
         $this->authorizeRecord($request->user(), $professionalSchool, update: true);
 
         $data = $request->validate([
-            'programme_id' => ['nullable', 'exists:programmes,id'],
-            'course_id' => ['nullable', 'exists:courses,id'],
             'training_batch_id' => ['nullable', 'exists:training_batches,id'],
             'registration_number' => ['required', 'string', 'max:100', Rule::unique('candidates', 'candidate_number')->where('professional_school_id', $professionalSchool->id)],
             'full_name' => ['required', 'string', 'max:255'],
@@ -510,15 +508,15 @@ class ProfessionalSchoolController extends Controller
             'phone' => ['nullable', 'string', 'max:50'],
             'status' => ['required', Rule::in([Candidate::STATUS_ACTIVE, Candidate::STATUS_INACTIVE, Candidate::STATUS_SUSPENDED])],
         ]);
-        abort_unless(! filled($data['programme_id'] ?? null) || $professionalSchool->programmes()->whereKey($data['programme_id'])->exists(), 422);
-        abort_unless(! filled($data['course_id'] ?? null) || $professionalSchool->courses()->whereKey($data['course_id'])->exists(), 422);
-        abort_unless(! filled($data['training_batch_id'] ?? null) || $professionalSchool->trainingBatches()->whereKey($data['training_batch_id'])->exists(), 422);
+        $batch = filled($data['training_batch_id'] ?? null)
+            ? $professionalSchool->trainingBatches()->whereKey($data['training_batch_id'])->firstOrFail()
+            : null;
 
         [$firstName, $lastName] = $this->splitFullName($data['full_name']);
         $professionalSchool->candidates()->create([
-            'programme_id' => $data['programme_id'] ?? null,
-            'course_id' => $data['course_id'] ?? null,
-            'training_batch_id' => $data['training_batch_id'] ?? null,
+            'programme_id' => $batch?->programme_id,
+            'course_id' => null,
+            'training_batch_id' => $batch?->id,
             'candidate_number' => strtoupper($data['registration_number']),
             'first_name' => $firstName,
             'last_name' => $lastName,
@@ -537,8 +535,8 @@ class ProfessionalSchoolController extends Controller
 
         return response()->streamDownload(function (): void {
             $output = fopen('php://output', 'w');
-            fputcsv($output, ['full_name', 'registration_number', 'email', 'phone', 'programme', 'course', 'batch', 'status']);
-            fputcsv($output, ['Ada Okafor', 'REG-001', 'ada@example.com', '08030000000', 'Accounting Technicians', 'Financial Accounting', 'July 2026 Cohort', 'active']);
+            fputcsv($output, ['full_name', 'registration_number', 'email', 'phone', 'status']);
+            fputcsv($output, ['Ada Okafor', 'REG-001', 'ada@example.com', '08030000000', 'active']);
             fclose($output);
         }, 'professional_candidate_template.csv', ['Content-Type' => 'text/csv']);
     }
@@ -549,11 +547,10 @@ class ProfessionalSchoolController extends Controller
 
         $data = $request->validate([
             'file' => ['required', 'file', 'mimes:csv,txt', 'max:4096'],
+            'training_batch_id' => ['required', 'exists:training_batches,id'],
         ]);
 
-        $programmes = $professionalSchool->programmes()->get()->keyBy(fn (Programme $programme) => $this->lookupKey($programme->name));
-        $courses = $professionalSchool->courses()->get()->keyBy(fn (Course $course) => $this->lookupKey($course->name));
-        $batches = $professionalSchool->trainingBatches()->get()->keyBy(fn (TrainingBatch $batch) => $this->lookupKey($batch->name));
+        $batch = $professionalSchool->trainingBatches()->whereKey($data['training_batch_id'])->firstOrFail();
         $created = 0;
         $skipped = 0;
         $failed = [];
@@ -585,15 +582,11 @@ class ProfessionalSchoolController extends Controller
                     continue;
                 }
 
-                $programme = filled($row['programme'] ?? null) ? $programmes->get($this->lookupKey((string) $row['programme'])) : null;
-                $course = filled($row['course'] ?? null) ? $courses->get($this->lookupKey((string) $row['course'])) : null;
-                $batch = filled($row['batch'] ?? null) ? $batches->get($this->lookupKey((string) $row['batch'])) : null;
-
                 [$firstName, $lastName] = $this->splitFullName($fullName);
                 $professionalSchool->candidates()->create([
-                    'programme_id' => $programme?->id,
-                    'course_id' => $course?->id,
-                    'training_batch_id' => $batch?->id,
+                    'programme_id' => $batch->programme_id,
+                    'course_id' => null,
+                    'training_batch_id' => $batch->id,
                     'candidate_number' => $registrationNumber,
                     'first_name' => $firstName,
                     'last_name' => $lastName,

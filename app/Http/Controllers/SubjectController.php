@@ -172,6 +172,7 @@ class SubjectController extends Controller
             ->when(($context['type'] ?? null) === 'secondary_school', fn ($query) => $query->where('secondary_school_id', $context['id']))
             ->when(($context['type'] ?? null) === 'professional_school', fn ($query) => $query->where('professional_school_id', $context['id']))
             ->when(($context['type'] ?? null) === 'cbt_center', fn ($query) => $query->where('cbt_center_id', $context['id']))
+            ->when($user->isTeacher(), fn ($query) => $query->whereIn('id', $user->assignedSubjects()->select('subjects.id')))
             ->when(! ($context['type'] ?? null), fn ($query) => $query
             ->when(! $user->isSuperAdmin() && $user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
             ->when(! $user->isSuperAdmin() && $user->school_id, fn ($query) => $query->where('school_id', $user->school_id))
@@ -210,6 +211,10 @@ class SubjectController extends Controller
                 'professional_school_id' => $context['id'],
                 'cbt_center_id' => null,
             ];
+        }
+
+        if ($user->isTeacher()) {
+            throw ValidationException::withMessages(['subject_id' => 'Teachers can use only assigned subjects. Ask a school admin to create new subjects.']);
         }
 
         if ($user->isOrganizationAdmin() || ($user->isExaminer() && $user->organization_id)) {

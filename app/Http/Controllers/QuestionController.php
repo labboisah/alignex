@@ -287,6 +287,10 @@ class QuestionController extends Controller
         if (($context['type'] ?? null) === 'secondary_school') {
             $query->where('secondary_school_id', $context['id']);
 
+            if ($user->isTeacher()) {
+                $query->whereIn('subject_id', $user->assignedSubjects()->select('subjects.id'));
+            }
+
             return;
         }
 
@@ -308,7 +312,8 @@ class QuestionController extends Controller
             ->when(! $user->isSuperAdmin() && $user->center_id, fn ($bankQuery) => $bankQuery->where('center_id', $user->center_id))
             ->when(! $user->isSuperAdmin() && $user->secondary_school_id, fn ($bankQuery) => $bankQuery->where('secondary_school_id', $user->secondary_school_id))
             ->when(! $user->isSuperAdmin() && $user->professional_school_id, fn ($bankQuery) => $bankQuery->where('professional_school_id', $user->professional_school_id))
-            ->when(! $user->isSuperAdmin() && $user->cbt_center_id, fn ($bankQuery) => $bankQuery->where('cbt_center_id', $user->cbt_center_id));
+            ->when(! $user->isSuperAdmin() && $user->cbt_center_id, fn ($bankQuery) => $bankQuery->where('cbt_center_id', $user->cbt_center_id))
+            ->when($user->isTeacher(), fn ($bankQuery) => $bankQuery->whereIn('subject_id', $user->assignedSubjects()->select('subjects.id')));
     }
 
     private function authorizedQuestionBank(Request $request, string $questionBankId): QuestionBank

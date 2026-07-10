@@ -1,11 +1,12 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { Award, BarChart3, BriefcaseBusiness, Monitor, Pencil, Shuffle, UserPlus, XCircle } from 'lucide-react';
+import { Award, BarChart3, BriefcaseBusiness, Monitor, Pencil, RefreshCw, Shuffle, Trash2, UserPlus, XCircle } from 'lucide-react';
 import { PageHeader, PortalAppShell, ProtectedAction, StatusBadge } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
 import { Exam } from './types';
 
-export default function ShowExam({ exam, can }: { exam: { data: Exam }; can: { update: boolean; cancel: boolean } }) {
+export default function ShowExam({ exam, can }: { exam: { data: Exam }; can: { update: boolean; cancel: boolean; delete?: boolean } }) {
     const record = exam.data;
+    const isSecondary = record.owner_context === 'secondary_school' || record.secondary_school_id;
     const isProfessional = record.owner_context === 'professional_school' || record.professional_school_id;
     const paperLabel = isProfessional ? 'Module' : 'Subject';
     const paperLabelPlural = isProfessional ? 'Module Configuration' : 'Subject Configuration';
@@ -20,13 +21,15 @@ export default function ShowExam({ exam, can }: { exam: { data: Exam }; can: { u
                     actions={
                         <>
                             <ProtectedAction allowed={can.update}><Button asChild type="button" variant="secondary"><Link href={`/exams/${record.id}/edit`}><Pencil className="h-4 w-4" />Edit</Link></Button></ProtectedAction>
-                            <Button asChild type="button" variant="secondary"><Link href={`/candidates/assignments?exam_id=${record.id}`}><UserPlus className="h-4 w-4" />Assign Candidates</Link></Button>
+                            <Button asChild type="button" variant="secondary"><Link href={`/candidates/assignments?exam_id=${record.id}`}><UserPlus className="h-4 w-4" />{isSecondary ? 'Assign Students' : 'Assign Candidates'}</Link></Button>
+                            <ProtectedAction allowed={can.update}><Button type="button" variant="secondary" onClick={() => window.confirm(`Refresh ${isSecondary ? 'students' : 'candidates'} from the selected ${refreshSourceLabel(record)}?`) && router.post(`/exams/${record.id}/participants/refresh`, {}, { preserveScroll: true })}><RefreshCw className="h-4 w-4" />Refresh {isSecondary ? 'Students' : 'Candidates'}</Button></ProtectedAction>
                             <Button asChild type="button" variant="secondary"><Link href={`/exams/${record.id}/papers`}><Shuffle className="h-4 w-4" />Generate Papers</Link></Button>
                             <Button asChild type="button" variant="secondary"><Link href={`/exams/${record.id}/monitor`}><Monitor className="h-4 w-4" />Monitor</Link></Button>
                             <Button asChild type="button" variant="secondary"><Link href={`/results/exams/${record.id}`}><BarChart3 className="h-4 w-4" />Results</Link></Button>
                             {(record.exam_type === 'professional' || record.exam_type === 'secondary') && <Button asChild type="button" variant="secondary"><Link href={`/exams/${record.id}/certification`}><Award className="h-4 w-4" />Certification</Link></Button>}
                             {record.exam_type === 'recruitment' && <Button asChild type="button" variant="secondary"><Link href={`/exams/${record.id}/recruitment`}><BriefcaseBusiness className="h-4 w-4" />Recruitment</Link></Button>}
                             <ProtectedAction allowed={can.cancel}><Button type="button" variant="danger" onClick={() => window.confirm('Cancel this exam?') && router.patch(`/exams/${record.id}/cancel`, {}, { preserveScroll: true })}><XCircle className="h-4 w-4" />Cancel Exam</Button></ProtectedAction>
+                            <ProtectedAction allowed={can.delete ?? false}><Button type="button" variant="danger" onClick={() => window.confirm('Delete this exam?') && router.delete(`/exams/${record.id}`, { preserveScroll: true })}><Trash2 className="h-4 w-4" />Delete</Button></ProtectedAction>
                         </>
                     }
                 />
@@ -71,6 +74,13 @@ export default function ShowExam({ exam, can }: { exam: { data: Exam }; can: { u
             </section>
         </PortalAppShell>
     );
+}
+
+function refreshSourceLabel(record: Exam): string {
+    if (record.owner_context === 'secondary_school' || record.secondary_school_id) return 'student group';
+    if (record.owner_context === 'professional_school' || record.professional_school_id) return 'batch';
+    if ((record.candidate_group_ids?.length ?? 0) > 0 || record.candidate_group_id) return 'candidate group';
+    return 'saved participant list';
 }
 
 function Metric({ label, value, badge }: { label: string; value: string; badge?: string }) {

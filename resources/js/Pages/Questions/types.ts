@@ -26,6 +26,11 @@ export type Question = Record<string, unknown> & {
     status: 'draft' | 'review' | 'approved' | 'rejected' | 'archived';
     status_label: string;
     options?: OptionChoice[];
+    can?: {
+        view: boolean;
+        update: boolean;
+        delete: boolean;
+    };
 };
 
 export type SelectOption = {

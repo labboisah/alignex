@@ -1,5 +1,5 @@
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { Download, Pencil, Plus, Trash2, Upload } from 'lucide-react';
+import { Download, Eye, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { FormEvent } from 'react';
 import { ActionDropdown, DataTable, PageHeader, PortalAppShell, ProtectedAction, StatusBadge } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
@@ -50,11 +50,13 @@ export default function QuestionBanksIndex({ questionBanks, can }: Props) {
                         render: (bank) => (
                             <ActionDropdown
                                 items={[
-                                    { label: 'Edit', icon: Pencil, onSelect: () => router.visit(`/question-bank/${bank.id}/edit`) },
+                                    { label: 'View', icon: Eye, disabled: bank.can?.view === false, onSelect: () => router.visit(`/question-bank/${bank.id}`) },
+                                    { label: 'Edit', icon: Pencil, disabled: bank.can?.update === false, onSelect: () => router.visit(`/question-bank/${bank.id}/edit`) },
                                     {
                                         label: 'Delete',
                                         icon: Trash2,
                                         destructive: true,
+                                        disabled: bank.can?.delete === false,
                                         onSelect: () => window.confirm('Delete this question bank?') && router.delete(`/question-bank/${bank.id}`, { preserveScroll: true }),
                                     },
                                 ]}

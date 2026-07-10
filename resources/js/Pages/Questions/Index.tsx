@@ -56,12 +56,13 @@ export default function QuestionsIndex({ questions, can, questionBanks, subjects
                         render: (question) => (
                             <ActionDropdown
                                 items={[
-                                    { label: 'Preview', icon: Eye, onSelect: () => router.visit(`/questions/${question.id}`) },
-                                    { label: 'Edit', icon: Pencil, onSelect: () => router.visit(`/questions/${question.id}/edit`) },
+                                    { label: 'Preview', icon: Eye, disabled: question.can?.view === false, onSelect: () => router.visit(`/questions/${question.id}`) },
+                                    { label: 'Edit', icon: Pencil, disabled: question.can?.update === false, onSelect: () => router.visit(`/questions/${question.id}/edit`) },
                                     {
                                         label: 'Delete',
                                         icon: Trash2,
                                         destructive: true,
+                                        disabled: question.can?.delete === false,
                                         onSelect: () => window.confirm('Delete this question?') && router.delete(`/questions/${question.id}`, { preserveScroll: true }),
                                     },
                                 ]}
