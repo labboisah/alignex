@@ -64,6 +64,8 @@ const defaultSettings: ExamSettings = {
 
 export function ExamWizard({ exam, subjects, organizations = [], schools = [], centers = [], secondarySchools = [], professionalSchools = [], cbtCenters = [], academicSessions = [], academicTerms = [], studentGroups = [], programmes = [], courses = [], modules = [], trainingBatches = [], participantCandidates = [], cbtCandidates = [], questionGroups = [], candidateGroups = [], questionBanks = [], examTypes, examCategories = [], modes, deliveryModes, statuses, submitLabel }: { exam?: Exam; subjects: { data: SubjectOption[] }; organizations?: TenantOption[]; schools?: TenantOption[]; centers?: TenantOption[]; secondarySchools?: TenantOption[]; professionalSchools?: TenantOption[]; cbtCenters?: TenantOption[]; academicSessions?: TenantOption[]; academicTerms?: TenantOption[]; studentGroups?: TenantOption[]; programmes?: TenantOption[]; courses?: TenantOption[]; modules?: TenantOption[]; trainingBatches?: TenantOption[]; participantCandidates?: TenantOption[]; cbtCandidates?: TenantOption[]; questionGroups?: TenantOption[]; candidateGroups?: TenantOption[]; questionBanks?: TenantOption[]; examTypes: SelectOption[]; examCategories?: SelectOption[]; modes: SelectOption[]; deliveryModes: SelectOption[]; statuses: SelectOption[]; submitLabel: string }) {
     const [step, setStep] = useState(1);
+    const auth = usePage().props.auth as { user?: { role?: string } };
+    const isTeacher = auth.user?.role === 'teacher';
     const currentContext = (usePage().props.current_context ?? null) as CurrentContext | null;
     const inferredContext = contextFrom(exam, currentContext, { organizations, secondarySchools, professionalSchools, cbtCenters, academicSessions, programmes, cbtCandidates, questionBanks });
     const { data, setData, post, patch, processing, errors } = useForm<ExamFormData>({
@@ -85,8 +87,8 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
         training_batch_id: exam?.training_batch_id ? String(exam.training_batch_id) : String(trainingBatches[0]?.id ?? ''),
         title: exam?.title ?? '',
         exam_code: exam?.exam_code ?? '',
-        exam_type: exam?.exam_type ?? defaultExamType(inferredContext.type),
-        exam_category: exam?.exam_category ?? defaultExamCategory(inferredContext.type),
+        exam_type: exam?.exam_type ?? (isTeacher ? 'assessment' : defaultExamType(inferredContext.type)),
+        exam_category: exam?.exam_category ?? (isTeacher ? 'assessment' : defaultExamCategory(inferredContext.type)),
         mode: exam?.mode ?? (inferredContext.type === 'secondary_school' ? 'traditional' : 'traditional'),
         delivery_mode: exam?.delivery_mode ?? 'online',
         start_at: exam?.start_at ?? '',
@@ -117,8 +119,10 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
     const isCbtExam = ownerContext === 'cbt_center';
     const isOrganizationExam = ownerContext === 'organization';
     const candidateOptions = participantCandidates;
-    const allowedCategories = isSecondaryExam
-        ? examCategories.filter((category) => category.value === 'terminal')
+    const allowedCategories = isTeacher
+        ? examCategories.filter((category) => category.value === 'assessment')
+        : isSecondaryExam
+        ? examCategories.filter((category) => ['terminal', 'assessment'].includes(category.value))
         : isProfessionalExam
             ? examCategories.filter((category) => ['professional', 'certification', 'practice'].includes(category.value))
             : examCategories.filter((category) => category.value !== 'terminal');
@@ -149,7 +153,7 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
                     <div className="flex gap-3">
                         <TriangleAlert className="h-5 w-5 shrink-0" />
                         <div>
-                            <div className="text-sm font-semibold">Please fix these exam setup details</div>
+                            <div className="text-sm font-semibold">Please fix these {isTeacher ? 'assessment' : 'exam'} setup details</div>
                             <ul className="mt-2 space-y-1 text-sm leading-6">
                                 {errorSummary.slice(0, 6).map((message) => <li key={message}>{message}</li>)}
                             </ul>
@@ -168,7 +172,7 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
             </div>
 
             {step === 1 && (
-                <FormSection title="Basic Information" description={`This exam will be created under ${inferredContext.name}.`}>
+                <FormSection title="Basic Information" description={`This ${isTeacher ? 'assessment' : 'exam'} will be created under ${inferredContext.name}.`}>
                     <input type="hidden" name="exam_owner_type" value={data.exam_owner_type} />
                     <input type="hidden" name="organization_id" value={data.organization_id} />
                     <input type="hidden" name="school_id" value={data.school_id} />
@@ -191,9 +195,20 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
                     )}
                     <div className="grid gap-4 md:grid-cols-2">
                         <Field label="Title" error={errors.title}><input className={inputClass} value={data.title} onChange={(event) => setData('title', event.target.value)} required /></Field>
-                        <Field label="Exam Code" error={errors.exam_code}><input className={inputClass} value={data.exam_code} onChange={(event) => setData('exam_code', event.target.value.toUpperCase())} required /></Field>
-                        <SelectField label="Exam Type" value={data.exam_type} options={examTypes} onChange={(value) => setData('exam_type', value)} error={errors.exam_type} />
-                        <SelectField label="Exam Category" value={data.exam_category} options={allowedCategories.length ? allowedCategories : [{ value: 'general', label: 'General' }]} onChange={(value) => setData('exam_category', value)} error={errors.exam_category} />
+                        <Field label={isTeacher ? 'Assessment Code' : 'Exam Code'} error={errors.exam_code}><input className={inputClass} value={data.exam_code} onChange={(event) => setData('exam_code', event.target.value.toUpperCase())} required /></Field>
+                        {isTeacher ? (
+                            <>
+                                <input type="hidden" value={data.exam_type} />
+                                <input type="hidden" value={data.exam_category} />
+                                <Summary label="Type" value="Assessment" />
+                                <Summary label="Category" value="Assessment" />
+                            </>
+                        ) : (
+                            <>
+                                <SelectField label="Exam Type" value={data.exam_type} options={examTypes} onChange={(value) => setData('exam_type', value)} error={errors.exam_type} />
+                                <SelectField label="Exam Category" value={data.exam_category} options={allowedCategories.length ? allowedCategories : [{ value: 'general', label: 'General' }]} onChange={(value) => setData('exam_category', value)} error={errors.exam_category} />
+                            </>
+                        )}
                         <SelectField label="Mode" value={data.mode} options={allowedModes} onChange={(value) => setData('mode', value)} error={errors.mode} />
                         <SelectField label="Delivery Mode" value={data.delivery_mode} options={deliveryModes} onChange={(value) => setData('delivery_mode', value)} error={errors.delivery_mode} />
                         <SelectField label="Status" value={data.status} options={statuses} onChange={(value) => setData('status', value)} error={errors.status} />
@@ -363,10 +378,10 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
             )}
 
             {step === 4 && (
-                <FormSection title="Review" description={`Confirm the exam summary, ${isProfessionalExam ? 'course/module' : 'subject'} configuration, and settings before saving.`}>
+                <FormSection title="Review" description={`Confirm the ${isTeacher ? 'assessment' : 'exam'} summary, ${isProfessionalExam ? 'course/module' : 'subject'} configuration, and settings before saving.`}>
                     <div className="grid gap-4 md:grid-cols-3">
                         <Summary label="Title" value={data.title || 'Untitled'} />
-                        <Summary label="Exam Code" value={data.exam_code || 'N/A'} />
+                        <Summary label={isTeacher ? 'Assessment Code' : 'Exam Code'} value={data.exam_code || 'N/A'} />
                         <Summary label="Total Marks" value={String(totals.marks)} />
                         <Summary label={paperLabelPlural} value={String(data.subjects.length)} />
                         <Summary label="Questions" value={String(totals.questions)} />

@@ -111,6 +111,10 @@ class StoreExamRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
+            if ($this->user()?->isTeacher() && $this->input('exam_category') !== Exam::CATEGORY_ASSESSMENT) {
+                $validator->errors()->add('exam_category', 'Teachers can only create and update assessments.');
+            }
+
             if ($this->isSecondaryExamRequest()) {
                 if (! in_array($this->input('exam_category'), [Exam::CATEGORY_TERMINAL, Exam::CATEGORY_ASSESSMENT], true)) {
                     $validator->errors()->add('exam_category', 'Secondary school exams must be terminal exams or assessments.');

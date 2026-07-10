@@ -213,6 +213,36 @@ class SecondarySchoolFeatureTest extends TestCase
             ->assertSessionHasErrors('question_bank_id');
     }
 
+    public function test_teacher_can_create_assessment_but_not_terminal_exam(): void
+    {
+        [$school, $admin, $subject, $session, $term, $class] = $this->terminalExamSetup();
+        $teacher = User::factory()->create([
+            'role' => User::ROLE_TEACHER,
+            'secondary_school_id' => $school->id,
+            'active_context_type' => 'secondary_school',
+            'active_context_id' => $school->id,
+        ]);
+        $teacher->assignedSubjects()->attach($subject->id, ['school_class_id' => $class->id, 'secondary_school_id' => $school->id]);
+
+        $this->actingAs($teacher)
+            ->post('/exams', $this->terminalExamPayload($school, $subject, $session, $term, $class, ['exam_code' => 'TCHR-TERM-001']))
+            ->assertSessionHasErrors('exam_category');
+
+        $this->actingAs($teacher)
+            ->post('/exams', $this->terminalExamPayload($school, $subject, $session, $term, $class, [
+                'exam_code' => 'TCHR-ASSMT-001',
+                'exam_type' => 'assessment',
+                'exam_category' => Exam::CATEGORY_ASSESSMENT,
+            ]))
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('exams', [
+            'code' => 'TCHR-ASSMT-001',
+            'exam_category' => Exam::CATEGORY_ASSESSMENT,
+            'created_by' => $teacher->id,
+        ]);
+    }
+
     public function test_secondary_school_can_create_terminal_traditional_exam(): void
     {
         [$school, $admin, $subject, $session, $term, $class] = $this->terminalExamSetup();

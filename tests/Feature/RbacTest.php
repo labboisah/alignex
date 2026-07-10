@@ -220,21 +220,19 @@ class RbacTest extends TestCase
                 ->where('auth.permissions.viewReports', true)
                 ->where('auth.navigation', function ($navigation) {
                     $labels = collect($navigation)
-                        ->flatMap(fn ($item) => collect([data_get($item, 'label')])
-                            ->merge(collect(data_get($item, 'children', []))->pluck('label')))
+                        ->pluck('label')
                         ->values()
                         ->all();
 
                     $this->assertSame([
                         'Dashboard',
-                        'Question Management',
                         'Subjects',
                         'Question Bank',
                         'Questions',
-                        'Exam',
                         'Assessments',
                         'Results',
                     ], $labels);
+                    $this->assertFalse(collect($navigation)->contains(fn ($item) => isset($item['children'])));
 
                     return true;
                 })

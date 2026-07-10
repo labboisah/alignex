@@ -64,7 +64,7 @@ class ExamController extends Controller
     {
         $exam = DB::transaction(fn () => $this->persistExam($request));
 
-        return redirect()->route('exams.show', $exam)->with('success', 'Exam created.');
+        return redirect()->route('exams.show', $exam)->with('success', $request->user()->isTeacher() ? 'Assessment created.' : 'Exam created.');
     }
 
     public function show(Request $request, Exam $exam): Response
@@ -97,7 +97,7 @@ class ExamController extends Controller
     {
         DB::transaction(fn () => $this->persistExam($request, $exam));
 
-        return redirect()->route('exams.show', $exam)->with('success', 'Exam updated.');
+        return redirect()->route('exams.show', $exam)->with('success', $request->user()->isTeacher() ? 'Assessment updated.' : 'Exam updated.');
     }
 
     public function cancel(Exam $exam): RedirectResponse
@@ -106,17 +106,17 @@ class ExamController extends Controller
 
         $exam->update(['status' => Exam::STATUS_CANCELLED]);
 
-        return back()->with('success', 'Exam cancelled.');
+        return back()->with('success', request()->user()?->isTeacher() ? 'Assessment cancelled.' : 'Exam cancelled.');
     }
 
     public function destroy(Exam $exam): RedirectResponse
     {
         Gate::authorize('delete', $exam);
-        abort_if($exam->attempts()->exists(), 422, 'Exams with candidate attempts cannot be deleted.');
+        abort_if($exam->attempts()->exists(), 422, 'Records with candidate attempts cannot be deleted.');
 
         $exam->delete();
 
-        return redirect()->route('exams.index')->with('success', 'Exam deleted.');
+        return redirect()->route('exams.index')->with('success', request()->user()?->isTeacher() ? 'Assessment deleted.' : 'Exam deleted.');
     }
 
     public function refreshParticipants(Request $request, Exam $exam): RedirectResponse
@@ -406,7 +406,8 @@ class ExamController extends Controller
             ->when($secondarySchool, fn ($query) => $query->where('secondary_school_id', $secondarySchool->id))
             ->when($professionalSchool, fn ($query) => $query->where('professional_school_id', $professionalSchool->id))
             ->when($cbtCenter, fn ($query) => $query->where('cbt_center_id', $cbtCenter->id))
-            ->when($request->filled('category'), fn ($query) => $query->where('exam_category', $request->query('category')))
+            ->when($user->isTeacher(), fn ($query) => $query->where('exam_category', Exam::CATEGORY_ASSESSMENT))
+            ->when(! $user->isTeacher() && $request->filled('category'), fn ($query) => $query->where('exam_category', $request->query('category')))
             ->when($request->filled('mode'), fn ($query) => $query->where(fn ($inner) => $inner->where('exam_mode', $request->query('mode'))->orWhere('mode', $request->query('mode'))))
             ->when($user->isTeacher(), fn ($query) => $query->whereHas('examSubjects', fn ($subjectQuery) => $subjectQuery->whereIn('subject_id', $user->assignedSubjects()->select('subjects.id'))))
             ->when(! $user->isSuperAdmin() && $user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))

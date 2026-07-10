@@ -131,14 +131,10 @@ class HandleInertiaRequests extends Middleware
         } elseif ($user->isTeacher()) {
             $navigation = collect([
                 ['label' => 'Dashboard', 'href' => '/dashboard'],
-                ['label' => 'Question Management', 'children' => [
-                    ['label' => 'Subjects', 'href' => '/subjects', 'permission' => 'manageQuestionBank'],
-                    ['label' => 'Question Bank', 'href' => '/question-bank', 'permission' => 'manageQuestionBank'],
-                    ['label' => 'Questions', 'href' => '/questions', 'permission' => 'manageQuestionBank'],
-                ]],
-                ['label' => 'Exam', 'children' => [
-                    ['label' => 'Assessments', 'href' => '/exams?category=assessment', 'permission' => 'manageExams'],
-                ]],
+                ['label' => 'Subjects', 'href' => '/subjects', 'permission' => 'manageQuestionBank'],
+                ['label' => 'Question Bank', 'href' => '/question-bank', 'permission' => 'manageQuestionBank'],
+                ['label' => 'Questions', 'href' => '/questions', 'permission' => 'manageQuestionBank'],
+                ['label' => 'Assessments', 'href' => '/exams?category=assessment', 'permission' => 'manageExams'],
                 ['label' => 'Results', 'href' => '/results', 'permission' => 'viewReports'],
             ]);
         } else {
