@@ -23,6 +23,10 @@ class ExamPolicy
                 ->exists();
         }
 
+        if ($user->isFacilitator()) {
+            return $this->facilitatorCanViewAssessment($user, $exam);
+        }
+
         return $this->viewAny($user) && $this->canAccessOrganization($user, $exam);
     }
 
@@ -37,6 +41,10 @@ class ExamPolicy
             return $this->teacherCanManageAssessment($user, $exam);
         }
 
+        if ($user->isFacilitator()) {
+            return $this->facilitatorCanManageAssessment($user, $exam);
+        }
+
         return $this->create($user) && $this->canAccessOrganization($user, $exam);
     }
 
@@ -44,6 +52,10 @@ class ExamPolicy
     {
         if ($user->isTeacher()) {
             return $this->teacherCanManageAssessment($user, $exam);
+        }
+
+        if ($user->isFacilitator()) {
+            return $this->facilitatorCanManageAssessment($user, $exam);
         }
 
         return $user->hasPermission('manageExams')
@@ -55,5 +67,26 @@ class ExamPolicy
         return $exam->exam_category === Exam::CATEGORY_ASSESSMENT
             && (string) $exam->created_by === (string) $user->id
             && $this->view($user, $exam);
+    }
+
+    private function facilitatorCanViewAssessment(User $user, Exam $exam): bool
+    {
+        return $this->viewAny($user)
+            && $exam->exam_category === Exam::CATEGORY_ASSESSMENT
+            && (string) $exam->professional_school_id === (string) $user->professional_school_id
+            && $exam->examSubjects()
+                ->whereHas('questionBank', function ($query) use ($user): void {
+                    $query
+                        ->whereIn('course_id', $user->assignedCourses()->select('courses.id'))
+                        ->orWhereIn('module_id', $user->assignedModules()->select('modules.id'));
+                })
+                ->exists();
+    }
+
+    private function facilitatorCanManageAssessment(User $user, Exam $exam): bool
+    {
+        return $exam->exam_category === Exam::CATEGORY_ASSESSMENT
+            && (string) $exam->created_by === (string) $user->id
+            && $this->facilitatorCanViewAssessment($user, $exam);
     }
 }

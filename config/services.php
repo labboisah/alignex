@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    'bulksms_nigeria' => [
+        'base_url' => env('BULKSMS_NIGERIA_BASE_URL', 'https://www.bulksmsnigeria.com/api/sandbox/v2'),
+        'api_token' => env('BULKSMS_NIGERIA_API_TOKEN'),
+        'sender_id' => env('BULKSMS_NIGERIA_SENDER_ID', 'AlignEx'),
+        'gateway' => env('BULKSMS_NIGERIA_GATEWAY'),
+        'dry_run' => env('BULKSMS_NIGERIA_DRY_RUN', env('NOTIFICATIONS_DRY_RUN', true)),
+    ],
+
 ];

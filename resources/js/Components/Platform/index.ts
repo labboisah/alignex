@@ -1,6 +1,7 @@
 export * from './ActionDropdown';
 export * from './AlertBanner';
 export * from './AppLogo';
+export * from './BackButton';
 export * from './ChartCard';
 export * from './ConfirmDialog';
 export * from './DashboardCard';

@@ -66,33 +66,33 @@ const iconMap = {
 const defaultSolutions: LandingCard[] = [
     {
         title: 'Secondary Schools',
-        body: 'Run term exams, mock tests, entrance assessments, and multi-subject CBT sessions with structured subjects and topics.',
+        body: 'Plan terminal exams, mock tests, entrance assessments, and subject-based CBT sessions from one organized workspace.',
         icon: 'GraduationCap',
     },
     {
         title: 'Professional Exams',
-        body: 'Deliver certification assessments with timed sections, question banks, supervisor monitoring, and controlled result release.',
+        body: 'Run certification exams with candidate assignment, timed delivery, supervisor review, and controlled result release.',
         icon: 'FileCheck2',
     },
     {
         title: 'Recruitment Exams',
-        body: 'Screen applicants at scale with secure online tests, candidate identity controls, and report-ready analytics.',
+        body: 'Screen applicants with secure exams, candidate tracking, anti-cheating records, and export-ready reports.',
         icon: 'Users',
     },
 ];
 
 const defaultFeatures: LandingCard[] = [
-    { title: 'Hybrid delivery', body: 'Online delivery now, with offline center-based examination planned for controlled venues.', icon: 'TabletSmartphone' },
-    { title: 'Real-time monitoring', body: 'Supervisors can track candidate status, incidents, timing, and live exam activity.', icon: 'MonitorDot' },
-    { title: 'Adaptive-ready', body: 'Architecture leaves room for future FastAPI-based adaptive question selection.', icon: 'Activity' },
-    { title: 'Result management', body: 'Support scoring, moderation, release workflows, reports, and exports.', icon: 'BarChart3' },
+    { title: 'Flexible exam delivery', body: 'Deliver exams online or through offline center servers where internet access is limited or controlled.', icon: 'TabletSmartphone' },
+    { title: 'Live candidate monitoring', body: 'Supervisors can track logins, progress, answer saving, submissions, and exam events in real time.', icon: 'MonitorDot' },
+    { title: 'Question paper control', body: 'Generate candidate papers before delivery and verify imported papers before offline exams begin.', icon: 'Activity' },
+    { title: 'Results and reports', body: 'Manage scoring, moderation, release decisions, exports, and operational reports from the portal.', icon: 'BarChart3' },
 ];
 
 const defaultWorkflow: LandingStep[] = [
-    { title: 'Prepare', body: 'Create subjects, topics, question banks, candidates, and exam settings.' },
-    { title: 'Deliver', body: 'Candidates write in a focused exam interface while answers autosave through secure APIs.' },
-    { title: 'Monitor', body: 'Supervisors review live sessions, warnings, and anti-cheating events in real time.' },
-    { title: 'Release', body: 'Scores are reviewed, approved, released, and exported through controlled result workflows.' },
+    { title: 'Prepare', body: 'Create exam structures, question banks, candidates, schedules, and delivery rules.' },
+    { title: 'Generate', body: 'Generate candidate papers and confirm each assigned candidate has a complete paper.' },
+    { title: 'Deliver', body: 'Run the exam online or import it into an offline center server for local delivery.' },
+    { title: 'Release', body: 'Review submissions, finalize results, publish outcomes, and export reports.' },
 ];
 
 const defaultStats: LandingStat[] = [
@@ -117,10 +117,10 @@ const defaultOperations: LandingMetric[] = [
 
 export default function PublicWelcome({ landing = {} }: { landing?: LandingContent }) {
     const hero = {
-        eyebrow: landing.hero?.eyebrow ?? 'Secure CBT operations',
-        title: landing.hero?.title ?? 'Secure Online and Offline CBT Examination Platform',
-        description: landing.hero?.description ?? 'AlignEx helps institutions deliver secondary school exams, professional certification exams, and recruitment exams with support for adaptive assessment, online and future offline delivery, real-time supervisor monitoring, anti-cheating controls, result management, and reports.',
-        badges: landing.hero?.badges ?? ['Laravel + Inertia', 'React + TypeScript', 'Reverb-ready'],
+        eyebrow: landing.hero?.eyebrow ?? 'Trusted CBT operations',
+        title: landing.hero?.title ?? 'Examination delivery built for schools, centers, and professional bodies',
+        description: landing.hero?.description ?? 'AlignEx helps teams prepare question banks, assign candidates, deliver secure exams, monitor live sessions, manage offline centers, and release results with confidence.',
+        badges: landing.hero?.badges ?? ['Online and offline delivery', 'Live supervision', 'Controlled result release'],
     };
     const solutions = landing.solutions ?? defaultSolutions;
     const features = landing.features ?? defaultFeatures;
@@ -159,8 +159,9 @@ function Navbar() {
                     <img src="/images/brand-logo.png" alt="AlignEx" className="h-12 w-auto max-w-[190px] object-contain" />
                 </Link>
                 <div className="hidden items-center gap-6 text-sm font-semibold text-slate-600 md:flex">
+                    <a href="#overview" className="hover:text-primary">Overview</a>
                     <a href="#solutions" className="hover:text-primary">Solutions</a>
-                    <a href="#features" className="hover:text-primary">Features</a>
+                    <a href="#delivery" className="hover:text-primary">Delivery</a>
                     <a href="#security" className="hover:text-primary">Security</a>
                     <a href="#workflow" className="hover:text-primary">Workflow</a>
                 </div>
@@ -168,7 +169,7 @@ function Navbar() {
                     <Button asChild variant="ghost" className="hidden sm:inline-flex">
                         <Link href="/login">Login</Link>
                     </Button>
-                    <Button asChild variant="ghost" className="hidden lg:inline-flex">
+                    <Button asChild variant="ghost" className="hidden xl:inline-flex">
                         <Link href="/verify-certificate">Verify Certificate</Link>
                     </Button>
                     <Button asChild variant="secondary" className="hidden sm:inline-flex">
@@ -185,7 +186,7 @@ function Navbar() {
 
 function HeroSection({ hero, metrics, activity, candidateMockup }: { hero: Required<NonNullable<LandingContent['hero']>>; metrics: LandingMetric[]; activity: NonNullable<LandingContent['activity']>; candidateMockup: NonNullable<LandingContent['candidateMockup']> }) {
     return (
-        <section className="border-b border-border bg-white">
+        <section id="overview" className="border-b border-border bg-white">
             <div className="mx-auto grid max-w-7xl gap-10 px-6 py-16 lg:grid-cols-[0.95fr_1.05fr] lg:px-8 lg:py-20">
                 <div className="flex flex-col justify-center">
                     <img src="/images/brand-logo.png" alt="AlignEx" className="mb-8 h-20 w-fit max-w-full object-contain" />
@@ -210,7 +211,7 @@ function HeroSection({ hero, metrics, activity, candidateMockup }: { hero: Requi
                             <Link href="/verify-certificate">Verify Certificate</Link>
                         </Button>
                         <Button asChild variant="secondary" className="h-11">
-                            <a href="#mockups">View Mockups</a>
+                            <a href="#delivery">See Delivery Flow</a>
                         </Button>
                     </div>
                     <div className="mt-8 grid max-w-xl gap-3 sm:grid-cols-3">
@@ -304,9 +305,9 @@ function MockupSection({ metrics }: { metrics: LandingMetric[] }) {
     return (
         <section className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
             <SectionHeading
-                eyebrow="Product mockups"
-                title="Purpose-built screens for every examination role"
-                description="AlignEx separates admin operations, candidate delivery, supervisor monitoring, and result analytics into focused interfaces."
+                eyebrow="Platform experience"
+                title="Focused workspaces for every examination role"
+                description="AlignEx keeps administration, candidate delivery, supervision, and result handling clear so teams can work quickly under exam pressure."
             />
             <div className="grid gap-5 lg:grid-cols-4">
                 <MiniMockup title="Admin dashboard" icon={Laptop} accent="bg-primary">
@@ -377,11 +378,11 @@ function SolutionsSection({ solutions }: { solutions: LandingCard[] }) {
 
 function FeaturesSection({ features }: { features: LandingCard[] }) {
     return (
-        <section id="features" className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
+        <section id="delivery" className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
             <SectionHeading
-                eyebrow="Features"
+                eyebrow="Delivery"
                 title="Built for exam teams, supervisors, and candidates"
-                description="The platform architecture keeps exam operations organized while protecting candidate delivery from administrative complexity."
+                description="The platform keeps exam preparation, delivery, monitoring, and reporting organized without distracting candidates during the exam."
             />
             <div className="grid gap-5 md:grid-cols-2">
                 {features.map(({ title, body, icon }) => {
@@ -405,7 +406,7 @@ function FeaturesSection({ features }: { features: LandingCard[] }) {
 function SecuritySection() {
     const items = [
         ['Answer-key isolation', 'Correct answers must never be sent to the candidate frontend.'],
-        ['Policy-controlled access', 'Laravel policies and middleware guard public, admin, and supervisor actions.'],
+        ['Role-controlled access', 'Public pages, admin actions, supervisor controls, and candidate exam screens are separated by responsibility.'],
         ['Exam-sensitive logs', 'Login, answer saves, submissions, focus changes, and supervisor interventions are logged.'],
         ['Server authority', 'Timing, submission, disqualification, scoring, and result release stay server-controlled.'],
     ];
@@ -475,23 +476,44 @@ function TrustSection({ stats }: { stats: LandingStat[] }) {
 }
 
 function FinalCta() {
+    const demoUsers = [
+        { role: 'Organization Admin', email: 'org.admin@alignex.test' },
+        { role: 'Secondary School Admin', email: 'secondary.admin@alignex.test' },
+        { role: 'Professional School Admin', email: 'professional.admin@alignex.test' },
+        { role: 'CBT Center Admin', email: 'cbt.admin@alignex.test' },
+    ];
+
     return (
         <section className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
             <div className="rounded-lg bg-primaryDark px-6 py-10 text-white sm:px-10">
-                <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
+                <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-start">
                     <div>
                         <h2 className="text-3xl font-bold">Start building a secure CBT operation with AlignEx.</h2>
                         <p className="mt-3 max-w-3xl text-sm leading-7 text-green-50">
-                            Use the Laravel and Inertia foundation to add organizations, question banks, candidate delivery, monitoring, anti-cheating, and reporting in safe ordered modules.
+                        Configure organizations, question banks, candidate delivery, monitoring, offline centers, anti-cheating review, and reporting in one exam operations platform.
                         </p>
                     </div>
-                    <div className="flex flex-wrap gap-3">
-                        <Button asChild className="bg-white text-primaryDark hover:bg-green-50">
-                            <Link href="/dashboard">Open Demo</Link>
-                        </Button>
-                        <Button asChild variant="secondary" className="border-white/30 bg-transparent text-white hover:bg-white/10">
-                            <Link href="/ui-preview">View UI Kit</Link>
-                        </Button>
+                    <div className="w-full max-w-md">
+                        <div className="flex flex-wrap gap-3">
+                            <Button asChild className="bg-white text-primaryDark hover:bg-green-50">
+                                <Link href="/dashboard">Open Demo</Link>
+                            </Button>
+                            <Button asChild variant="secondary" className="border-white/30 bg-transparent text-white hover:bg-white/10">
+                                <Link href="/register-admin">Register Institution</Link>
+                            </Button>
+                        </div>
+                        <div className="mt-4 rounded-md border border-white/15 bg-white/10 p-4 text-sm text-green-50">
+                            <div className="font-semibold text-white">Demo login details</div>
+                            <div className="mt-1 text-xs">Use password <span className="font-bold text-white">password</span> for these demo users.</div>
+                            <div className="mt-3 grid gap-2">
+                                {demoUsers.map((user) => (
+                                    <div key={user.email} className="rounded-md bg-white/10 p-2">
+                                        <div className="text-xs font-semibold uppercase text-green-100">{user.role}</div>
+                                        <div className="mt-0.5 break-all font-mono text-xs text-white">{user.email}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -506,7 +528,9 @@ function Footer() {
                 <div className="font-semibold text-primaryDark">AlignEx</div>
                 <div className="flex flex-wrap gap-4">
                     <a href="#solutions" className="hover:text-primary">Solutions</a>
+                    <a href="#delivery" className="hover:text-primary">Delivery</a>
                     <a href="#security" className="hover:text-primary">Security</a>
+                    <Link href="/pricing" className="hover:text-primary">Pricing</Link>
                     <Link href="/login" className="hover:text-primary">Login</Link>
                     <Link href="/exam/login" className="hover:text-primary">Candidate Exam</Link>
                     <Link href="/verify-certificate" className="hover:text-primary">Verify Certificate</Link>

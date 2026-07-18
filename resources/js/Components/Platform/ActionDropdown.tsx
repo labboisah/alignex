@@ -13,7 +13,18 @@ export type ActionDropdownItem = {
 
 export function ActionDropdown({ label = 'Actions', items, trigger }: { label?: string; items: ActionDropdownItem[]; trigger?: ReactNode }) {
     const [open, setOpen] = useState(false);
+    const [placement, setPlacement] = useState<'up' | 'down'>('down');
     const menuRef = useRef<HTMLDivElement>(null);
+
+    const toggleOpen = () => {
+        const rect = menuRef.current?.getBoundingClientRect();
+
+        if (rect) {
+            setPlacement(window.innerHeight - rect.bottom < 220 && rect.top > 220 ? 'up' : 'down');
+        }
+
+        setOpen((current) => !current);
+    };
 
     useEffect(() => {
         if (!open) {
@@ -44,18 +55,24 @@ export function ActionDropdown({ label = 'Actions', items, trigger }: { label?: 
     return (
         <div ref={menuRef} className="relative inline-flex">
             {trigger ? (
-                <button type="button" onClick={() => setOpen((current) => !current)} className="inline-flex">
+                <button type="button" onClick={toggleOpen} className="inline-flex" aria-expanded={open} aria-haspopup="menu">
                     {trigger}
                 </button>
             ) : (
-                <Button variant="secondary" type="button" onClick={() => setOpen((current) => !current)} aria-expanded={open} aria-haspopup="menu">
+                <Button variant="secondary" type="button" onClick={toggleOpen} aria-expanded={open} aria-haspopup="menu">
                     {label}
                     <ChevronDown className="h-4 w-4" />
                 </Button>
             )}
 
             {open && (
-                <div className="absolute right-0 top-full z-50 mt-1 min-w-48 rounded-md border border-border bg-white p-1 shadow-lg" role="menu">
+                <div
+                    className={cn(
+                        'absolute right-0 z-50 min-w-48 rounded-md border border-border bg-white p-1 shadow-lg',
+                        placement === 'up' ? 'bottom-full mb-1' : 'top-full mt-1',
+                    )}
+                    role="menu"
+                >
                     {items.map((item) => {
                         const Icon = item.icon;
 

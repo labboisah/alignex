@@ -297,6 +297,10 @@ class QuestionController extends Controller
         if (($context['type'] ?? null) === 'professional_school') {
             $query->where('professional_school_id', $context['id']);
 
+            if ($user->isFacilitator()) {
+                $this->scopeFacilitatorQuestionBanks($query, $user);
+            }
+
             return;
         }
 
@@ -313,7 +317,17 @@ class QuestionController extends Controller
             ->when(! $user->isSuperAdmin() && $user->secondary_school_id, fn ($bankQuery) => $bankQuery->where('secondary_school_id', $user->secondary_school_id))
             ->when(! $user->isSuperAdmin() && $user->professional_school_id, fn ($bankQuery) => $bankQuery->where('professional_school_id', $user->professional_school_id))
             ->when(! $user->isSuperAdmin() && $user->cbt_center_id, fn ($bankQuery) => $bankQuery->where('cbt_center_id', $user->cbt_center_id))
-            ->when($user->isTeacher(), fn ($bankQuery) => $bankQuery->whereIn('subject_id', $user->assignedSubjects()->select('subjects.id')));
+            ->when($user->isTeacher(), fn ($bankQuery) => $bankQuery->whereIn('subject_id', $user->assignedSubjects()->select('subjects.id')))
+            ->when($user->isFacilitator(), fn ($bankQuery) => $this->scopeFacilitatorQuestionBanks($bankQuery, $user));
+    }
+
+    private function scopeFacilitatorQuestionBanks($query, $user): void
+    {
+        $query->where(function ($scope) use ($user): void {
+            $scope
+                ->whereIn('course_id', $user->assignedCourses()->select('courses.id'))
+                ->orWhereIn('module_id', $user->assignedModules()->select('modules.id'));
+        });
     }
 
     private function authorizedQuestionBank(Request $request, string $questionBankId): QuestionBank

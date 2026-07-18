@@ -17,6 +17,17 @@ class AdminRegistrationRequestResource extends JsonResource
             'entity_type' => $this->entity_type,
             'entity_type_label' => str($this->entity_type)->replace('_', ' ')->title()->toString(),
             'entity_id' => $this->entity_id,
+            'pricing_plan_id' => $this->pricing_plan_id,
+            'pricing_plan' => $this->whenLoaded('pricingPlan', fn () => [
+                'id' => $this->pricingPlan?->id,
+                'name' => $this->pricingPlan?->name,
+                'formatted_price' => $this->pricingPlan
+                    ? PricingPlanResource::make($this->pricingPlan)->toArray($request)['formatted_price']
+                    : null,
+                'billing_label' => $this->pricingPlan
+                    ? PricingPlanResource::make($this->pricingPlan)->toArray($request)['billing_label']
+                    : null,
+            ]),
             'admin_name' => $this->admin_name,
             'admin_email' => $this->admin_email,
             'entity_name' => $this->entity_name,

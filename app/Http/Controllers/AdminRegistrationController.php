@@ -6,8 +6,11 @@ use App\Http\Requests\ReviewAdminRegistrationRequest;
 use App\Http\Requests\StoreAdminRegistrationRequest;
 use App\Http\Requests\UpdateAdminRegistrationRequest;
 use App\Http\Resources\AdminRegistrationRequestResource;
+use App\Http\Resources\PricingPlanResource;
 use App\Models\AdminRegistrationRequest;
+use App\Models\PricingPlan;
 use App\Services\AdminRegistrationApprovalService;
+use App\Services\Notifications\NotificationDispatcher;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
@@ -19,16 +22,20 @@ class AdminRegistrationController extends Controller
     {
         return Inertia::render('AdminRegistrations/Create', [
             'entityTypes' => $this->entityTypes(),
+            'plans' => $this->registrationPlans(),
+            'selectedPlan' => request('plan'),
         ]);
     }
 
     public function store(StoreAdminRegistrationRequest $request): RedirectResponse
     {
-        AdminRegistrationRequest::create([
+        $registration = AdminRegistrationRequest::create([
             ...$request->safe()->except(['password', 'password_confirmation']),
             'password' => Hash::make($request->validated('password')),
             'status' => AdminRegistrationRequest::STATUS_PENDING,
         ]);
+
+        $this->notifyRegistrationReceived($registration);
 
         return redirect()
             ->route('admin-registrations.thank-you')
@@ -45,6 +52,7 @@ class AdminRegistrationController extends Controller
         return Inertia::render('AdminRegistrations/Index', [
             'registrations' => AdminRegistrationRequestResource::collection(
                 AdminRegistrationRequest::query()
+                    ->with('pricingPlan')
                     ->latest()
                     ->get()
             ),
@@ -54,7 +62,7 @@ class AdminRegistrationController extends Controller
     public function show(AdminRegistrationRequest $adminRegistration): Response
     {
         return Inertia::render('AdminRegistrations/Show', [
-            'registration' => AdminRegistrationRequestResource::make($adminRegistration),
+            'registration' => AdminRegistrationRequestResource::make($adminRegistration->load('pricingPlan')),
         ]);
     }
 
@@ -63,8 +71,9 @@ class AdminRegistrationController extends Controller
         abort_if($adminRegistration->status !== AdminRegistrationRequest::STATUS_PENDING, 403);
 
         return Inertia::render('AdminRegistrations/Edit', [
-            'registration' => AdminRegistrationRequestResource::make($adminRegistration),
+            'registration' => AdminRegistrationRequestResource::make($adminRegistration->load('pricingPlan')),
             'entityTypes' => $this->entityTypes(),
+            'plans' => $this->registrationPlans(includeInactive: true),
         ]);
     }
 
@@ -142,5 +151,54 @@ class AdminRegistrationController extends Controller
                 'description' => 'Facilities capable of delivering online or local CBT exams.',
             ],
         ];
+    }
+
+    private function notifyRegistrationReceived(AdminRegistrationRequest $registration): void
+    {
+        try {
+            app(NotificationDispatcher::class)->dispatch(
+                'admin_application_received',
+                [
+                    'name' => $registration->admin_name,
+                    'email' => $registration->admin_email,
+                    'phone' => $registration->phone,
+                ],
+                [
+                    'admin_name' => $registration->admin_name,
+                    'admin_email' => $registration->admin_email,
+                    'application_name' => $registration->entity_name,
+                    'submitted_by' => $registration->admin_name,
+                    'reference' => 'AX-APP-'.$registration->id,
+                    'portal_login_url' => route('login', absolute: true),
+                    'password_reset_url' => route('password.request', absolute: true),
+                ],
+            );
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+    }
+
+    /**
+     * @return array<int, array{id: int, slug: string, name: string, label: string, description: string}>
+     */
+    private function registrationPlans(bool $includeInactive = false): array
+    {
+        return PricingPlan::query()
+            ->when(! $includeInactive, fn ($query) => $query->where('is_active', true))
+            ->ordered()
+            ->get()
+            ->map(function (PricingPlan $plan): array {
+                $resource = PricingPlanResource::make($plan)->toArray(request());
+
+                return [
+                    'id' => $plan->id,
+                    'slug' => $plan->slug,
+                    'name' => $plan->name,
+                    'label' => $resource['formatted_price'].' '.$resource['billing_label'],
+                    'description' => $plan->description,
+                ];
+            })
+            ->values()
+            ->all();
     }
 }

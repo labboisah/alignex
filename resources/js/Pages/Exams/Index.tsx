@@ -6,20 +6,20 @@ import { Exam } from './types';
 
 export default function ExamsIndex({ exams, can }: { exams: { data: Exam[] }; can: { create: boolean } }) {
     const auth = usePage().props.auth as { user?: { role?: string } };
-    const isTeacher = auth.user?.role === 'teacher';
-    const noun = isTeacher ? 'Assessment' : 'Exam';
-    const nounPlural = isTeacher ? 'Assessments' : 'Exams';
+    const isAssessmentRole = auth.user?.role === 'teacher' || auth.user?.role === 'facilitator';
+    const noun = isAssessmentRole ? 'Assessment' : 'Exam';
+    const nounPlural = isAssessmentRole ? 'Assessments' : 'Exams';
 
     return (
         <PortalAppShell title={nounPlural}>
             <Head title={nounPlural} />
             <PageHeader
-                eyebrow={isTeacher ? 'Assessment' : 'Assessment'}
+                eyebrow="Assessment"
                 title={nounPlural}
-                description={isTeacher ? 'Create, configure, monitor, and review assessments for your assigned subjects.' : 'Create, configure, schedule, and operate examinations.'}
+                description={isAssessmentRole ? 'Create, configure, monitor, and review assessments for your assigned courses.' : 'Create, configure, schedule, and operate examinations.'}
                 actions={
                     <ProtectedAction allowed={can.create}>
-                        <Button asChild type="button"><Link href={isTeacher ? '/exams/create?category=assessment' : '/exams/create'}><Plus className="h-4 w-4" />New {noun}</Link></Button>
+                        <Button asChild type="button"><Link href={isAssessmentRole ? '/exams/create?category=assessment' : '/exams/create'}><Plus className="h-4 w-4" />New {noun}</Link></Button>
                     </ProtectedAction>
                 }
             />

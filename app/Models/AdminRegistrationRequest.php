@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable([
     'entity_type',
     'entity_id',
+    'pricing_plan_id',
     'admin_name',
     'admin_email',
     'password',
@@ -64,5 +65,10 @@ class AdminRegistrationRequest extends Model
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    public function pricingPlan(): BelongsTo
+    {
+        return $this->belongsTo(PricingPlan::class);
     }
 }

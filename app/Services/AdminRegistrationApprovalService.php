@@ -10,13 +10,16 @@ use App\Models\ProfessionalSchool;
 use App\Models\School;
 use App\Models\SecondarySchool;
 use App\Models\User;
+use App\Services\Notifications\NotificationDispatcher;
 use Illuminate\Support\Facades\DB;
 
 class AdminRegistrationApprovalService
 {
     public function approve(AdminRegistrationRequest $registration, User $reviewer, ?string $notes = null): void
     {
-        DB::transaction(function () use ($registration, $reviewer, $notes): void {
+        $approved = false;
+
+        DB::transaction(function () use ($registration, $reviewer, $notes, &$approved): void {
             if ($registration->status !== AdminRegistrationRequest::STATUS_PENDING) {
                 return;
             }
@@ -27,6 +30,7 @@ class AdminRegistrationApprovalService
                         'name' => $registration->entity_name,
                         'code' => $registration->entity_code,
                         'contact_person' => $registration->contact_person,
+                        'pricing_plan_id' => $registration->pricing_plan_id,
                         'email' => $registration->entity_email,
                         'phone' => $registration->phone,
                         'address' => $registration->address,
@@ -76,7 +80,16 @@ class AdminRegistrationApprovalService
                 'reviewed_by' => $reviewer->id,
                 'reviewed_at' => now(),
             ]);
+
+            $approved = true;
         });
+
+        if ($approved) {
+            $registration->refresh();
+            $this->notifyRegistration($registration, 'admin_application_approved', [
+                'approved_by' => $reviewer->name,
+            ]);
+        }
     }
 
     public function reject(AdminRegistrationRequest $registration, User $reviewer, ?string $notes = null): void
@@ -90,6 +103,10 @@ class AdminRegistrationApprovalService
             'review_notes' => $notes,
             'reviewed_by' => $reviewer->id,
             'reviewed_at' => now(),
+        ]);
+
+        $this->notifyRegistration($registration->refresh(), 'admin_application_rejected', [
+            'rejection_reason' => $notes ?: 'Not specified',
         ]);
     }
 
@@ -144,6 +161,7 @@ class AdminRegistrationApprovalService
             'phone' => $registration->phone,
             'email' => $registration->entity_email,
             'status' => School::STATUS_ACTIVE,
+            'pricing_plan_id' => $registration->pricing_plan_id,
         ];
     }
 
@@ -157,6 +175,7 @@ class AdminRegistrationApprovalService
             'phone' => $registration->phone,
             'address' => $registration->address ?: $registration->location,
             'status' => SecondarySchool::STATUS_ACTIVE,
+            'pricing_plan_id' => $registration->pricing_plan_id,
         ];
     }
 
@@ -166,6 +185,7 @@ class AdminRegistrationApprovalService
             'name' => $registration->entity_name,
             'code' => $registration->entity_code,
             'organization_id' => null,
+            'pricing_plan_id' => $registration->pricing_plan_id,
             'location' => $registration->location ?: $registration->address ?: 'Not specified',
             'capacity' => $registration->capacity ?? 0,
             'contact_person' => $registration->contact_person,
@@ -173,5 +193,30 @@ class AdminRegistrationApprovalService
             'phone' => $registration->phone,
             'status' => CbtCenter::STATUS_ACTIVE,
         ];
+    }
+
+    private function notifyRegistration(AdminRegistrationRequest $registration, string $type, array $extraContext = []): void
+    {
+        try {
+            app(NotificationDispatcher::class)->dispatch(
+                $type,
+                [
+                    'name' => $registration->admin_name,
+                    'email' => $registration->admin_email,
+                    'phone' => $registration->phone,
+                ],
+                [
+                    'admin_name' => $registration->admin_name,
+                    'admin_email' => $registration->admin_email,
+                    'application_name' => $registration->entity_name,
+                    'reference' => 'AX-APP-'.$registration->id,
+                    'portal_login_url' => route('login', absolute: true),
+                    'password_reset_url' => route('password.request', absolute: true),
+                    ...$extraContext,
+                ],
+            );
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 }

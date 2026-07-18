@@ -1,5 +1,5 @@
-import { Link, useForm } from '@inertiajs/react';
-import { ArrowLeft, Save } from 'lucide-react';
+import { useForm } from '@inertiajs/react';
+import { Save } from 'lucide-react';
 import { FormEvent, ReactNode } from 'react';
 import { FormSection } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
@@ -48,7 +48,6 @@ export function CandidateForm({ candidate, organizations = [], schools = [], cen
                 description="Create and maintain candidate identity, contact details, and registration number."
                 footer={
                     <div className="flex flex-wrap justify-end gap-2">
-                        <Button asChild type="button" variant="secondary"><Link href={candidate ? `/candidates/${candidate.id}` : '/candidates'}><ArrowLeft className="h-4 w-4" />Back</Link></Button>
                         <Button type="submit" disabled={processing}><Save className="h-4 w-4" />{submitLabel}</Button>
                     </div>
                 }

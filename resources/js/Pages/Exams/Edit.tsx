@@ -5,14 +5,14 @@ import { Exam, SelectOption, SubjectOption, TenantOption } from './types';
 
 export default function EditExam({ exam, ...props }: { exam: { data: Exam }; subjects: { data: SubjectOption[] }; organizations: TenantOption[]; schools: TenantOption[]; centers: TenantOption[]; secondarySchools?: TenantOption[]; professionalSchools?: TenantOption[]; cbtCenters?: TenantOption[]; academicSessions?: TenantOption[]; academicTerms?: TenantOption[]; schoolClasses?: TenantOption[]; studentGroups?: TenantOption[]; programmes?: TenantOption[]; courses?: TenantOption[]; modules?: TenantOption[]; trainingBatches?: TenantOption[]; participantCandidates?: TenantOption[]; students?: TenantOption[]; candidateGroups?: TenantOption[]; questionBanks?: TenantOption[]; examTypes: SelectOption[]; examCategories?: SelectOption[]; modes: SelectOption[]; deliveryModes: SelectOption[]; statuses: SelectOption[] }) {
     const auth = usePage().props.auth as { user?: { role?: string } };
-    const isTeacher = auth.user?.role === 'teacher';
+    const isAssessmentRole = auth.user?.role === 'teacher' || auth.user?.role === 'facilitator';
 
     return (
-        <PortalAppShell title={isTeacher ? 'Edit Assessment' : 'Edit Exam'}>
-            <Head title={isTeacher ? 'Edit Assessment' : 'Edit Exam'} />
+        <PortalAppShell title={isAssessmentRole ? 'Edit Assessment' : 'Edit Exam'}>
+            <Head title={isAssessmentRole ? 'Edit Assessment' : 'Edit Exam'} />
             <section className="mx-auto max-w-6xl">
-                <PageHeader eyebrow={isTeacher ? 'Assessments' : 'Exams'} title={isTeacher ? 'Edit Assessment' : 'Edit Exam Wizard'} description="Update setup, subjects, settings, and review changes." />
-                <ExamWizard exam={exam.data} {...props} submitLabel={isTeacher ? 'Save Assessment' : 'Save Changes'} />
+                <PageHeader eyebrow={isAssessmentRole ? 'Assessments' : 'Exams'} title={isAssessmentRole ? 'Edit Assessment' : 'Edit Exam Wizard'} description="Update setup, subjects, settings, and review changes." />
+                <ExamWizard exam={exam.data} {...props} submitLabel={isAssessmentRole ? 'Save Assessment' : 'Save Changes'} />
             </section>
         </PortalAppShell>
     );

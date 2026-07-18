@@ -1,5 +1,5 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import { ArrowLeft, Download, KeyRound, ListChecks, Save, Upload } from 'lucide-react';
+import { Head, router, useForm } from '@inertiajs/react';
+import { Download, KeyRound, ListChecks, Save, Upload } from 'lucide-react';
 import { FormEvent } from 'react';
 import { AlertBanner, DataTable, PageHeader, PortalAppShell, StatusBadge } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
@@ -76,9 +76,9 @@ export default function RecruitmentShow({
                     eyebrow="Recruitment"
                     title={exam.title}
                     description={`${exam.exam_code} recruitment settings, shortlist, ranking, and access controls.`}
+                    backHref={`/exams/${exam.id}`}
                     actions={
                         <div className="flex flex-wrap gap-2">
-                            <Button asChild type="button" variant="secondary"><Link href={`/exams/${exam.id}`}><ArrowLeft className="h-4 w-4" />Back</Link></Button>
                             <Button asChild type="button" variant="secondary"><a href={`/exams/${exam.id}/recruitment/shortlist.csv`}><Download className="h-4 w-4" />Shortlist</a></Button>
                             <Button asChild type="button" variant="secondary"><a href={`/exams/${exam.id}/recruitment/access-codes.csv`}><Download className="h-4 w-4" />Access Codes</a></Button>
                         </div>

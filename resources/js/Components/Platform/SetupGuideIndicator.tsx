@@ -37,7 +37,7 @@ export function SetupGuideIndicator({ guide }: { guide?: SetupGuide | null }) {
     }
 
     return (
-        <div className="fixed bottom-4 left-4 z-40 w-[calc(100vw-2rem)] max-w-sm">
+        <div className={cn('fixed bottom-4 left-4 z-40 w-[calc(100vw-2rem)]', open ? 'max-w-sm' : 'max-w-48 sm:max-w-48')}>
             {open ? (
                 <div className="overflow-hidden rounded-md border border-border bg-white shadow-lg">
                     <div className="border-b border-border p-4">
@@ -109,11 +109,11 @@ export function SetupGuideIndicator({ guide }: { guide?: SetupGuide | null }) {
             ) : (
                 <button
                     type="button"
-                    className="flex w-full items-center gap-3 rounded-md border border-border bg-white p-3 text-left shadow-lg transition hover:border-primary"
+                    className="flex w-full items-center gap-2 rounded-md border border-border bg-white p-2 text-left shadow-lg transition hover:border-primary"
                     onClick={() => setOpen(true)}
                 >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-md bg-green-50 text-primary">
-                        <ListChecks className="h-5 w-5" />
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-green-50 text-primary">
+                        <ListChecks className="h-4 w-4" />
                     </div>
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-3">

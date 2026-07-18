@@ -50,6 +50,13 @@ export default function ShowAdminRegistration({ registration }: Props) {
                     </div>
                 </div>
 
+                <div className="mt-5">
+                    <Details title="Selected Plan" rows={[
+                        ['Plan', record.pricing_plan?.name ?? 'N/A'],
+                        ['Price', record.pricing_plan?.formatted_price ? `${record.pricing_plan.formatted_price} ${record.pricing_plan.billing_label ?? ''}` : 'N/A'],
+                    ]} />
+                </div>
+
                 <div className="mt-6 grid gap-5 lg:grid-cols-2">
                     <Details title="Administrator" rows={[
                         ['Name', record.admin_name],

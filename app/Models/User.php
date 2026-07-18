@@ -5,16 +5,18 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use App\Support\AccessControl;
+use App\Notifications\Auth\ResetPasswordNotification;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'role', 'organization_id', 'center_id', 'school_id', 'secondary_school_id', 'professional_school_id', 'cbt_center_id', 'active_context_type', 'active_context_id', 'password'])]
+#[Fillable(['name', 'email', 'role', 'status', 'organization_id', 'center_id', 'school_id', 'secondary_school_id', 'professional_school_id', 'cbt_center_id', 'active_context_type', 'active_context_id', 'password'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -30,9 +32,18 @@ class User extends Authenticatable
     public const ROLE_CBT_CENTER_ADMIN = 'cbt_center_admin';
     public const ROLE_EXAMINER = 'examiner';
     public const ROLE_TEACHER = 'teacher';
+    public const ROLE_FACILITATOR = 'facilitator';
     public const ROLE_SUPERVISOR = 'supervisor';
     public const ROLE_CANDIDATE = 'candidate';
     public const ROLE_STUDENT = 'student';
+
+    public const STATUS_ACTIVE = 'active';
+    public const STATUS_INACTIVE = 'inactive';
+
+    public const STATUSES = [
+        self::STATUS_ACTIVE,
+        self::STATUS_INACTIVE,
+    ];
 
     public const PORTAL_ROLES = [
         self::ROLE_SUPER_ADMIN,
@@ -44,6 +55,7 @@ class User extends Authenticatable
         self::ROLE_CBT_CENTER_ADMIN,
         self::ROLE_EXAMINER,
         self::ROLE_TEACHER,
+        self::ROLE_FACILITATOR,
         self::ROLE_SUPERVISOR,
     ];
 
@@ -110,10 +122,26 @@ class User extends Authenticatable
         return $this->hasMany(Question::class, 'created_by');
     }
 
-    public function assignedSubjects(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function assignedSubjects(): BelongsToMany
     {
         return $this->belongsToMany(Subject::class, 'subject_teacher', 'user_id', 'subject_id')
             ->withPivot('school_id', 'secondary_school_id', 'school_class_id')
+            ->withTimestamps();
+    }
+
+    public function assignedCourses(): BelongsToMany
+    {
+        return $this->belongsToMany(Course::class, 'course_facilitator', 'user_id', 'course_id')
+            ->withPivot('professional_school_id', 'module_id')
+            ->distinct()
+            ->withTimestamps();
+    }
+
+    public function assignedModules(): BelongsToMany
+    {
+        return $this->belongsToMany(ProfessionalModule::class, 'course_facilitator', 'user_id', 'module_id')
+            ->withPivot('professional_school_id', 'course_id')
+            ->wherePivotNotNull('module_id')
             ->withTimestamps();
     }
 
@@ -187,6 +215,11 @@ class User extends Authenticatable
         return $this->role === self::ROLE_TEACHER;
     }
 
+    public function isFacilitator(): bool
+    {
+        return $this->role === self::ROLE_FACILITATOR;
+    }
+
     public function isCandidate(): bool
     {
         return $this->role === self::ROLE_CANDIDATE;
@@ -200,6 +233,11 @@ class User extends Authenticatable
     public function isPortalUser(): bool
     {
         return in_array($this->role, self::PORTAL_ROLES, true);
+    }
+
+    public function isActive(): bool
+    {
+        return ($this->status ?? self::STATUS_ACTIVE) === self::STATUS_ACTIVE;
     }
 
     public function hasPermission(string $permission): bool
@@ -332,8 +370,14 @@ class User extends Authenticatable
             self::ROLE_CBT_CENTER_ADMIN,
             self::ROLE_EXAMINER,
             self::ROLE_TEACHER,
+            self::ROLE_FACILITATOR,
             self::ROLE_SUPERVISOR => 'dashboard',
             default => 'dashboard',
         };
+    }
+
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new ResetPasswordNotification($token));
     }
 }

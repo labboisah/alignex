@@ -1,5 +1,5 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import { ArrowLeft, Search, Trash2, UserPlus } from 'lucide-react';
+import { Head, router, useForm } from '@inertiajs/react';
+import { Search, Trash2, UserPlus } from 'lucide-react';
 import { FormEvent, useMemo, useState } from 'react';
 import { DataTable, PageHeader, PortalAppShell, StatusBadge } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
@@ -53,7 +53,7 @@ export default function CandidateAssignments({ exams, selectedExam, candidates, 
     return (
         <PortalAppShell title={isSecondaryExam ? 'Assign Students' : 'Assign Candidates'}>
             <Head title={isSecondaryExam ? 'Assign Students' : 'Assign Candidates'} />
-            <PageHeader eyebrow="Exam Registration" title={isSecondaryExam ? 'Assign Student Group to Exam' : 'Assign Candidates to Exam'} description={isSecondaryExam ? 'Select a student group and review the students that will sit for this exam.' : 'Select an exam, find candidates, and manage exam candidate assignments.'} actions={<Button asChild type="button" variant="secondary"><Link href="/candidates"><ArrowLeft className="h-4 w-4" />Back</Link></Button>} />
+            <PageHeader eyebrow="Exam Registration" title={isSecondaryExam ? 'Assign Student Group to Exam' : 'Assign Candidates to Exam'} description={isSecondaryExam ? 'Select a student group and review the students that will sit for this exam.' : 'Select an exam, find candidates, and manage exam candidate assignments.'} backHref="/candidates" />
 
             <form onSubmit={submit} className="mb-5 rounded-md border border-border bg-white p-4 shadow-sm">
                 <div className="grid gap-3 lg:grid-cols-[1fr_1fr_auto] lg:items-end">

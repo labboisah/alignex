@@ -48,6 +48,10 @@ class AccessControl
                 'label' => 'Teacher',
                 'description' => 'Uploads questions and creates assessments for assigned secondary school subjects.',
             ],
+            User::ROLE_FACILITATOR => [
+                'label' => 'Facilitator',
+                'description' => 'Uploads questions and creates assessments for assigned professional school courses and modules.',
+            ],
             User::ROLE_SUPERVISOR => [
                 'label' => 'Supervisor',
                 'description' => 'Monitors assigned exams, candidate activity, incidents, and reports.',
@@ -79,6 +83,16 @@ class AccessControl
                 'label' => 'Manage applications',
                 'group' => 'Platform',
                 'description' => 'Review, edit, approve, or reject organization, school, and center applications.',
+            ],
+            'managePricingPlans' => [
+                'label' => 'Manage pricing plans',
+                'group' => 'Platform',
+                'description' => 'Create, update, activate, and retire public registration pricing plans.',
+            ],
+            'manageAppReleases' => [
+                'label' => 'Manage app releases',
+                'group' => 'Platform',
+                'description' => 'Manage offline server and client app versions, downloads, and update metadata.',
             ],
             'manageCenters' => [
                 'label' => 'Manage centers',
@@ -120,6 +134,11 @@ class AccessControl
                 'group' => 'Administration',
                 'description' => 'Manage organization or platform settings according to scope.',
             ],
+            'downloadOfflineServer' => [
+                'label' => 'Download offline server',
+                'group' => 'Offline Delivery',
+                'description' => 'Download the AlignEx Center Server Electron app for offline exam delivery.',
+            ],
         ];
     }
 
@@ -138,6 +157,7 @@ class AccessControl
                 'manageExams',
                 'viewReports',
                 'manageSettings',
+                'downloadOfflineServer',
             ],
             User::ROLE_CENTER_ADMIN => [
                 'manageCenters',
@@ -145,6 +165,7 @@ class AccessControl
                 'manageExams',
                 'viewSupervisorMonitor',
                 'viewReports',
+                'downloadOfflineServer',
             ],
             User::ROLE_CBT_CENTER_ADMIN => [
                 'manageCenters',
@@ -152,6 +173,7 @@ class AccessControl
                 'manageExams',
                 'viewSupervisorMonitor',
                 'viewReports',
+                'downloadOfflineServer',
             ],
             User::ROLE_SCHOOL_ADMIN => [
                 'manageSchools',
@@ -165,6 +187,7 @@ class AccessControl
                 'manageExams',
                 'viewReports',
                 'manageSettings',
+                'downloadOfflineServer',
             ],
             User::ROLE_PROFESSIONAL_SCHOOL_ADMIN => [
                 'manageSchools',
@@ -172,13 +195,20 @@ class AccessControl
                 'manageExams',
                 'viewReports',
                 'manageSettings',
+                'downloadOfflineServer',
             ],
             User::ROLE_EXAMINER => [
                 'manageQuestionBank',
                 'manageExams',
                 'viewReports',
+                'downloadOfflineServer',
             ],
             User::ROLE_TEACHER => [
+                'manageQuestionBank',
+                'manageExams',
+                'viewReports',
+            ],
+            User::ROLE_FACILITATOR => [
                 'manageQuestionBank',
                 'manageExams',
                 'viewReports',

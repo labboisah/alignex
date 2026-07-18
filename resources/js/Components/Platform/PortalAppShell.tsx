@@ -5,11 +5,13 @@ import {
     BookOpen,
     Building2,
     ClipboardList,
+    Download,
     FileQuestion,
     FileText,
     GraduationCap,
     LayoutDashboard,
     Monitor,
+    MonitorDown,
     Settings,
     ShieldCheck,
     SlidersHorizontal,
@@ -26,6 +28,8 @@ const iconByLabel = {
     Organizations: Building2,
     'Access Controls': ShieldCheck,
     Applications: Users,
+    'Pricing Plans': FileText,
+    'App Releases': MonitorDown,
     Centers: Building2,
     Schools: Building2,
     'My Schools': Building2,
@@ -75,6 +79,9 @@ const iconByLabel = {
     Certificates: FileText,
     'Report Cards': FileText,
     Reports: FileText,
+    'Offline Server': Download,
+    'Client App': MonitorDown,
+    'Activation Codes': ShieldCheck,
     Settings,
     'Center Settings': Settings,
     'Secondary Schools': Building2,
@@ -88,12 +95,15 @@ type SharedNavItem = {
     label: keyof typeof iconByLabel;
     href?: string;
     permission?: string;
+    feature?: string;
     children?: SharedNavItem[];
 };
 
 type SharedProps = {
     auth?: {
         navigation?: SharedNavItem[];
+        plan?: { id: number | null; slug: string | null; name: string | null } | null;
+        plan_features?: Record<string, boolean>;
         setup_guide?: SetupGuide | null;
     };
     flash?: {
@@ -102,7 +112,17 @@ type SharedProps = {
     };
 };
 
-export function PortalAppShell({ title, children, navItems, topbarActions }: { title?: string; children: ReactNode; navItems?: PortalNavItem[]; topbarActions?: ReactNode }) {
+export function PortalAppShell({
+    title,
+    children,
+    navItems,
+    topbarActions,
+}: {
+    title?: string;
+    children: ReactNode;
+    navItems?: PortalNavItem[];
+    topbarActions?: ReactNode;
+}) {
     const pageProps = usePage().props as SharedProps;
     const sharedNav = pageProps.auth?.navigation ?? [];
     const setupGuide = pageProps.auth?.setup_guide ?? null;

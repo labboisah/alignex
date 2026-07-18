@@ -22,6 +22,10 @@ class QuestionBankPolicy
                 && $user->assignedSubjects()->whereKey($questionBank->subject_id)->exists();
         }
 
+        if ($user->isFacilitator()) {
+            return $this->facilitatorCanAccess($user, $questionBank);
+        }
+
         return $this->viewAny($user) && $this->canAccessTenant($user, $questionBank);
     }
 
@@ -43,5 +47,15 @@ class QuestionBankPolicy
 
         return $user->hasPermission('manageQuestionBank')
             && $this->canAccessTenant($user, $questionBank);
+    }
+
+    private function facilitatorCanAccess(User $user, QuestionBank $questionBank): bool
+    {
+        return $this->viewAny($user)
+            && (string) $questionBank->professional_school_id === (string) $user->professional_school_id
+            && (
+                ($questionBank->course_id && $user->assignedCourses()->whereKey($questionBank->course_id)->exists())
+                || ($questionBank->module_id && $user->assignedModules()->whereKey($questionBank->module_id)->exists())
+            );
     }
 }

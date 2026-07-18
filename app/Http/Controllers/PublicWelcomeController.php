@@ -48,27 +48,27 @@ class PublicWelcomeController extends Controller
         return Inertia::render('Public/Welcome', [
             'landing' => [
                 'hero' => [
-                    'eyebrow' => 'Secure CBT operations',
-                    'title' => 'Secure Online and Offline CBT Examination Platform',
-                    'description' => 'AlignEx helps institutions deliver secondary school exams, professional certification exams, and recruitment exams with support for adaptive assessment, online and future offline delivery, real-time supervisor monitoring, anti-cheating controls, result management, and reports.',
-                    'badges' => ['Laravel + Inertia', 'React + TypeScript', 'Reverb-ready'],
+                    'eyebrow' => 'Trusted CBT operations',
+                    'title' => 'Examination delivery built for schools, centers, and professional bodies',
+                    'description' => 'AlignEx helps teams prepare question banks, assign candidates, deliver secure exams, monitor live sessions, manage offline centers, and release results with confidence.',
+                    'badges' => ['Online and offline delivery', 'Live supervision', 'Controlled result release'],
                 ],
                 'solutions' => [
-                    ['title' => 'Secondary Schools', 'body' => 'Run term exams, mock tests, entrance assessments, and multi-subject CBT sessions with structured subjects and topics.', 'icon' => 'GraduationCap'],
-                    ['title' => 'Professional Exams', 'body' => 'Deliver certification assessments with timed sections, question banks, supervisor monitoring, and controlled result release.', 'icon' => 'FileCheck2'],
-                    ['title' => 'Recruitment Exams', 'body' => 'Screen applicants at scale with secure online tests, candidate identity controls, and report-ready analytics.', 'icon' => 'Users'],
+                    ['title' => 'Secondary Schools', 'body' => 'Plan terminal exams, mock tests, entrance assessments, and subject-based CBT sessions from one organized workspace.', 'icon' => 'GraduationCap'],
+                    ['title' => 'Professional Exams', 'body' => 'Run certification exams with candidate assignment, timed delivery, supervisor review, and controlled result release.', 'icon' => 'FileCheck2'],
+                    ['title' => 'Recruitment Exams', 'body' => 'Screen applicants with secure exams, candidate tracking, anti-cheating records, and export-ready reports.', 'icon' => 'Users'],
                 ],
                 'features' => [
-                    ['title' => 'Hybrid delivery', 'body' => 'Online delivery now, with offline center-based examination planned for controlled venues.', 'icon' => 'TabletSmartphone'],
-                    ['title' => 'Real-time monitoring', 'body' => 'Supervisors can track candidate status, incidents, timing, and live exam activity.', 'icon' => 'MonitorDot'],
-                    ['title' => 'Adaptive-ready', 'body' => 'Architecture leaves room for future FastAPI-based adaptive question selection.', 'icon' => 'Activity'],
-                    ['title' => 'Result management', 'body' => 'Support scoring, moderation, release workflows, reports, and exports.', 'icon' => 'BarChart3'],
+                    ['title' => 'Flexible exam delivery', 'body' => 'Deliver exams online or through offline center servers where internet access is limited or controlled.', 'icon' => 'TabletSmartphone'],
+                    ['title' => 'Live candidate monitoring', 'body' => 'Supervisors can track logins, progress, answer saving, submissions, and exam events in real time.', 'icon' => 'MonitorDot'],
+                    ['title' => 'Question paper control', 'body' => 'Generate candidate papers before delivery and verify imported papers before offline exams begin.', 'icon' => 'Activity'],
+                    ['title' => 'Results and reports', 'body' => 'Manage scoring, moderation, release decisions, exports, and operational reports from the portal.', 'icon' => 'BarChart3'],
                 ],
                 'workflow' => [
-                    ['title' => 'Prepare', 'body' => 'Create subjects, topics, question banks, candidates, and exam settings.'],
-                    ['title' => 'Deliver', 'body' => 'Candidates write in a focused exam interface while answers autosave through secure APIs.'],
-                    ['title' => 'Monitor', 'body' => 'Supervisors review live sessions, warnings, and anti-cheating events in real time.'],
-                    ['title' => 'Release', 'body' => 'Scores are reviewed, approved, released, and exported through controlled result workflows.'],
+                    ['title' => 'Prepare', 'body' => 'Create exam structures, question banks, candidates, schedules, and delivery rules.'],
+                    ['title' => 'Generate', 'body' => 'Generate candidate papers and confirm each assigned candidate has a complete paper.'],
+                    ['title' => 'Deliver', 'body' => 'Run the exam online or import it into an offline center server for local delivery.'],
+                    ['title' => 'Release', 'body' => 'Review submissions, finalize results, publish outcomes, and export reports.'],
                 ],
                 'stats' => [
                     ['value' => $this->formatNumber(Exam::query()->count()), 'label' => 'Exams configured'],

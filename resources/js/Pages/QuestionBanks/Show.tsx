@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, FileQuestion, Pencil, Trash2 } from 'lucide-react';
+import { FileQuestion, Pencil, Trash2 } from 'lucide-react';
 import { DashboardCard, PageHeader, PortalAppShell, ProtectedAction, StatusBadge } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
 import { QuestionBank } from './types';
@@ -24,14 +24,9 @@ export default function ShowQuestionBank({ questionBank, can }: Props) {
                 eyebrow="Question Bank"
                 title={record.name}
                 description={record.description ?? 'Question bank details and ownership scope.'}
+                backHref="/question-bank"
                 actions={
                     <>
-                        <Button asChild type="button" variant="secondary">
-                            <Link href="/question-bank">
-                                <ArrowLeft className="h-4 w-4" />
-                                Back
-                            </Link>
-                        </Button>
                         <ProtectedAction allowed={can.update}>
                             <Button asChild type="button" variant="secondary">
                                 <Link href={`/question-bank/${record.id}/edit`}>

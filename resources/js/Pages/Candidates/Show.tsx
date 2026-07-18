@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, Pencil, Trash2, UserCircle2, UserPlus } from 'lucide-react';
+import { Pencil, Trash2, UserCircle2, UserPlus } from 'lucide-react';
 import { PageHeader, PortalAppShell, StatusBadge } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
 import { Candidate } from './types';
@@ -15,9 +15,9 @@ export default function ShowCandidate({ candidate }: { candidate: { data: Candid
                     eyebrow="Candidate Details"
                     title={record.full_name}
                     description={record.registration_number}
+                    backHref="/candidates"
                     actions={
                         <>
-                            <Button asChild type="button" variant="secondary"><Link href="/candidates"><ArrowLeft className="h-4 w-4" />Back</Link></Button>
                             <Button asChild type="button" variant="secondary"><Link href={`/candidates/assignments`}><UserPlus className="h-4 w-4" />Assign to Exam</Link></Button>
                             <Button asChild type="button" variant="secondary"><Link href={`/candidates/${record.id}/edit`}><Pencil className="h-4 w-4" />Edit</Link></Button>
                             <Button type="button" variant="danger" onClick={() => window.confirm('Delete this candidate?') && router.delete(`/candidates/${record.id}`)}><Trash2 className="h-4 w-4" />Delete</Button>

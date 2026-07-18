@@ -10,6 +10,7 @@ const links = [
     ['Courses', 'courses'],
     ['Modules', 'modules'],
     ['Training Batches', 'training-batches'],
+    ['Facilitators', 'facilitators'],
     ['Question Banks', 'question-banks'],
     ['Certificates', 'certificates'],
     ['Candidates', 'candidates'],

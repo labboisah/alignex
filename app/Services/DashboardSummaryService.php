@@ -35,12 +35,16 @@ class DashboardSummaryService
 
         if ($user->isTeacher()) {
             $examScope = $this->teacherExamScope($user, $examScope);
+        } elseif ($user->isFacilitator()) {
+            $examScope = $this->facilitatorExamScope($user, $examScope);
         }
 
         $attemptScope = CandidateExamAttempt::query()->whereIn('exam_id', (clone $examScope)->select('id'));
         $submittedScope = (clone $attemptScope)->whereIn('status', [CandidateExamAttempt::STATUS_SUBMITTED, CandidateExamAttempt::STATUS_AUTO_SUBMITTED]);
         $result = $this->resultSummary($submittedScope);
-        $teacherPanel = $user->isTeacher() ? $this->teacherPanel($user, $examScope, $submittedScope) : null;
+        $teacherPanel = $user->isTeacher()
+            ? $this->teacherPanel($user, $examScope, $submittedScope)
+            : ($user->isFacilitator() ? $this->facilitatorPanel($user, $examScope, $submittedScope) : null);
 
         return [
             'role' => [
@@ -158,9 +162,25 @@ class DashboardSummaryService
     private function teacherExamScope(User $user, Builder $examScope): Builder
     {
         return $examScope
+            ->where('exam_category', Exam::CATEGORY_ASSESSMENT)
             ->whereHas('examSubjects', fn (Builder $query) => $query->whereIn('subject_id', $user->assignedSubjects()->select('subjects.id')))
             ->when($user->secondary_school_id, fn (Builder $query) => $query->where('secondary_school_id', $user->secondary_school_id))
             ->when($user->school_id, fn (Builder $query) => $query->where('school_id', $user->school_id));
+    }
+
+    private function facilitatorExamScope(User $user, Builder $examScope): Builder
+    {
+        return $examScope
+            ->where('exam_category', Exam::CATEGORY_ASSESSMENT)
+            ->where('professional_school_id', $user->professional_school_id)
+            ->where(function (Builder $query) use ($user): void {
+                $query
+                    ->whereIn('course_id', $user->assignedCourses()->select('courses.id'))
+                    ->orWhereIn('module_id', $user->assignedModules()->select('modules.id'))
+                    ->orWhereHas('examSubjects.questionBank', fn (Builder $bankQuery) => $bankQuery
+                        ->whereIn('course_id', $user->assignedCourses()->select('courses.id'))
+                        ->orWhereIn('module_id', $user->assignedModules()->select('modules.id')));
+            });
     }
 
     private function teacherPanel(User $user, Builder $examScope, Builder $submittedScope): array
@@ -200,6 +220,70 @@ class DashboardSummaryService
                 'name' => trim($student->first_name.' '.$student->last_name),
                 'registration_number' => $student->admission_number,
                 'status' => $student->status,
+            ])->all(),
+        ];
+    }
+
+    private function facilitatorPanel(User $user, Builder $examScope, Builder $submittedScope): array
+    {
+        $courses = $user->assignedCourses()
+            ->with('programme:id,name')
+            ->orderBy('name')
+            ->get()
+            ->unique('id')
+            ->values();
+        $courseIds = $courses->pluck('id')->unique()->values();
+        $modules = ProfessionalModule::query()
+            ->whereIn('course_id', $courseIds)
+            ->with('course:id,name')
+            ->orderBy('name')
+            ->get()
+            ->unique('id')
+            ->values();
+        $moduleIds = $modules->pluck('id')->unique()->values();
+
+        $candidates = Candidate::query()
+            ->where('professional_school_id', $user->professional_school_id)
+            ->where(function (Builder $query) use ($courseIds): void {
+                $query
+                    ->whereIn('course_id', $courseIds)
+                    ->orWhereHas('trainingBatch.programme.courses', fn (Builder $courseQuery) => $courseQuery->whereIn('courses.id', $courseIds));
+            })
+            ->latest()
+            ->limit(8)
+            ->get();
+
+        return [
+            'kind' => 'facilitator',
+            'metrics' => [
+                $this->metric('Assigned Courses', $courseIds->count(), 'Courses this facilitator can manage.', 'BookOpen'),
+                $this->metric('Assigned Modules', $moduleIds->count(), 'Modules linked to assigned courses.', 'Library'),
+                $this->metric('Candidates / Trainees', $candidates->count(), 'Recent trainees linked to assigned courses.', 'Users'),
+                $this->metric('Question Banks', QuestionBank::query()->where('professional_school_id', $user->professional_school_id)->whereIn('course_id', $courseIds)->count(), 'Question banks in assigned courses.', 'FileQuestion'),
+                $this->metric('Assessments', (clone $examScope)->count(), 'Assessments using assigned courses or modules.', 'ClipboardList'),
+                $this->metric('Submitted Results', (clone $submittedScope)->count(), 'Submitted attempts for assigned-course assessments.', 'CheckCircle2'),
+            ],
+            'subjects' => [],
+            'classes' => [],
+            'student_groups' => [],
+            'students' => [],
+            'courses' => $courses->map(fn (Course $course) => [
+                'id' => $course->id,
+                'name' => $course->name,
+                'code' => $course->code,
+                'programme_name' => $course->programme?->name,
+            ])->all(),
+            'modules' => $modules->map(fn (ProfessionalModule $module) => [
+                'id' => $module->id,
+                'name' => $module->name,
+                'code' => $module->code,
+                'course_name' => $module->course?->name,
+            ])->all(),
+            'candidates' => $candidates->map(fn (Candidate $candidate) => [
+                'id' => (string) $candidate->id,
+                'name' => trim($candidate->first_name.' '.$candidate->last_name),
+                'registration_number' => $candidate->candidate_number,
+                'status' => $candidate->status,
             ])->all(),
         ];
     }
@@ -357,6 +441,24 @@ class DashboardSummaryService
 
     private function quickActions(User $user, ?array $context): array
     {
+        if ($user->isTeacher()) {
+            return [
+                ['label' => 'Create Assessment', 'href' => '/exams/create?category=assessment'],
+                ['label' => 'Manage Questions', 'href' => '/questions'],
+                ['label' => 'Question Bank', 'href' => '/question-bank'],
+                ['label' => 'View Results', 'href' => '/results'],
+            ];
+        }
+
+        if ($user->isFacilitator()) {
+            return [
+                ['label' => 'Create Assessment', 'href' => '/exams/create?category=assessment'],
+                ['label' => 'Manage Questions', 'href' => '/questions'],
+                ['label' => 'Question Bank', 'href' => '/question-bank'],
+                ['label' => 'View Results', 'href' => '/results'],
+            ];
+        }
+
         $type = $context['type'] ?? 'platform';
         $id = $context['id'] ?? null;
         $secondaryBase = $type === 'secondary_school' ? '/secondary-schools/'.$id : '/secondary-school';

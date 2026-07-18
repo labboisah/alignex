@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use App\Services\Notifications\ExamNotificationService;
 
 class ExamPaperGeneratorService
 {
@@ -92,11 +93,12 @@ class ExamPaperGeneratorService
             throw ValidationException::withMessages(['questions' => 'There are not enough usable questions for the selected exam settings.']);
         }
 
-        return DB::transaction(function () use ($exam): array {
+        $result = DB::transaction(function () use ($exam): array {
             app(ExamParticipantAssignmentService::class)->syncFromExamSettings($exam);
             $exam->loadMissing(['examSubjects.subject', 'candidates', 'participants']);
             $created = 0;
             $skipped = 0;
+            $createdCandidateIds = [];
 
             $participants = $exam->participants->isNotEmpty()
                 ? $exam->participants
@@ -140,14 +142,21 @@ class ExamPaperGeneratorService
                 ]);
 
                 $created++;
+                $createdCandidateIds[] = (string) $attempt->candidate_id;
             }
 
             return [
                 'created' => $created,
                 'skipped' => $skipped,
+                'created_candidate_ids' => array_values(array_unique($createdCandidateIds)),
                 'summary' => $this->generatedSummary($exam),
             ];
         });
+
+        $result['notifications'] = $this->notifyGeneratedCandidates($exam, $result['created_candidate_ids'] ?? []);
+        unset($result['created_candidate_ids']);
+
+        return $result;
     }
 
     private function canGenerate(Exam $exam): bool
@@ -159,6 +168,38 @@ class ExamPaperGeneratorService
         return ! $exam->attempts()
             ->whereNotNull('started_at')
             ->exists();
+    }
+
+    /**
+     * @param array<int, string> $candidateIds
+     * @return array{details_sent: int, reminders_scheduled: int}
+     */
+    private function notifyGeneratedCandidates(Exam $exam, array $candidateIds): array
+    {
+        if ($candidateIds === []) {
+            return ['details_sent' => 0, 'reminders_scheduled' => 0];
+        }
+
+        $service = app(ExamNotificationService::class);
+        $detailsSent = 0;
+        $remindersScheduled = 0;
+
+        Candidate::query()
+            ->whereIn('id', $candidateIds)
+            ->get()
+            ->each(function (Candidate $candidate) use ($exam, $service, &$detailsSent, &$remindersScheduled): void {
+                try {
+                    $detailsSent += count($service->sendCandidateExamDetails($exam->fresh(), $candidate));
+                    $remindersScheduled += count($service->scheduleCandidateExamReminder($exam->fresh(), $candidate));
+                } catch (\Throwable $exception) {
+                    report($exception);
+                }
+            });
+
+        return [
+            'details_sent' => $detailsSent,
+            'reminders_scheduled' => $remindersScheduled,
+        ];
     }
 
     /**

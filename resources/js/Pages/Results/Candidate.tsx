@@ -1,5 +1,5 @@
-import { Head, Link } from '@inertiajs/react';
-import { ArrowLeft, Printer } from 'lucide-react';
+import { Head } from '@inertiajs/react';
+import { Printer } from 'lucide-react';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { PageHeader, PortalAppShell, StatusBadge } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
@@ -42,7 +42,8 @@ export default function CandidateResultDetails({ result, answers, adaptive }: { 
                     eyebrow="Candidate Result"
                     title={result.candidate_name}
                     description={result.registration_number}
-                    actions={<><Button asChild variant="secondary"><Link href={`/results/exams/${result.exam_id}`}><ArrowLeft className="h-4 w-4" />Back</Link></Button><Button asChild variant="secondary"><a href={`/results/attempts/${result.attempt_id}/marked-paper.pdf`}><Printer className="h-4 w-4" />Marked Paper</a></Button></>}
+                    backHref={`/results/exams/${result.exam_id}`}
+                    actions={<Button asChild variant="secondary"><a href={`/results/attempts/${result.attempt_id}/marked-paper.pdf`}><Printer className="h-4 w-4" />Marked Paper</a></Button>}
                 />
                 <div className="grid gap-4 md:grid-cols-4">
                     <Metric label="Score" value={`${result.score}/${result.total_marks}`} />

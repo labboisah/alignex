@@ -6,6 +6,7 @@ use App\Models\AdminRegistrationRequest;
 use App\Models\Center;
 use App\Models\CbtCenter;
 use App\Models\Organization;
+use App\Models\PricingPlan;
 use App\Models\ProfessionalSchool;
 use App\Models\School;
 use App\Models\SecondarySchool;
@@ -33,6 +34,7 @@ class UpdateAdminRegistrationRequest extends FormRequest
                 AdminRegistrationRequest::TYPE_CENTER,
                 AdminRegistrationRequest::TYPE_CBT_CENTER,
             ])],
+            'pricing_plan_id' => ['required', Rule::exists(PricingPlan::class, 'id')],
             'admin_name' => ['required', 'string', 'max:255'],
             'admin_email' => [
                 'required',

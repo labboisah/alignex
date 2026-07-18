@@ -4,11 +4,26 @@ export type EntityType = {
     description: string;
 };
 
+export type RegistrationPlan = {
+    id: number;
+    slug: string;
+    name: string;
+    label: string;
+    description: string;
+};
+
 export type AdminRegistration = Record<string, unknown> & {
     id: number;
     entity_type: 'organization' | 'school' | 'secondary_school' | 'professional_school' | 'center' | 'cbt_center';
     entity_type_label: string;
     entity_id?: number | null;
+    pricing_plan_id?: number | null;
+    pricing_plan?: {
+        id: number;
+        name: string;
+        formatted_price?: string | null;
+        billing_label?: string | null;
+    } | null;
     admin_name: string;
     admin_email: string;
     entity_name: string;

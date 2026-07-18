@@ -3,10 +3,11 @@ import { Save } from 'lucide-react';
 import { FormEvent, ReactNode } from 'react';
 import { PageHeader, PortalAppShell } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
-import { AdminRegistration, EntityType } from './types';
+import { AdminRegistration, EntityType, RegistrationPlan } from './types';
 
 type FormData = {
     entity_type: AdminRegistration['entity_type'];
+    pricing_plan_id: string;
     admin_name: string;
     admin_email: string;
     entity_name: string;
@@ -33,14 +34,16 @@ type Props = {
         data: AdminRegistration;
     };
     entityTypes: EntityType[];
+    plans: RegistrationPlan[];
 };
 
 const inputClass = 'mt-1 block w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm';
 
-export default function EditApplication({ registration, entityTypes }: Props) {
+export default function EditApplication({ registration, entityTypes, plans }: Props) {
     const record = registration.data;
     const { data, setData, patch, processing, errors } = useForm<FormData>({
         entity_type: record.entity_type,
+        pricing_plan_id: record.pricing_plan_id ? String(record.pricing_plan_id) : (plans[0] ? String(plans[0].id) : ''),
         admin_name: record.admin_name ?? '',
         admin_email: record.admin_email ?? '',
         entity_name: record.entity_name ?? '',
@@ -103,6 +106,26 @@ export default function EditApplication({ registration, entityTypes }: Props) {
                             ))}
                         </div>
                         {errors.entity_type && <ErrorText message={errors.entity_type} />}
+                    </section>
+
+                    <section className="rounded-md border border-border bg-white p-5 shadow-sm">
+                        <h2 className="font-semibold text-slateDark">Selected Plan</h2>
+                        <div className="mt-4 grid gap-3 md:grid-cols-2">
+                            {plans.map((plan) => (
+                                <label key={plan.id} className="cursor-pointer rounded-md border border-border p-4 hover:bg-slate-50">
+                                    <input
+                                        type="radio"
+                                        className="text-primary focus:ring-primary"
+                                        checked={data.pricing_plan_id === String(plan.id)}
+                                        onChange={() => setData('pricing_plan_id', String(plan.id))}
+                                    />
+                                    <span className="ml-2 font-semibold">{plan.name}</span>
+                                    <span className="ml-2 text-sm font-semibold text-primary">{plan.label}</span>
+                                    <span className="mt-2 block text-sm leading-6 text-slate-600">{plan.description}</span>
+                                </label>
+                            ))}
+                        </div>
+                        {errors.pricing_plan_id && <ErrorText message={errors.pricing_plan_id} />}
                     </section>
 
                     <section className="rounded-md border border-border bg-white p-5 shadow-sm">

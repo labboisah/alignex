@@ -2,7 +2,9 @@
 
 use App\Http\Controllers\AccessControlController;
 use App\Http\Controllers\AdminRegistrationController;
+use App\Http\Controllers\AppReleaseController;
 use App\Http\Controllers\CandidateController;
+use App\Http\Controllers\CandidateClientDownloadController;
 use App\Http\Controllers\CandidateGroupController;
 use App\Http\Controllers\CenterController;
 use App\Http\Controllers\CbtCenterController;
@@ -11,8 +13,12 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExamController;
 use App\Http\Controllers\ExamMonitorController;
 use App\Http\Controllers\ExamPaperController;
+use App\Http\Controllers\OfflineActivationCodeController;
+use App\Http\Controllers\OfflineServerDownloadController;
 use App\Http\Controllers\OrganizationController;
+use App\Http\Controllers\PricingPlanController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PublicPricingController;
 use App\Http\Controllers\PublicWelcomeController;
 use App\Http\Controllers\ProfessionalExamController;
 use App\Http\Controllers\ProfessionalSchoolController;
@@ -24,10 +30,13 @@ use App\Http\Controllers\SchoolController;
 use App\Http\Controllers\SecondarySchoolController;
 use App\Http\Controllers\SubjectController;
 use App\Http\Controllers\TopicController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', PublicWelcomeController::class)->name('home');
+Route::get('/documentation', fn () => Inertia::render('Public/Documentation'))->name('documentation.public');
+Route::get('/pricing', PublicPricingController::class)->name('pricing.public');
 
 Route::get('/ui-preview', fn () => Inertia::render('UiPreview/Index'))->name('ui-preview');
 
@@ -46,6 +55,17 @@ Route::middleware('guest')->group(function (): void {
 
 Route::middleware(['auth', 'portal.user'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::get('/offline-server/download', OfflineServerDownloadController::class)
+        ->middleware('plan.feature:offline_activation')
+        ->name('offline-server.download');
+    Route::get('/candidate-client/download', CandidateClientDownloadController::class)
+        ->name('candidate-client.download');
+    Route::get('/offline-activation-codes', [OfflineActivationCodeController::class, 'index'])
+        ->middleware(['permission:downloadOfflineServer', 'plan.feature:offline_activation'])
+        ->name('offline-activation-codes.index');
+    Route::post('/offline-activation-codes', [OfflineActivationCodeController::class, 'store'])
+        ->middleware(['permission:downloadOfflineServer', 'plan.feature:offline_activation'])
+        ->name('offline-activation-codes.store');
     Route::patch('/current-context', [CurrentContextController::class, 'update'])->name('current-context.update');
     Route::delete('/current-context', [CurrentContextController::class, 'destroy'])->name('current-context.destroy');
     Route::get('/access-denied', fn () => Inertia::render('AccessDenied'))->name('access-denied');
@@ -89,6 +109,21 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
         Route::patch('/admin-registrations/{adminRegistration}/deactivate', [AdminRegistrationController::class, 'deactivate'])->name('admin-registrations.deactivate');
     });
 
+    Route::middleware(['role:super_admin', 'permission:managePricingPlans'])->group(function (): void {
+        Route::get('/pricing-plans', [PricingPlanController::class, 'index'])->name('pricing-plans.index');
+        Route::post('/pricing-plans', [PricingPlanController::class, 'store'])->name('pricing-plans.store');
+        Route::patch('/pricing-plans/{pricingPlan}', [PricingPlanController::class, 'update'])->name('pricing-plans.update');
+        Route::delete('/pricing-plans/{pricingPlan}', [PricingPlanController::class, 'destroy'])->name('pricing-plans.destroy');
+    });
+
+    Route::middleware(['role:super_admin', 'permission:manageAppReleases'])->group(function (): void {
+        Route::get('/app-releases', [AppReleaseController::class, 'index'])->name('app-releases.index');
+        Route::post('/app-releases', [AppReleaseController::class, 'store'])->name('app-releases.store');
+        Route::patch('/app-releases/{appRelease}', [AppReleaseController::class, 'update'])->name('app-releases.update');
+        Route::delete('/app-releases/{appRelease}', [AppReleaseController::class, 'destroy'])->name('app-releases.destroy');
+        Route::get('/app-releases/{appRelease}/download', [AppReleaseController::class, 'download'])->name('app-releases.download');
+    });
+
     Route::get('/organizations/{organization}', [OrganizationController::class, 'show'])
         ->middleware('role:super_admin,organization_admin')
         ->name('organizations.show');
@@ -121,16 +156,16 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
         Route::post('/secondary-schools/{secondarySchool}/students', [SecondarySchoolController::class, 'storeStudent'])->name('secondary-schools.students.store');
         Route::patch('/secondary-schools/{secondarySchool}/students/{student}', [SecondarySchoolController::class, 'updateStudent'])->name('secondary-schools.students.update');
         Route::delete('/secondary-schools/{secondarySchool}/students/{student}', [SecondarySchoolController::class, 'destroyStudent'])->name('secondary-schools.students.destroy');
-        Route::get('/secondary-schools/{secondarySchool}/teachers', [SecondarySchoolController::class, 'teachers'])->name('secondary-schools.teachers.index');
-        Route::post('/secondary-schools/{secondarySchool}/teachers', [SecondarySchoolController::class, 'storeTeacher'])->name('secondary-schools.teachers.store');
-        Route::patch('/secondary-schools/{secondarySchool}/teachers/{teacher}', [SecondarySchoolController::class, 'updateTeacher'])->name('secondary-schools.teachers.update');
-        Route::delete('/secondary-schools/{secondarySchool}/teachers/{teacher}', [SecondarySchoolController::class, 'destroyTeacher'])->name('secondary-schools.teachers.destroy');
+        Route::get('/secondary-schools/{secondarySchool}/teachers', [SecondarySchoolController::class, 'teachers'])->middleware('plan.feature:teacher_management')->name('secondary-schools.teachers.index');
+        Route::post('/secondary-schools/{secondarySchool}/teachers', [SecondarySchoolController::class, 'storeTeacher'])->middleware('plan.feature:teacher_management')->name('secondary-schools.teachers.store');
+        Route::patch('/secondary-schools/{secondarySchool}/teachers/{teacher}', [SecondarySchoolController::class, 'updateTeacher'])->middleware('plan.feature:teacher_management')->name('secondary-schools.teachers.update');
+        Route::delete('/secondary-schools/{secondarySchool}/teachers/{teacher}', [SecondarySchoolController::class, 'destroyTeacher'])->middleware('plan.feature:teacher_management')->name('secondary-schools.teachers.destroy');
         Route::post('/secondary-schools/{secondarySchool}/subjects', [SecondarySchoolController::class, 'storeSubjectForSchool'])->name('secondary-schools.subjects.store');
         Route::get('/secondary-schools/{secondarySchool}/{section}/template', [SecondarySchoolController::class, 'structureTemplate'])->name('secondary-schools.structure.template');
         Route::post('/secondary-schools/{secondarySchool}/{section}/import', [SecondarySchoolController::class, 'importStructure'])->name('secondary-schools.structure.import');
     });
 
-    Route::middleware(['role:super_admin,organization_admin,professional_school_admin,examiner', 'permission:manageSchools'])->group(function (): void {
+    Route::middleware('role:super_admin,organization_admin,professional_school_admin,examiner,facilitator')->group(function (): void {
         Route::get('/professional-schools', [ProfessionalSchoolController::class, 'index'])->name('professional-schools.index');
         Route::get('/professional-schools/create', [ProfessionalSchoolController::class, 'create'])->name('professional-schools.create');
         Route::post('/professional-schools', [ProfessionalSchoolController::class, 'store'])->name('professional-schools.store');
@@ -147,12 +182,16 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
         Route::post('/professional-schools/{professionalSchool}/training-batches', [ProfessionalSchoolController::class, 'storeBatch'])->name('professional-schools.training-batches.store');
         Route::patch('/professional-schools/{professionalSchool}/training-batches/{trainingBatch}', [ProfessionalSchoolController::class, 'updateBatch'])->name('professional-schools.training-batches.update');
         Route::delete('/professional-schools/{professionalSchool}/training-batches/{trainingBatch}', [ProfessionalSchoolController::class, 'destroyBatch'])->name('professional-schools.training-batches.destroy');
+        Route::get('/professional-schools/{professionalSchool}/facilitators', [ProfessionalSchoolController::class, 'facilitators'])->middleware('plan.feature:facilitator_management')->name('professional-schools.facilitators.index');
+        Route::post('/professional-schools/{professionalSchool}/facilitators', [ProfessionalSchoolController::class, 'storeFacilitator'])->middleware('plan.feature:facilitator_management')->name('professional-schools.facilitators.store');
+        Route::patch('/professional-schools/{professionalSchool}/facilitators/{facilitator}', [ProfessionalSchoolController::class, 'updateFacilitator'])->middleware('plan.feature:facilitator_management')->name('professional-schools.facilitators.update');
+        Route::delete('/professional-schools/{professionalSchool}/facilitators/{facilitator}', [ProfessionalSchoolController::class, 'destroyFacilitator'])->middleware('plan.feature:facilitator_management')->name('professional-schools.facilitators.destroy');
         Route::get('/professional-schools/{professionalSchool}/question-banks', [ProfessionalSchoolController::class, 'questionBanks'])->name('professional-schools.question-banks.index');
         Route::post('/professional-schools/{professionalSchool}/question-banks', [ProfessionalSchoolController::class, 'storeQuestionBank'])->name('professional-schools.question-banks.store');
         Route::get('/professional-schools/{professionalSchool}/questions', [ProfessionalSchoolController::class, 'questions'])->name('professional-schools.questions.index');
         Route::get('/professional-schools/{professionalSchool}/questions/template', [ProfessionalSchoolController::class, 'questionTemplate'])->name('professional-schools.questions.template');
         Route::post('/professional-schools/{professionalSchool}/questions/import', [ProfessionalSchoolController::class, 'importQuestions'])->name('professional-schools.questions.import');
-        Route::get('/professional-schools/{professionalSchool}/certificates', [ProfessionalSchoolController::class, 'certificates'])->name('professional-schools.certificates.index');
+        Route::get('/professional-schools/{professionalSchool}/certificates', [ProfessionalSchoolController::class, 'certificates'])->middleware('plan.feature:certificate_generation')->name('professional-schools.certificates.index');
         Route::get('/professional-schools/{professionalSchool}/candidates', [ProfessionalSchoolController::class, 'candidates'])->name('professional-schools.candidates.index');
         Route::get('/professional-schools/{professionalSchool}/candidates/template', [ProfessionalSchoolController::class, 'candidateTemplate'])->name('professional-schools.candidates.template');
         Route::post('/professional-schools/{professionalSchool}/candidates', [ProfessionalSchoolController::class, 'storeCandidate'])->name('professional-schools.candidates.store');
@@ -218,9 +257,10 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
     });
 
     Route::middleware(['role:super_admin,organization_admin', 'permission:manageUsers'])->group(function (): void {
-        Route::get('/users', fn () => Inertia::render('Portal/Placeholder', [
-            'title' => 'Users',
-        ]))->name('users.index');
+        Route::get('/users', [UserController::class, 'index'])->name('users.index');
+        Route::post('/users', [UserController::class, 'store'])->name('users.store');
+        Route::patch('/users/{user}', [UserController::class, 'update'])->name('users.update');
+        Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
     });
 
     Route::middleware(['role:super_admin,organization_admin', 'permission:manageSettings'])->group(function (): void {
@@ -229,7 +269,7 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
         ]))->name('settings.index');
     });
 
-    Route::middleware('role:super_admin,organization_admin,examiner,teacher,school_admin,secondary_school_admin,professional_school_admin,center_admin,cbt_center_admin,supervisor')->group(function (): void {
+    Route::middleware('role:super_admin,organization_admin,examiner,teacher,facilitator,school_admin,secondary_school_admin,professional_school_admin,center_admin,cbt_center_admin,supervisor')->group(function (): void {
         Route::middleware('permission:manageQuestionBank')->group(function (): void {
             Route::get('/subjects/template', [SubjectController::class, 'template'])->name('subjects.template');
             Route::post('/subjects/import', [SubjectController::class, 'import'])->name('subjects.import');
@@ -295,9 +335,9 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
             Route::patch('/exams/{exam}/professional/templates/{template}', [ProfessionalExamController::class, 'updateTemplate'])->name('exams.professional.templates.update');
             Route::delete('/exams/{exam}/professional/templates/{template}', [ProfessionalExamController::class, 'destroyTemplate'])->name('exams.professional.templates.destroy');
             Route::patch('/exams/{exam}/professional/attempts/{attempt}/payment', [ProfessionalExamController::class, 'updatePayment'])->name('exams.professional.payment');
-            Route::post('/exams/{exam}/professional/certificates', [ProfessionalExamController::class, 'generateCertificates'])->name('exams.professional.certificates.generate');
-            Route::get('/exams/{exam}/professional/certificates/{certificate}/download', [ProfessionalExamController::class, 'downloadCertificate'])->name('exams.professional.certificates.download');
-            Route::post('/exams/{exam}/professional/attempts/{attempt}/certificate', [ProfessionalExamController::class, 'generateCertificate'])->name('exams.professional.certificate.generate');
+            Route::post('/exams/{exam}/professional/certificates', [ProfessionalExamController::class, 'generateCertificates'])->middleware('plan.feature:certificate_generation')->name('exams.professional.certificates.generate');
+            Route::get('/exams/{exam}/professional/certificates/{certificate}/download', [ProfessionalExamController::class, 'downloadCertificate'])->middleware('plan.feature:certificate_generation')->name('exams.professional.certificates.download');
+            Route::post('/exams/{exam}/professional/attempts/{attempt}/certificate', [ProfessionalExamController::class, 'generateCertificate'])->middleware('plan.feature:certificate_generation')->name('exams.professional.certificate.generate');
             Route::get('/exams/{exam}/certification', [ProfessionalExamController::class, 'show'])->name('exams.certification.show');
             Route::patch('/exams/{exam}/certification/settings', [ProfessionalExamController::class, 'updateSettings'])->name('exams.certification.settings');
             Route::post('/exams/{exam}/certification/templates', [ProfessionalExamController::class, 'storeTemplate'])->name('exams.certification.templates.store');
@@ -305,9 +345,9 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
             Route::patch('/exams/{exam}/certification/templates/{template}', [ProfessionalExamController::class, 'updateTemplate'])->name('exams.certification.templates.update');
             Route::delete('/exams/{exam}/certification/templates/{template}', [ProfessionalExamController::class, 'destroyTemplate'])->name('exams.certification.templates.destroy');
             Route::patch('/exams/{exam}/certification/attempts/{attempt}/payment', [ProfessionalExamController::class, 'updatePayment'])->name('exams.certification.payment');
-            Route::post('/exams/{exam}/certification/certificates', [ProfessionalExamController::class, 'generateCertificates'])->name('exams.certification.certificates.generate');
-            Route::get('/exams/{exam}/certification/certificates/{certificate}/download', [ProfessionalExamController::class, 'downloadCertificate'])->name('exams.certification.certificates.download');
-            Route::post('/exams/{exam}/certification/attempts/{attempt}/certificate', [ProfessionalExamController::class, 'generateCertificate'])->name('exams.certification.certificate.generate');
+            Route::post('/exams/{exam}/certification/certificates', [ProfessionalExamController::class, 'generateCertificates'])->middleware('plan.feature:certificate_generation')->name('exams.certification.certificates.generate');
+            Route::get('/exams/{exam}/certification/certificates/{certificate}/download', [ProfessionalExamController::class, 'downloadCertificate'])->middleware('plan.feature:certificate_generation')->name('exams.certification.certificates.download');
+            Route::post('/exams/{exam}/certification/attempts/{attempt}/certificate', [ProfessionalExamController::class, 'generateCertificate'])->middleware('plan.feature:certificate_generation')->name('exams.certification.certificate.generate');
         });
 
         Route::middleware('permission:manageExams')->group(function (): void {
@@ -333,10 +373,10 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
             Route::post('/secondary-school/students', [SecondarySchoolController::class, 'storeLegacyStudent'])->name('secondary-school.students.store');
             Route::patch('/secondary-school/students/{student}', [SecondarySchoolController::class, 'updateLegacyStudent'])->name('secondary-school.students.update');
             Route::delete('/secondary-school/students/{student}', [SecondarySchoolController::class, 'destroyLegacyStudent'])->name('secondary-school.students.destroy');
-            Route::get('/secondary-school/teachers', [SecondarySchoolController::class, 'legacyTeachers'])->middleware('permission:manageSchools')->name('secondary-school.teachers.index');
-            Route::post('/secondary-school/teachers', [SecondarySchoolController::class, 'storeLegacyTeacher'])->middleware('permission:manageSchools')->name('secondary-school.teachers.store');
-            Route::patch('/secondary-school/teachers/{teacher}', [SecondarySchoolController::class, 'updateLegacyTeacher'])->middleware('permission:manageSchools')->name('secondary-school.teachers.update');
-            Route::delete('/secondary-school/teachers/{teacher}', [SecondarySchoolController::class, 'destroyLegacyTeacher'])->middleware('permission:manageSchools')->name('secondary-school.teachers.destroy');
+            Route::get('/secondary-school/teachers', [SecondarySchoolController::class, 'legacyTeachers'])->middleware(['permission:manageSchools', 'plan.feature:teacher_management'])->name('secondary-school.teachers.index');
+            Route::post('/secondary-school/teachers', [SecondarySchoolController::class, 'storeLegacyTeacher'])->middleware(['permission:manageSchools', 'plan.feature:teacher_management'])->name('secondary-school.teachers.store');
+            Route::patch('/secondary-school/teachers/{teacher}', [SecondarySchoolController::class, 'updateLegacyTeacher'])->middleware(['permission:manageSchools', 'plan.feature:teacher_management'])->name('secondary-school.teachers.update');
+            Route::delete('/secondary-school/teachers/{teacher}', [SecondarySchoolController::class, 'destroyLegacyTeacher'])->middleware(['permission:manageSchools', 'plan.feature:teacher_management'])->name('secondary-school.teachers.destroy');
             Route::get('/secondary-school/student-groups', [SecondarySchoolController::class, 'legacyStudentGroups'])->name('secondary-school.student-groups.index');
             Route::post('/secondary-school/student-groups', [SecondarySchoolController::class, 'storeLegacyStudentGroup'])->name('secondary-school.student-groups.store');
             Route::patch('/secondary-school/student-groups/{studentGroup}', [SecondarySchoolController::class, 'updateLegacyStudentGroup'])->name('secondary-school.student-groups.update');
@@ -380,12 +420,12 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
             Route::get('/results/exams/{exam}', [ResultController::class, 'show'])->name('results.exams.show');
             Route::get('/results/attempts/{attempt}', [ResultController::class, 'candidate'])->name('results.attempts.show');
             Route::get('/results/attempts/{attempt}/marked-paper.pdf', [ResultController::class, 'markedPaperPdf'])->name('results.attempts.marked-paper');
-            Route::get('/results/exams/{exam}/export.csv', [ResultController::class, 'exportCsv'])->name('results.exams.export-csv');
-            Route::get('/results/exams/{exam}/summary.pdf', [ResultController::class, 'exportPdf'])->name('results.exams.export-pdf');
+            Route::get('/results/exams/{exam}/export.csv', [ResultController::class, 'exportCsv'])->middleware('plan.feature:csv_export')->name('results.exams.export-csv');
+            Route::get('/results/exams/{exam}/summary.pdf', [ResultController::class, 'exportPdf'])->middleware('plan.feature:pdf_export')->name('results.exams.export-pdf');
         });
     });
 
-    Route::middleware(['role:super_admin,organization_admin,examiner,supervisor,center_admin,school_admin,secondary_school_admin,professional_school_admin,cbt_center_admin', 'permission:viewReports'])->group(function (): void {
+    Route::middleware(['role:super_admin,organization_admin,examiner,supervisor,center_admin,school_admin,secondary_school_admin,professional_school_admin,cbt_center_admin', 'permission:viewReports', 'plan.feature:custom_reports'])->group(function (): void {
         Route::get('/reports', fn () => Inertia::render('Portal/Placeholder', [
             'title' => 'Reports',
         ]))->name('reports.index');

@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RolesSeeder::class,
             DemoEntitySeeder::class,
+            NotificationTemplateSeeder::class,
         ]);
     }
 }

@@ -10,6 +10,7 @@ use App\Models\Role;
 use App\Models\School;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -49,6 +50,7 @@ class RbacTest extends TestCase
             '/candidates',
             '/results',
             '/reports',
+            '/documentation',
             '/settings',
             '/assigned-exams',
             '/supervisor-monitor',
@@ -90,6 +92,42 @@ class RbacTest extends TestCase
         $this->actingAs($supervisor)->get('/question-bank')->assertForbidden();
     }
 
+    public function test_portal_admin_without_offline_download_permission_can_download_server_package(): void
+    {
+        $path = public_path('downloads/offline-server/AlignEx-Center-Server-win-unpacked.zip');
+        $backupPath = $path.'.test-backup';
+        File::ensureDirectoryExists(dirname($path));
+
+        if (File::exists($backupPath)) {
+            File::delete($backupPath);
+        }
+
+        if (File::exists($path)) {
+            File::move($path, $backupPath);
+        }
+
+        try {
+            File::put($path, 'fake offline server package');
+
+            $schoolAdmin = User::factory()->create(['role' => User::ROLE_SCHOOL_ADMIN]);
+
+            $this->assertFalse($schoolAdmin->hasPermission('downloadOfflineServer'));
+
+            $this->actingAs($schoolAdmin)
+                ->get('/offline-server/download')
+                ->assertOk()
+                ->assertDownload('AlignEx-Center-Server-win-unpacked.zip');
+        } finally {
+            if (File::exists($path)) {
+                File::delete($path);
+            }
+
+            if (File::exists($backupPath)) {
+                File::move($backupPath, $path);
+            }
+        }
+    }
+
     public function test_sidebar_renders_correctly_by_role(): void
     {
         $expected = [
@@ -103,6 +141,7 @@ class RbacTest extends TestCase
                 'Users',
                 'Access Controls',
                 'Reports',
+                'Documentation',
             ],
             User::ROLE_ORGANIZATION_ADMIN => [
                 'Dashboard',
@@ -120,6 +159,7 @@ class RbacTest extends TestCase
                 'Results',
                 'Admin',
                 'Users',
+                'Documentation',
                 'Settings',
             ],
             User::ROLE_EXAMINER => [
@@ -136,11 +176,13 @@ class RbacTest extends TestCase
                 'Adaptive Exams',
                 'Reports',
                 'Results',
+                'Documentation',
             ],
             User::ROLE_SUPERVISOR => [
                 'Dashboard',
                 'Reports',
                 'Results',
+                'Documentation',
             ],
             User::ROLE_CENTER_ADMIN => [
                 'Dashboard',
@@ -156,6 +198,7 @@ class RbacTest extends TestCase
                 'Adaptive Exams',
                 'Reports',
                 'Results',
+                'Documentation',
             ],
             User::ROLE_SCHOOL_ADMIN => [
                 'Dashboard',
@@ -171,6 +214,7 @@ class RbacTest extends TestCase
                 'Adaptive Exams',
                 'Reports',
                 'Results',
+                'Documentation',
             ],
         ];
 
@@ -231,6 +275,7 @@ class RbacTest extends TestCase
                         'Questions',
                         'Assessments',
                         'Results',
+                        'Documentation',
                     ], $labels);
                     $this->assertFalse(collect($navigation)->contains(fn ($item) => isset($item['children'])));
 

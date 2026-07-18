@@ -6,8 +6,8 @@ import { Exam } from './types';
 
 export default function ShowExam({ exam, can }: { exam: { data: Exam }; can: { update: boolean; cancel: boolean; delete?: boolean } }) {
     const auth = usePage().props.auth as { user?: { role?: string } };
-    const isTeacher = auth.user?.role === 'teacher';
-    const noun = isTeacher ? 'Assessment' : 'Exam';
+    const isAssessmentRole = auth.user?.role === 'teacher' || auth.user?.role === 'facilitator';
+    const noun = isAssessmentRole ? 'Assessment' : 'Exam';
     const record = exam.data;
     const isSecondary = record.owner_context === 'secondary_school' || record.secondary_school_id;
     const isProfessional = record.owner_context === 'professional_school' || record.professional_school_id;
@@ -29,8 +29,8 @@ export default function ShowExam({ exam, can }: { exam: { data: Exam }; can: { u
                             <Button asChild type="button" variant="secondary"><Link href={`/exams/${record.id}/papers`}><Shuffle className="h-4 w-4" />Generate Papers</Link></Button>
                             <Button asChild type="button" variant="secondary"><Link href={`/exams/${record.id}/monitor`}><Monitor className="h-4 w-4" />Monitor</Link></Button>
                             <Button asChild type="button" variant="secondary"><Link href={`/results/exams/${record.id}`}><BarChart3 className="h-4 w-4" />Results</Link></Button>
-                            {!isTeacher && (record.exam_type === 'professional' || record.exam_type === 'secondary') && <Button asChild type="button" variant="secondary"><Link href={`/exams/${record.id}/certification`}><Award className="h-4 w-4" />Certification</Link></Button>}
-                            {!isTeacher && record.exam_type === 'recruitment' && <Button asChild type="button" variant="secondary"><Link href={`/exams/${record.id}/recruitment`}><BriefcaseBusiness className="h-4 w-4" />Recruitment</Link></Button>}
+                            {!isAssessmentRole && (record.exam_type === 'professional' || record.exam_type === 'secondary') && <Button asChild type="button" variant="secondary"><Link href={`/exams/${record.id}/certification`}><Award className="h-4 w-4" />Certification</Link></Button>}
+                            {!isAssessmentRole && record.exam_type === 'recruitment' && <Button asChild type="button" variant="secondary"><Link href={`/exams/${record.id}/recruitment`}><BriefcaseBusiness className="h-4 w-4" />Recruitment</Link></Button>}
                             <ProtectedAction allowed={can.cancel}><Button type="button" variant="danger" onClick={() => window.confirm(`Cancel this ${noun.toLowerCase()}?`) && router.patch(`/exams/${record.id}/cancel`, {}, { preserveScroll: true })}><XCircle className="h-4 w-4" />Cancel {noun}</Button></ProtectedAction>
                             <ProtectedAction allowed={can.delete ?? false}><Button type="button" variant="danger" onClick={() => window.confirm(`Delete this ${noun.toLowerCase()}?`) && router.delete(`/exams/${record.id}`, { preserveScroll: true })}><Trash2 className="h-4 w-4" />Delete</Button></ProtectedAction>
                         </>

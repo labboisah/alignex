@@ -59,6 +59,15 @@ class LoginRequest extends FormRequest
             ]);
         }
 
+        if (! Auth::user()?->isActive()) {
+            Auth::guard('web')->logout();
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'email' => 'This user account has been deactivated.',
+            ]);
+        }
+
         RateLimiter::clear($this->throttleKey());
     }
 

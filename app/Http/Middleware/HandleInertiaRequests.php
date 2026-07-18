@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\User;
 use App\Services\CurrentContextService;
 use App\Services\ExamSetupGuideService;
+use App\Services\PlanFeatureService;
 use App\Support\AccessControl;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -35,6 +36,7 @@ class HandleInertiaRequests extends Middleware
     {
         $user = $request->user();
         $contextService = app(CurrentContextService::class);
+        $planFeatures = app(PlanFeatureService::class);
         $currentContext = $user ? $contextService->current($user) : null;
         $availableContexts = $user ? $contextService->available($user)->values()->all() : [];
 
@@ -59,6 +61,8 @@ class HandleInertiaRequests extends Middleware
                     'label' => AccessControl::roleLabel($user->role),
                 ] : null,
                 'permissions' => $user ? $this->permissionsFor($user) : [],
+                'plan' => $user ? $planFeatures->planSummaryForUser($user) : null,
+                'plan_features' => $user ? $planFeatures->featuresForUser($user) : [],
                 'current_context' => $currentContext,
                 'available_contexts' => $availableContexts,
                 'navigation' => $user ? $this->navigationFor($user, $currentContext) : [],
@@ -68,6 +72,7 @@ class HandleInertiaRequests extends Middleware
             'available_contexts' => $availableContexts,
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
+                'activation_code' => fn () => $request->session()->get('activation_code'),
                 'import_summary' => fn () => $request->session()->get('import_summary'),
             ],
         ];
@@ -82,6 +87,8 @@ class HandleInertiaRequests extends Middleware
             'manageOrganizations' => $user->hasPermission('manageOrganizations'),
             'manageAccessControls' => $user->hasPermission('manageAccessControls'),
             'manageAdminRegistrations' => $user->hasPermission('manageAdminRegistrations'),
+            'managePricingPlans' => $user->hasPermission('managePricingPlans'),
+            'manageAppReleases' => $user->hasPermission('manageAppReleases'),
             'manageCenters' => $user->hasPermission('manageCenters'),
             'manageSchools' => $user->hasPermission('manageSchools'),
             'manageUsers' => $user->hasPermission('manageUsers'),
@@ -90,6 +97,7 @@ class HandleInertiaRequests extends Middleware
             'viewSupervisorMonitor' => $user->hasPermission('viewSupervisorMonitor'),
             'viewReports' => $user->hasPermission('viewReports'),
             'manageSettings' => $user->hasPermission('manageSettings'),
+            'downloadOfflineServer' => $user->hasPermission('downloadOfflineServer'),
         ];
     }
 
@@ -118,6 +126,10 @@ class HandleInertiaRequests extends Middleware
                 ['label' => 'Platform', 'children' => [
                     ['label' => 'Organizations', 'href' => '/organizations', 'permission' => 'manageOrganizations'],
                     ['label' => 'Applications', 'href' => '/admin-registrations', 'permission' => 'manageAdminRegistrations'],
+                    ['label' => 'Pricing Plans', 'href' => '/pricing-plans', 'permission' => 'managePricingPlans'],
+                    ['label' => 'App Releases', 'href' => '/app-releases', 'permission' => 'manageAppReleases'],
+                    ['label' => 'Secondary Schools', 'href' => '/secondary-schools', 'permission' => 'manageSchools'],
+                    ['label' => 'Professional Schools', 'href' => '/professional-schools', 'permission' => 'manageSchools'],
                     ['label' => 'CBT Centers', 'href' => '/cbt-centers', 'permission' => 'manageCenters'],
                 ]],
                 ['label' => 'Admin', 'children' => [
@@ -127,6 +139,10 @@ class HandleInertiaRequests extends Middleware
                 ['label' => 'Reports', 'children' => [
                     ['label' => 'Reports', 'href' => '/reports', 'permission' => 'viewReports'],
                 ]],
+                ['label' => 'Offline Server', 'href' => '/offline-server/download', 'feature' => 'offline_activation'],
+                ['label' => 'Client App', 'href' => '/candidate-client/download'],
+                ['label' => 'Activation Codes', 'href' => '/offline-activation-codes', 'permission' => 'downloadOfflineServer', 'feature' => 'offline_activation'],
+                ['label' => 'Documentation', 'href' => '/documentation'],
             ]);
         } elseif ($user->isTeacher()) {
             $navigation = collect([
@@ -136,6 +152,25 @@ class HandleInertiaRequests extends Middleware
                 ['label' => 'Questions', 'href' => '/questions', 'permission' => 'manageQuestionBank'],
                 ['label' => 'Assessments', 'href' => '/exams?category=assessment', 'permission' => 'manageExams'],
                 ['label' => 'Results', 'href' => '/results', 'permission' => 'viewReports'],
+                ['label' => 'Offline Server', 'href' => '/offline-server/download', 'feature' => 'offline_activation'],
+                ['label' => 'Client App', 'href' => '/candidate-client/download'],
+                ['label' => 'Activation Codes', 'href' => '/offline-activation-codes', 'permission' => 'downloadOfflineServer', 'feature' => 'offline_activation'],
+                ['label' => 'Documentation', 'href' => '/documentation'],
+            ]);
+        } elseif ($user->isFacilitator()) {
+            $base = $user->professional_school_id ? '/professional-schools/'.$user->professional_school_id : '/professional-schools';
+            $navigation = collect([
+                ['label' => 'Dashboard', 'href' => '/dashboard'],
+                ['label' => 'Courses', 'href' => $base.'/courses', 'permission' => 'manageQuestionBank'],
+                ['label' => 'Modules', 'href' => $base.'/modules', 'permission' => 'manageQuestionBank'],
+                ['label' => 'Question Bank', 'href' => $base.'/question-banks', 'permission' => 'manageQuestionBank'],
+                ['label' => 'Questions', 'href' => $base.'/questions', 'permission' => 'manageQuestionBank'],
+                ['label' => 'Assessments', 'href' => '/exams?category=assessment', 'permission' => 'manageExams'],
+                ['label' => 'Results', 'href' => '/results', 'permission' => 'viewReports'],
+                ['label' => 'Offline Server', 'href' => '/offline-server/download', 'feature' => 'offline_activation'],
+                ['label' => 'Client App', 'href' => '/candidate-client/download'],
+                ['label' => 'Activation Codes', 'href' => '/offline-activation-codes', 'permission' => 'downloadOfflineServer', 'feature' => 'offline_activation'],
+                ['label' => 'Documentation', 'href' => '/documentation'],
             ]);
         } else {
             $navigation = collect(match ($contextType) {
@@ -147,7 +182,7 @@ class HandleInertiaRequests extends Middleware
                         ['label' => 'Classes', 'href' => $secondaryHref('/classes'), 'permission' => 'manageSchools'],
                         ['label' => 'Students', 'href' => $secondaryHref('/students')],
                         ['label' => 'Student Groups', 'href' => $secondaryHref('/student-groups'), 'permission' => 'manageSchools'],
-                        ['label' => 'Teachers', 'href' => $secondaryHref('/teachers'), 'permission' => 'manageSchools'],
+                        ['label' => 'Teachers', 'href' => $secondaryHref('/teachers'), 'permission' => 'manageSchools', 'feature' => 'teacher_management'],
                     ]],
                     ['label' => 'Exam', 'children' => [
                         ['label' => 'Subjects', 'href' => '/subjects', 'permission' => 'manageQuestionBank'],
@@ -157,7 +192,11 @@ class HandleInertiaRequests extends Middleware
                         ['label' => 'Assessments', 'href' => '/exams?category=assessment', 'permission' => 'manageExams'],
                     ]],
                     ['label' => 'Results', 'href' => '/results', 'permission' => 'viewReports'],
-                    ['label' => 'Reports', 'href' => '/reports', 'permission' => 'viewReports'],
+                    ['label' => 'Reports', 'href' => '/reports', 'permission' => 'viewReports', 'feature' => 'custom_reports'],
+                    ['label' => 'Offline Server', 'href' => '/offline-server/download', 'feature' => 'offline_activation'],
+                    ['label' => 'Client App', 'href' => '/candidate-client/download'],
+                    ['label' => 'Activation Codes', 'href' => '/offline-activation-codes', 'permission' => 'downloadOfflineServer', 'feature' => 'offline_activation'],
+                    ['label' => 'Documentation', 'href' => '/documentation'],
                     ['label' => 'Settings', 'href' => '/settings', 'permission' => 'manageSettings'],
                 ],
                 'professional_school' => [
@@ -170,19 +209,24 @@ class HandleInertiaRequests extends Middleware
                     ]],
                     ['label' => 'Candidates', 'children' => [
                         ['label' => 'Candidates / Trainees', 'href' => $professionalBase.'/candidates', 'permission' => 'manageExams'],
+                        ['label' => 'Facilitators', 'href' => $professionalBase.'/facilitators', 'permission' => 'manageSchools', 'feature' => 'facilitator_management'],
                     ]],
                     ['label' => 'Exam', 'children' => [
                         ['label' => 'Question Bank', 'href' => $professionalBase.'/question-banks', 'permission' => 'manageQuestionBank'],
                         ['label' => 'Questions', 'href' => $professionalBase.'/questions', 'permission' => 'manageQuestionBank'],
                         ['label' => 'Traditional Exams', 'href' => '/exams?mode=traditional', 'permission' => 'manageExams'],
-                        ['label' => 'Adaptive Exams', 'href' => '/exams?mode=adaptive', 'permission' => 'manageExams'],
+                        ['label' => 'Adaptive Exams', 'href' => '/exams?mode=adaptive', 'permission' => 'manageExams', 'feature' => 'adaptive_exam'],
                         ['label' => 'Certification Exams', 'href' => '/exams?category=certification', 'permission' => 'manageExams'],
                     ]],
                     ['label' => 'Reports', 'children' => [
                         ['label' => 'Results', 'href' => '/results', 'permission' => 'viewReports'],
-                        ['label' => 'Certificates', 'href' => '/verify-certificate', 'permission' => 'viewReports'],
-                        ['label' => 'Reports', 'href' => '/reports', 'permission' => 'viewReports'],
+                        ['label' => 'Certificates', 'href' => '/verify-certificate', 'permission' => 'viewReports', 'feature' => 'certificate_generation'],
+                        ['label' => 'Reports', 'href' => '/reports', 'permission' => 'viewReports', 'feature' => 'custom_reports'],
                     ]],
+                    ['label' => 'Documentation', 'href' => '/documentation'],
+                    ['label' => 'Offline Server', 'href' => '/offline-server/download', 'feature' => 'offline_activation'],
+                    ['label' => 'Client App', 'href' => '/candidate-client/download'],
+                    ['label' => 'Activation Codes', 'href' => '/offline-activation-codes', 'permission' => 'downloadOfflineServer', 'feature' => 'offline_activation'],
                     ['label' => 'Settings', 'href' => '/settings', 'permission' => 'manageSettings'],
                 ],
                 'cbt_center' => [
@@ -197,12 +241,16 @@ class HandleInertiaRequests extends Middleware
                         ['label' => 'Questions', 'href' => '/questions', 'permission' => 'manageQuestionBank'],
                         ['label' => 'Exams', 'href' => '/exams', 'permission' => 'manageExams'],
                         ['label' => 'Traditional CBT Exams', 'href' => '/exams?mode=traditional', 'permission' => 'manageExams'],
-                        ['label' => 'Adaptive CBT Exams', 'href' => '/exams?mode=adaptive', 'permission' => 'manageExams'],
+                        ['label' => 'Adaptive CBT Exams', 'href' => '/exams?mode=adaptive', 'permission' => 'manageExams', 'feature' => 'adaptive_exam'],
                     ]],
                     ['label' => 'Reports', 'children' => [
                         ['label' => 'Results', 'href' => '/results', 'permission' => 'viewReports'],
-                        ['label' => 'Reports', 'href' => '/reports', 'permission' => 'viewReports'],
+                        ['label' => 'Reports', 'href' => '/reports', 'permission' => 'viewReports', 'feature' => 'custom_reports'],
                     ]],
+                    ['label' => 'Documentation', 'href' => '/documentation'],
+                    ['label' => 'Offline Server', 'href' => '/offline-server/download', 'feature' => 'offline_activation'],
+                    ['label' => 'Client App', 'href' => '/candidate-client/download'],
+                    ['label' => 'Activation Codes', 'href' => '/offline-activation-codes', 'permission' => 'downloadOfflineServer', 'feature' => 'offline_activation'],
                     ['label' => 'Center Settings', 'href' => $cbtCenterBase.'/edit', 'permission' => 'manageCenters'],
                 ],
                 default => [
@@ -221,15 +269,19 @@ class HandleInertiaRequests extends Middleware
                         ['label' => 'Recruitment Exams', 'href' => '/exams?category=recruitment', 'permission' => 'manageExams'],
                         ['label' => 'Assessment Exams', 'href' => '/exams?category=assessment', 'permission' => 'manageExams'],
                         ['label' => 'Certification Exams', 'href' => '/exams?category=certification', 'permission' => 'manageExams'],
-                        ['label' => 'Adaptive Exams', 'href' => '/exams?mode=adaptive', 'permission' => 'manageExams'],
+                        ['label' => 'Adaptive Exams', 'href' => '/exams?mode=adaptive', 'permission' => 'manageExams', 'feature' => 'adaptive_exam'],
                     ]],
                     ['label' => 'Reports', 'children' => [
                         ['label' => 'Results', 'href' => '/results'],
-                        ['label' => 'Reports', 'href' => '/reports', 'permission' => 'viewReports'],
+                        ['label' => 'Reports', 'href' => '/reports', 'permission' => 'viewReports', 'feature' => 'custom_reports'],
                     ]],
                     ['label' => 'Admin', 'children' => [
                         ['label' => 'Users', 'href' => '/users', 'permission' => 'manageUsers'],
                     ]],
+                    ['label' => 'Documentation', 'href' => '/documentation'],
+                    ['label' => 'Offline Server', 'href' => '/offline-server/download', 'feature' => 'offline_activation'],
+                    ['label' => 'Client App', 'href' => '/candidate-client/download'],
+                    ['label' => 'Activation Codes', 'href' => '/offline-activation-codes', 'permission' => 'downloadOfflineServer', 'feature' => 'offline_activation'],
                     ['label' => 'Settings', 'href' => '/settings', 'permission' => 'manageSettings'],
                 ],
             });
@@ -273,7 +325,10 @@ class HandleInertiaRequests extends Middleware
                     return count($item['children']) > 0 ? $item : null;
                 }
 
-                return ! isset($item['permission']) || $user->hasPermission($item['permission']) ? $item : null;
+                $hasPermission = ! isset($item['permission']) || $user->hasPermission($item['permission']);
+                $hasFeature = ! isset($item['feature']) || app(PlanFeatureService::class)->hasFeature($user, $item['feature']);
+
+                return $hasPermission && $hasFeature ? $item : null;
             })
             ->filter()
             ->values()

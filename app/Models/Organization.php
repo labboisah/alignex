@@ -5,9 +5,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'code', 'organization_type', 'description', 'logo', 'website', 'contact_person', 'email', 'phone', 'address', 'status'])]
+#[Fillable(['pricing_plan_id', 'name', 'code', 'organization_type', 'description', 'logo', 'website', 'contact_person', 'email', 'phone', 'address', 'status'])]
 class Organization extends Model
 {
     use HasFactory;
@@ -38,6 +39,11 @@ class Organization extends Model
         self::TYPE_SCHOOL_GROUP_OWNER,
         self::TYPE_OTHER,
     ];
+
+    public function pricingPlan(): BelongsTo
+    {
+        return $this->belongsTo(PricingPlan::class);
+    }
 
     public function users(): HasMany
     {

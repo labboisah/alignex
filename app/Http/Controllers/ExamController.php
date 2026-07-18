@@ -21,10 +21,12 @@ use App\Models\School;
 use App\Models\SecondarySchool;
 use App\Models\StudentGroup;
 use App\Models\Subject;
+use App\Models\User;
 use App\Services\CurrentContextService;
 use App\Services\ExamParticipantAssignmentService;
 use App\Services\ExamStatusService;
 use App\Support\ExamOwnershipRules;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -64,7 +66,7 @@ class ExamController extends Controller
     {
         $exam = DB::transaction(fn () => $this->persistExam($request));
 
-        return redirect()->route('exams.show', $exam)->with('success', $request->user()->isTeacher() ? 'Assessment created.' : 'Exam created.');
+        return redirect()->route('exams.show', $exam)->with('success', $request->user()->isTeacher() || $request->user()->isFacilitator() ? 'Assessment created.' : 'Exam created.');
     }
 
     public function show(Request $request, Exam $exam): Response
@@ -97,7 +99,7 @@ class ExamController extends Controller
     {
         DB::transaction(fn () => $this->persistExam($request, $exam));
 
-        return redirect()->route('exams.show', $exam)->with('success', $request->user()->isTeacher() ? 'Assessment updated.' : 'Exam updated.');
+        return redirect()->route('exams.show', $exam)->with('success', $request->user()->isTeacher() || $request->user()->isFacilitator() ? 'Assessment updated.' : 'Exam updated.');
     }
 
     public function cancel(Exam $exam): RedirectResponse
@@ -106,7 +108,7 @@ class ExamController extends Controller
 
         $exam->update(['status' => Exam::STATUS_CANCELLED]);
 
-        return back()->with('success', request()->user()?->isTeacher() ? 'Assessment cancelled.' : 'Exam cancelled.');
+        return back()->with('success', request()->user()?->isTeacher() || request()->user()?->isFacilitator() ? 'Assessment cancelled.' : 'Exam cancelled.');
     }
 
     public function destroy(Exam $exam): RedirectResponse
@@ -116,7 +118,7 @@ class ExamController extends Controller
 
         $exam->delete();
 
-        return redirect()->route('exams.index')->with('success', request()->user()?->isTeacher() ? 'Assessment deleted.' : 'Exam deleted.');
+        return redirect()->route('exams.index')->with('success', request()->user()?->isTeacher() || request()->user()?->isFacilitator() ? 'Assessment deleted.' : 'Exam deleted.');
     }
 
     public function refreshParticipants(Request $request, Exam $exam): RedirectResponse
@@ -321,7 +323,7 @@ class ExamController extends Controller
         foreach (array_values($data['subjects']) as $index => $subject) {
             $this->authorizeSubject($request, $subject['subject_id']);
             $bankIds = $this->resolveQuestionBankIds($subject, $data);
-            $this->authorizeSubjectQuestionBanks($tenant, $bankIds, $subject['subject_id'], true);
+            $this->authorizeSubjectQuestionBanks($tenant, $bankIds, $subject['subject_id'], true, $request->user());
             $exam->examSubjects()->create([
                 'subject_id' => $subject['subject_id'],
                 'question_bank_id' => $bankIds[0] ?? null,
@@ -406,10 +408,11 @@ class ExamController extends Controller
             ->when($secondarySchool, fn ($query) => $query->where('secondary_school_id', $secondarySchool->id))
             ->when($professionalSchool, fn ($query) => $query->where('professional_school_id', $professionalSchool->id))
             ->when($cbtCenter, fn ($query) => $query->where('cbt_center_id', $cbtCenter->id))
-            ->when($user->isTeacher(), fn ($query) => $query->where('exam_category', Exam::CATEGORY_ASSESSMENT))
-            ->when(! $user->isTeacher() && $request->filled('category'), fn ($query) => $query->where('exam_category', $request->query('category')))
+            ->when($user->isTeacher() || $user->isFacilitator(), fn ($query) => $query->where('exam_category', Exam::CATEGORY_ASSESSMENT))
+            ->when(! $user->isTeacher() && ! $user->isFacilitator() && $request->filled('category'), fn ($query) => $query->where('exam_category', $request->query('category')))
             ->when($request->filled('mode'), fn ($query) => $query->where(fn ($inner) => $inner->where('exam_mode', $request->query('mode'))->orWhere('mode', $request->query('mode'))))
             ->when($user->isTeacher(), fn ($query) => $query->whereHas('examSubjects', fn ($subjectQuery) => $subjectQuery->whereIn('subject_id', $user->assignedSubjects()->select('subjects.id'))))
+            ->when($user->isFacilitator(), fn ($query) => $query->whereHas('examSubjects.questionBank', fn ($bankQuery) => $this->scopeFacilitatorQuestionBanks($bankQuery, $user)))
             ->when(! $user->isSuperAdmin() && $user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
             ->when(! $user->isSuperAdmin() && $user->school_id, fn ($query) => $query->where('school_id', $user->school_id))
             ->when(! $user->isSuperAdmin() && $user->center_id, fn ($query) => $query->where('center_id', $user->center_id))
@@ -432,6 +435,7 @@ class ExamController extends Controller
             ->when($professionalSchool, fn ($query) => $query->where('professional_school_id', $professionalSchool->id))
             ->when($cbtCenter, fn ($query) => $query->where('cbt_center_id', $cbtCenter->id))
             ->when($user->isTeacher(), fn ($query) => $query->whereIn('id', $user->assignedSubjects()->select('subjects.id')))
+            ->when($user->isFacilitator(), fn ($query) => $query->whereHas('questionBanks', fn ($bankQuery) => $this->scopeFacilitatorQuestionBanks($bankQuery, $user)))
             ->when(! $user->isSuperAdmin() && $user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
             ->when(! $user->isSuperAdmin() && $user->school_id, fn ($query) => $query->where('school_id', $user->school_id))
             ->when(! $user->isSuperAdmin() && $user->center_id, fn ($query) => $query->where('center_id', $user->center_id))
@@ -508,7 +512,7 @@ class ExamController extends Controller
             return $this->tenantPayload(Exam::OWNER_CBT_CENTER, $data['cbt_center_id']);
         }
 
-        if ($user->isProfessionalSchoolAdmin() || ($user->isExaminer() && $user->professional_school_id)) {
+        if ($user->isProfessionalSchoolAdmin() || $user->isFacilitator() || ($user->isExaminer() && $user->professional_school_id)) {
             return $this->tenantPayload(Exam::OWNER_PROFESSIONAL_SCHOOL, $user->professional_school_id);
         }
 
@@ -657,7 +661,25 @@ class ExamController extends Controller
 
         $school = ProfessionalSchool::query()->find($schoolId);
 
-        return $school ? $school->{$relation}()->orderBy('name')->get($columns) : [];
+        if (! $school) {
+            return [];
+        }
+
+        $query = $school->{$relation}()->orderBy('name');
+
+        if ($request->user()->isFacilitator()) {
+            match ($relation) {
+                'courses' => $query->whereIn('id', $request->user()->assignedCourses()->select('courses.id')),
+                'modules' => $query->where(function (Builder $scope) use ($request): void {
+                    $scope
+                        ->whereIn('course_id', $request->user()->assignedCourses()->select('courses.id'))
+                        ->orWhereIn('id', $request->user()->assignedModules()->select('modules.id'));
+                }),
+                default => null,
+            };
+        }
+
+        return $query->get($columns);
     }
 
     private function secondaryOptions(Request $request, $query, array $columns)
@@ -807,6 +829,7 @@ class ExamController extends Controller
 
         return QuestionBank::query()
             ->when($user->isTeacher(), fn ($query) => $query->whereIn('subject_id', $user->assignedSubjects()->select('subjects.id')))
+            ->when($user->isFacilitator(), fn ($query) => $this->scopeFacilitatorQuestionBanks($query, $user))
             ->when(! $user->isSuperAdmin(), function ($query) use ($user): void {
                 $query->where(function ($inner) use ($user): void {
                     $inner->whereRaw('1 = 0')
@@ -821,6 +844,17 @@ class ExamController extends Controller
             ->orderBy('name')
             ->limit(500)
             ->get(['id', 'name', 'code', 'subject_id', 'course_id', 'module_id']);
+    }
+
+    private function scopeFacilitatorQuestionBanks($query, User $user): void
+    {
+        $query
+            ->where('professional_school_id', $user->professional_school_id)
+            ->where(function (Builder $scope) use ($user): void {
+                $scope
+                    ->whereIn('course_id', $user->assignedCourses()->select('courses.id'))
+                    ->orWhereIn('module_id', $user->assignedModules()->select('modules.id'));
+            });
     }
 
     private function authorizeQuestionBank(array $tenant, ?string $questionBankId): void
@@ -841,7 +875,7 @@ class ExamController extends Controller
         }
     }
 
-    private function authorizeSubjectQuestionBanks(array $tenant, array $questionBankIds, string $subjectId, bool $required = false): void
+    private function authorizeSubjectQuestionBanks(array $tenant, array $questionBankIds, string $subjectId, bool $required = false, ?User $user = null): void
     {
         $normalized = collect($questionBankIds)
             ->filter()
@@ -872,6 +906,10 @@ class ExamController extends Controller
                 Exam::OWNER_CBT_CENTER => $query->where('cbt_center_id', $tenant['cbt_center_id'] ?? $tenant['center_id'] ?? null),
                 default => null,
             };
+
+            if ($user?->isFacilitator()) {
+                $this->scopeFacilitatorQuestionBanks($query, $user);
+            }
 
             if (! $query->exists()) {
                 throw ValidationException::withMessages(['subjects' => 'Choose question banks that belong to the selected subject and exam context.']);

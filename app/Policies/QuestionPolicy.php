@@ -22,6 +22,18 @@ class QuestionPolicy
                 && $user->assignedSubjects()->whereKey($question->subject_id)->exists();
         }
 
+        if ($user->isFacilitator()) {
+            $bank = $question->loadMissing('questionBank')->questionBank;
+
+            return $bank !== null
+                && $this->viewAny($user)
+                && (string) $bank->professional_school_id === (string) $user->professional_school_id
+                && (
+                    ($bank->course_id && $user->assignedCourses()->whereKey($bank->course_id)->exists())
+                    || ($bank->module_id && $user->assignedModules()->whereKey($bank->module_id)->exists())
+                );
+        }
+
         return $this->viewAny($user) && $this->canAccessTenant($user, $question->loadMissing('questionBank'));
     }
 

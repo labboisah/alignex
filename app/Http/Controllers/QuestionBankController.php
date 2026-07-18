@@ -172,6 +172,7 @@ class QuestionBankController extends Controller
         return QuestionBank::query()
             ->when($organization, fn ($query) => $query->where('organization_id', $organization->id))
             ->when($user->isTeacher(), fn ($query) => $query->whereIn('subject_id', $user->assignedSubjects()->select('subjects.id')))
+            ->when($user->isFacilitator(), fn ($query) => $this->scopeFacilitatorQuestionBanks($query, $user))
             ->when(! $user->isSuperAdmin() && $user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
             ->when(! $user->isSuperAdmin() && $user->school_id, fn ($query) => $query->where('school_id', $user->school_id))
             ->when(! $user->isSuperAdmin() && $user->center_id, fn ($query) => $query->where('center_id', $user->center_id))
@@ -188,6 +189,7 @@ class QuestionBankController extends Controller
         return Subject::query()
             ->when($organization, fn ($query) => $query->where('organization_id', $organization->id))
             ->when($user->isTeacher(), fn ($query) => $query->whereIn('id', $user->assignedSubjects()->select('subjects.id')))
+            ->when($user->isFacilitator(), fn ($query) => $query->whereHas('questionBanks', fn ($bankQuery) => $this->scopeFacilitatorQuestionBanks($bankQuery, $user)))
             ->when(! $user->isSuperAdmin() && $user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
             ->when(! $user->isSuperAdmin() && $user->school_id, fn ($query) => $query->where('school_id', $user->school_id))
             ->when(! $user->isSuperAdmin() && $user->center_id, fn ($query) => $query->where('center_id', $user->center_id))
@@ -205,6 +207,17 @@ class QuestionBankController extends Controller
         }
 
         return $subject;
+    }
+
+    private function scopeFacilitatorQuestionBanks($query, $user): void
+    {
+        $query
+            ->where('professional_school_id', $user->professional_school_id)
+            ->where(function ($scope) use ($user): void {
+                $scope
+                    ->whereIn('course_id', $user->assignedCourses()->select('courses.id'))
+                    ->orWhereIn('module_id', $user->assignedModules()->select('modules.id'));
+            });
     }
 
     private function subjectByCode(Request $request, string $code, int $row): Subject

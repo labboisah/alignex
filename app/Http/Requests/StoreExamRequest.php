@@ -111,8 +111,8 @@ class StoreExamRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
-            if ($this->user()?->isTeacher() && $this->input('exam_category') !== Exam::CATEGORY_ASSESSMENT) {
-                $validator->errors()->add('exam_category', 'Teachers can only create and update assessments.');
+            if (($this->user()?->isTeacher() || $this->user()?->isFacilitator()) && $this->input('exam_category') !== Exam::CATEGORY_ASSESSMENT) {
+                $validator->errors()->add('exam_category', 'This account can only create and update assessments.');
             }
 
             if ($this->isSecondaryExamRequest()) {
@@ -158,8 +158,8 @@ class StoreExamRequest extends FormRequest
             }
 
             if ($this->isProfessionalExamRequest()) {
-                if (! in_array($this->input('exam_category'), [Exam::CATEGORY_PROFESSIONAL, Exam::CATEGORY_CERTIFICATION, Exam::CATEGORY_PRACTICE], true)) {
-                    $validator->errors()->add('exam_category', 'Professional school exams must be professional, certification, or practice exams.');
+                if (! in_array($this->input('exam_category'), [Exam::CATEGORY_PROFESSIONAL, Exam::CATEGORY_CERTIFICATION, Exam::CATEGORY_PRACTICE, Exam::CATEGORY_ASSESSMENT], true)) {
+                    $validator->errors()->add('exam_category', 'Professional school exams must be professional, certification, practice, or assessments.');
                 }
 
                 if (! in_array($this->input('exam_mode') ?? $this->input('mode'), [Exam::MODE_TRADITIONAL, Exam::MODE_ADAPTIVE], true)) {

@@ -5,9 +5,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'code', 'location', 'capacity', 'contact_person', 'phone', 'email', 'status'])]
+#[Fillable(['pricing_plan_id', 'name', 'code', 'location', 'capacity', 'contact_person', 'phone', 'email', 'status'])]
 class Center extends Model
 {
     use HasFactory;
@@ -20,6 +21,11 @@ class Center extends Model
         return [
             'capacity' => 'integer',
         ];
+    }
+
+    public function pricingPlan(): BelongsTo
+    {
+        return $this->belongsTo(PricingPlan::class);
     }
 
     public function users(): HasMany

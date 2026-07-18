@@ -1,5 +1,5 @@
-import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, FileCheck2, Shuffle, TriangleAlert } from 'lucide-react';
+import { Head, router } from '@inertiajs/react';
+import { FileCheck2, Shuffle, TriangleAlert } from 'lucide-react';
 import { AlertBanner, DataTable, PageHeader, PortalAppShell, StatusBadge } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
 import { Exam } from '@/Pages/Exams/types';
@@ -48,18 +48,16 @@ export default function ExamPaperShow({ exam, preview, generatedPapers }: { exam
                     eyebrow="Exam Papers"
                     title="Generate Candidate Papers"
                     description={`${record.title} (${record.exam_code})`}
+                    backHref={`/exams/${record.id}`}
                     actions={
-                        <>
-                            <Button asChild type="button" variant="secondary"><Link href={`/exams/${record.id}`}><ArrowLeft className="h-4 w-4" />Back</Link></Button>
-                            <Button
-                                type="button"
-                                disabled={!preview.can_generate || hasWarnings || preview.assigned_candidates < 1}
-                                onClick={() => window.confirm('Generate permanent candidate papers for this exam?') && router.post(`/exams/${record.id}/papers/generate`, {}, { preserveScroll: true })}
-                            >
-                                <FileCheck2 className="h-4 w-4" />
-                                Generate Papers
-                            </Button>
-                        </>
+                        <Button
+                            type="button"
+                            disabled={!preview.can_generate || hasWarnings || preview.assigned_candidates < 1}
+                            onClick={() => window.confirm('Generate permanent candidate papers for this exam?') && router.post(`/exams/${record.id}/papers/generate`, {}, { preserveScroll: true })}
+                        >
+                            <FileCheck2 className="h-4 w-4" />
+                            Generate Papers
+                        </Button>
                     }
                 />
 

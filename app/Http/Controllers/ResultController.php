@@ -73,7 +73,7 @@ class ResultController extends Controller
 
     public function candidate(Request $request, CandidateExamAttempt $attempt): InertiaResponse
     {
-        $attempt->loadMissing(['exam', 'candidate', 'answers.question.options', 'answers.subject', 'papers.question.options', 'papers.question.subject', 'proctoringEvents']);
+        $attempt->loadMissing(['exam', 'candidate', 'answers.question.options', 'answers.subject', 'papers.question.options', 'papers.question.subject', 'papers.question.questionBank', 'proctoringEvents']);
         $this->authorizeExam($request->user(), $attempt->exam);
 
         return Inertia::render('Results/Candidate', [
@@ -142,7 +142,7 @@ class ResultController extends Controller
 
     public function markedPaperPdf(Request $request, CandidateExamAttempt $attempt)
     {
-        $attempt->loadMissing(['exam.organization', 'exam.school', 'exam.center', 'candidate', 'answers.question.options', 'answers.subject', 'papers.question.options', 'papers.question.subject', 'proctoringEvents']);
+        $attempt->loadMissing(['exam.organization', 'exam.school', 'exam.center', 'candidate', 'answers.question.options', 'answers.subject', 'papers.question.options', 'papers.question.subject', 'papers.question.questionBank', 'proctoringEvents']);
         $this->authorizeExam($request->user(), $attempt->exam);
 
         abort_unless(in_array($attempt->status, [CandidateExamAttempt::STATUS_SUBMITTED, CandidateExamAttempt::STATUS_AUTO_SUBMITTED], true), 404);
@@ -267,7 +267,10 @@ class ResultController extends Controller
                         ->when($user->cbt_center_id, fn ($scope) => $scope->orWhere('cbt_center_id', $user->cbt_center_id));
                 });
             })
-            ->when($user->isTeacher(), fn (Builder $query) => $query->whereHas('examSubjects', fn (Builder $subjectQuery) => $subjectQuery->whereIn('subject_id', $user->assignedSubjects()->select('subjects.id'))));
+            ->when($user->isTeacher(), fn (Builder $query) => $query->whereHas('examSubjects', fn (Builder $subjectQuery) => $subjectQuery->whereIn('subject_id', $user->assignedSubjects()->select('subjects.id'))))
+            ->when($user->isFacilitator(), fn (Builder $query) => $query
+                ->where('exam_category', Exam::CATEGORY_ASSESSMENT)
+                ->whereHas('examSubjects.questionBank', fn (Builder $bankQuery) => $this->scopeFacilitatorQuestionBanks($bankQuery, $user)));
     }
 
     private function authorizeExam(User $user, Exam $exam): void
@@ -416,11 +419,30 @@ class ResultController extends Controller
         $assignedSubjectIds = $user?->isTeacher()
             ? $user->assignedSubjects()->pluck('subjects.id')->map(fn ($id) => (string) $id)->all()
             : null;
+        $assignedCourseIds = $user?->isFacilitator()
+            ? $user->assignedCourses()->pluck('courses.id')->map(fn ($id) => (string) $id)->all()
+            : null;
+        $assignedModuleIds = $user?->isFacilitator()
+            ? $user->assignedModules()->pluck('modules.id')->map(fn ($id) => (string) $id)->all()
+            : null;
 
         return $attempt->papers
             ->sortBy('question_order')
             ->values()
-            ->filter(fn ($paper) => $assignedSubjectIds === null || in_array((string) $paper->question?->subject_id, $assignedSubjectIds, true))
+            ->filter(function ($paper) use ($assignedSubjectIds, $assignedCourseIds, $assignedModuleIds): bool {
+                if ($assignedSubjectIds !== null) {
+                    return in_array((string) $paper->question?->subject_id, $assignedSubjectIds, true);
+                }
+
+                if ($assignedCourseIds === null && $assignedModuleIds === null) {
+                    return true;
+                }
+
+                $bank = $paper->question?->questionBank;
+
+                return ($bank?->course_id && in_array((string) $bank->course_id, $assignedCourseIds ?? [], true))
+                    || ($bank?->module_id && in_array((string) $bank->module_id, $assignedModuleIds ?? [], true));
+            })
             ->values()
             ->map(function ($paper) use ($answers) {
                 $question = $paper->question;
@@ -450,6 +472,17 @@ class ResultController extends Controller
                     'explanation' => $question?->explanation,
                     'options' => $options,
                 ];
+            });
+    }
+
+    private function scopeFacilitatorQuestionBanks(Builder $query, User $user): void
+    {
+        $query
+            ->where('professional_school_id', $user->professional_school_id)
+            ->where(function (Builder $scope) use ($user): void {
+                $scope
+                    ->whereIn('course_id', $user->assignedCourses()->select('courses.id'))
+                    ->orWhereIn('module_id', $user->assignedModules()->select('modules.id'));
             });
     }
 }

@@ -1,5 +1,5 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import { ArrowLeft, Award, BadgeCheck, CreditCard, Download, FileCheck, Save, Trash2 } from 'lucide-react';
+import { Head, router, useForm } from '@inertiajs/react';
+import { Award, BadgeCheck, CreditCard, Download, FileCheck, Save, Trash2 } from 'lucide-react';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { AlertBanner, DataTable, PageHeader, PortalAppShell, StatusBadge } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
@@ -39,7 +39,7 @@ export default function ProfessionalShow({ exam, settings, templates, attempts, 
                     eyebrow="Certification"
                     title={exam.title}
                     description={`${exam.exam_code} certification, retake, and payment administration.`}
-                    actions={<Button asChild type="button" variant="secondary"><Link href={`/exams/${exam.id}`}><ArrowLeft className="h-4 w-4" />Back</Link></Button>}
+                    backHref={`/exams/${exam.id}`}
                 />
                 <div className="grid gap-5 xl:grid-cols-[24rem_minmax(0,1fr)]">
                     <div className="space-y-5">

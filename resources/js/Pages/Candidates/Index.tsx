@@ -1,5 +1,5 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { ArrowLeft, Download, Eye, Pencil, Plus, Trash2, Upload, UserCircle2, UserPlus } from 'lucide-react';
+import { Download, Eye, Pencil, Plus, Trash2, Upload, UserCircle2, UserPlus } from 'lucide-react';
 import { FormEvent } from 'react';
 import { ActionDropdown, AlertBanner, DataTable, PageHeader, PortalAppShell, ProtectedAction, StatusBadge } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
@@ -16,7 +16,6 @@ export default function CandidatesIndex({ candidates, exams, candidateGroups, ca
                 actions={
                     <ProtectedAction allowed={can.create}>
                         <div className="flex flex-wrap gap-2">
-                            <Button asChild type="button" variant="secondary"><Link href="/dashboard"><ArrowLeft className="h-4 w-4" />Back</Link></Button>
                             <Button asChild type="button" variant="secondary"><Link href="/candidates/assignments"><UserPlus className="h-4 w-4" />Assign to Exam</Link></Button>
                             <Button asChild type="button"><Link href="/candidates/create"><Plus className="h-4 w-4" />New Candidate</Link></Button>
                         </div>

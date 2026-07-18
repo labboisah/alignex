@@ -50,11 +50,15 @@ type NamedValue = {
 };
 
 type TeacherPanel = {
+    kind?: 'teacher' | 'facilitator';
     metrics: Metric[];
     subjects: { id: string; name: string; code?: string | null; class_name?: string | null }[];
     classes: { id: string; name: string; level?: string | null; students_count: number; groups_count: number }[];
     student_groups: { id: string; name: string; code?: string | null; class_name?: string | null; students_count: number; status?: string | null }[];
     students: { id: string; name: string; registration_number: string; status: string }[];
+    courses?: { id: string; name: string; code?: string | null; programme_name?: string | null }[];
+    modules?: { id: string; name: string; code?: string | null; course_name?: string | null }[];
+    candidates?: { id: string; name: string; registration_number: string; status: string }[];
 };
 
 const iconMap = {
@@ -107,6 +111,7 @@ export default function Dashboard({
 }) {
     const currentContext = (usePage().props.current_context ?? null) as { type: string; name: string } | null;
     const terms = getContextTerminology(currentContext?.type);
+    const isTeacherDashboard = Boolean(teacher_panel);
     const passFail = [
         { name: 'Passed', value: result_summary.passed },
         { name: 'Failed', value: result_summary.failed },
@@ -119,7 +124,9 @@ export default function Dashboard({
                 <PageHeader
                     eyebrow={role.label}
                     title={currentContext?.name ?? 'Dashboard'}
-                    description={`${role.scope} overview for ${terms.examLabel.toLowerCase()}s, ${terms.learnerPlural.toLowerCase()}, ${terms.questionStructure.toLowerCase()}, and ${terms.resultDocument.toLowerCase()}s.`}
+                    description={isTeacherDashboard
+                        ? 'Overview of your assigned subjects, classes, student groups, students, assessments, and results.'
+                        : `${role.scope} overview for ${terms.examLabel.toLowerCase()}s, ${terms.learnerPlural.toLowerCase()}, ${terms.questionStructure.toLowerCase()}, and ${terms.resultDocument.toLowerCase()}s.`}
                     actions={quick_actions.slice(0, 2).map((action) => (
                         <Button key={action.href} asChild variant="secondary">
                             <Link href={action.href}>{action.label}</Link>
@@ -141,53 +148,55 @@ export default function Dashboard({
 
                 {teacher_panel && <TeacherDashboardPanel panel={teacher_panel} />}
 
-                <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_360px]">
-                    <div className="rounded-md border border-border bg-white p-5 shadow-sm">
-                        <div className="flex items-center justify-between gap-3">
-                            <div>
-                                <h2 className="font-semibold text-slateDark">Exam Status</h2>
-                                <p className="mt-1 text-sm text-slate-500">Current exam pipeline in your scope.</p>
+                {!isTeacherDashboard && (
+                    <div className="mt-6 grid gap-6 xl:grid-cols-[1fr_360px]">
+                        <div className="rounded-md border border-border bg-white p-5 shadow-sm">
+                            <div className="flex items-center justify-between gap-3">
+                                <div>
+                                    <h2 className="font-semibold text-slateDark">Exam Status</h2>
+                                    <p className="mt-1 text-sm text-slate-500">Current exam pipeline in your scope.</p>
+                                </div>
+                                <Button asChild variant="secondary">
+                                    <Link href="/exams">View Exams</Link>
+                                </Button>
                             </div>
-                            <Button asChild variant="secondary">
-                                <Link href="/exams">View Exams</Link>
-                            </Button>
+                            <div className="mt-5 h-72">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={exam_status}>
+                                        <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                                        <YAxis allowDecimals={false} />
+                                        <Tooltip />
+                                        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                                            {exam_status.map((entry, index) => <Cell key={entry.name} fill={statusColors[index % statusColors.length]} />)}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
                         </div>
-                        <div className="mt-5 h-72">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={exam_status}>
-                                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                                    <YAxis allowDecimals={false} />
-                                    <Tooltip />
-                                    <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                                        {exam_status.map((entry, index) => <Cell key={entry.name} fill={statusColors[index % statusColors.length]} />)}
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
+
+                        <div className="rounded-md border border-border bg-white p-5 shadow-sm">
+                            <h2 className="font-semibold text-slateDark">Result Snapshot</h2>
+                            <p className="mt-1 text-sm text-slate-500">Submitted attempts and outcome spread.</p>
+                            <div className="mt-5 grid grid-cols-2 gap-3">
+                                <MiniStat label="Submitted" value={result_summary.submitted} />
+                                <MiniStat label="Avg. Score" value={result_summary.average_score} />
+                            </div>
+                            <div className="mt-5 h-48">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie data={passFail} dataKey="value" nameKey="name" innerRadius={44} outerRadius={72}>
+                                            <Cell fill="#16A34A" />
+                                            <Cell fill="#DC2626" />
+                                        </Pie>
+                                        <Tooltip />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </div>
                         </div>
                     </div>
+                )}
 
-                    <div className="rounded-md border border-border bg-white p-5 shadow-sm">
-                        <h2 className="font-semibold text-slateDark">Result Snapshot</h2>
-                        <p className="mt-1 text-sm text-slate-500">Submitted attempts and outcome spread.</p>
-                        <div className="mt-5 grid grid-cols-2 gap-3">
-                            <MiniStat label="Submitted" value={result_summary.submitted} />
-                            <MiniStat label="Avg. Score" value={result_summary.average_score} />
-                        </div>
-                        <div className="mt-5 h-48">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie data={passFail} dataKey="value" nameKey="name" innerRadius={44} outerRadius={72}>
-                                        <Cell fill="#16A34A" />
-                                        <Cell fill="#DC2626" />
-                                    </Pie>
-                                    <Tooltip />
-                                </PieChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-                </div>
-
-                {organization_charts.exams_by_category && (
+                {!isTeacherDashboard && organization_charts.exams_by_category && (
                     <div className="mt-6 grid gap-6 xl:grid-cols-3">
                         <ChartPanel title="Exams by Category" data={organization_charts.exams_by_category} />
                         <ChartPanel title="Exams by Mode" data={organization_charts.exams_by_mode ?? []} />
@@ -195,7 +204,7 @@ export default function Dashboard({
                     </div>
                 )}
 
-                <div className="mt-6 grid gap-6 lg:grid-cols-[360px_1fr]">
+                {!isTeacherDashboard && <div className="mt-6 grid gap-6 lg:grid-cols-[360px_1fr]">
                     <section className="rounded-md border border-border bg-white p-5 shadow-sm">
                         <h2 className="font-semibold text-slateDark">Work Queue</h2>
                         <div className="mt-4 space-y-3">
@@ -252,9 +261,9 @@ export default function Dashboard({
                             </tbody>
                         </table>
                     </section>
-                </div>
+                </div>}
 
-                {(recent_candidates.length > 0 || recent_results.length > 0) && (
+                {!isTeacherDashboard && (recent_candidates.length > 0 || recent_results.length > 0) && (
                     <div className="mt-6 grid gap-6 lg:grid-cols-2">
                         <section className="rounded-md border border-border bg-white p-5 shadow-sm">
                             <h2 className="font-semibold text-slateDark">Recent Candidates</h2>
@@ -289,6 +298,32 @@ export default function Dashboard({
 }
 
 function TeacherDashboardPanel({ panel }: { panel: TeacherPanel }) {
+    if (panel.kind === 'facilitator') {
+        return (
+            <section className="mt-6 space-y-6">
+                <div className="grid gap-6 xl:grid-cols-2">
+                    <SimplePanel title="Assigned Courses" empty="No assigned courses found.">
+                        {(panel.courses ?? []).map((course) => (
+                            <InfoRow key={course.id} title={course.name} meta={[course.code, course.programme_name].filter(Boolean).join(' / ')} />
+                        ))}
+                    </SimplePanel>
+
+                    <SimplePanel title="Assigned Modules" empty="No assigned modules found.">
+                        {(panel.modules ?? []).map((module) => (
+                            <InfoRow key={module.id} title={module.name} meta={[module.code, module.course_name].filter(Boolean).join(' / ')} />
+                        ))}
+                    </SimplePanel>
+
+                    <SimplePanel title="Candidates / Trainees" empty="No candidates found for assigned courses.">
+                        {(panel.candidates ?? []).map((candidate) => (
+                            <InfoRow key={candidate.id} title={candidate.name} meta={[candidate.registration_number, candidate.status].filter(Boolean).join(' / ')} />
+                        ))}
+                    </SimplePanel>
+                </div>
+            </section>
+        );
+    }
+
     return (
         <section className="mt-6 space-y-6">
             <div className="grid gap-6 xl:grid-cols-2">

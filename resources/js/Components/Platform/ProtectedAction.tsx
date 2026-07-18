@@ -6,12 +6,14 @@ import { usePage } from '@inertiajs/react';
 type SharedProps = {
     auth?: {
         permissions?: Record<string, boolean>;
+        plan_features?: Record<string, boolean>;
     };
 };
 
 export function ProtectedAction({
     allowed,
     permission,
+    feature,
     children,
     fallbackLabel = 'Restricted',
     onDenied,
@@ -19,13 +21,17 @@ export function ProtectedAction({
 }: {
     allowed?: boolean;
     permission?: string;
+    feature?: string;
     children: ReactNode;
     fallbackLabel?: string;
     onDenied?: () => void;
     hideWhenDenied?: boolean;
 }) {
     const permissions = (usePage().props as SharedProps).auth?.permissions ?? {};
-    const canProceed = allowed ?? (permission ? Boolean(permissions[permission]) : false);
+    const planFeatures = (usePage().props as SharedProps).auth?.plan_features ?? {};
+    const hasPermission = permission ? Boolean(permissions[permission]) : true;
+    const hasFeature = feature ? Boolean(planFeatures[feature]) : true;
+    const canProceed = allowed ?? (hasPermission && hasFeature);
 
     if (canProceed) {
         return <>{children}</>;

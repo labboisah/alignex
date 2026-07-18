@@ -34,7 +34,7 @@ class CandidateExamController extends Controller
     public function login(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'exam_code' => ['required', 'string'],
+            'exam_code' => ['nullable', 'string'],
             'identifier' => ['required_without_all:registration_number,phone,nin', 'nullable', 'string'],
             'registration_number' => ['required_without_all:identifier,phone,nin', 'nullable', 'string'],
             'phone' => ['required_without_all:identifier,registration_number,nin', 'nullable', 'string'],
@@ -42,9 +42,7 @@ class CandidateExamController extends Controller
             'device_fingerprint' => ['required', 'string', 'max:255'],
         ]);
 
-        $exam = Exam::query()
-            ->where('code', strtoupper(trim($data['exam_code'])))
-            ->first();
+        $exam = $this->examForLogin($data);
 
         if ($exam && $this->examOverdue($exam)) {
             $exam = app(ExamStatusService::class)->sync($exam);
@@ -53,7 +51,7 @@ class CandidateExamController extends Controller
         }
 
         if (! $exam || $exam->status !== Exam::STATUS_ACTIVE) {
-            $this->session->log($request, 'login_failed', null, ['exam_code' => $data['exam_code']], 'Exam not found or not active.');
+            $this->session->log($request, 'login_failed', null, ['exam_code' => $data['exam_code'] ?? null], 'Exam not found or not active.');
             throw ValidationException::withMessages(['exam_code' => 'Exam not found or not active.']);
         }
 
@@ -294,6 +292,45 @@ class CandidateExamController extends Controller
                         ->orWhere('metadata->nin', $identifier);
                 }
             })
+            ->first();
+    }
+
+    private function examForLogin(array $data): ?Exam
+    {
+        if (filled($data['exam_code'] ?? null)) {
+            return Exam::query()
+                ->where('code', strtoupper(trim($data['exam_code'])))
+                ->first();
+        }
+
+        $identifiers = collect([
+            $data['identifier'] ?? null,
+            $data['registration_number'] ?? null,
+            $data['phone'] ?? null,
+            $data['nin'] ?? null,
+        ])
+            ->filter(fn ($value) => filled($value))
+            ->map(fn ($value) => trim((string) $value))
+            ->values();
+
+        if ($identifiers->isEmpty()) {
+            return null;
+        }
+
+        return Exam::query()
+            ->where('status', Exam::STATUS_ACTIVE)
+            ->whereHas('candidates', function ($query) use ($identifiers): void {
+                $query->where(function ($candidateQuery) use ($identifiers): void {
+                    foreach ($identifiers as $identifier) {
+                        $candidateQuery
+                            ->orWhere('candidate_number', $identifier)
+                            ->orWhere('phone', $identifier)
+                            ->orWhere('nin', $identifier)
+                            ->orWhere('metadata->nin', $identifier);
+                    }
+                });
+            })
+            ->latest('starts_at')
             ->first();
     }
 

@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -136,11 +137,14 @@ class ProfessionalSchoolController extends Controller
     public function courses(Request $request, ProfessionalSchool $professionalSchool): Response
     {
         $this->authorizeRecord($request->user(), $professionalSchool);
+        $courseQuery = $professionalSchool->courses()->with('programme:id,name')->orderBy('name');
+        $this->scopeFacilitatorCourses($courseQuery, $request->user());
 
         return Inertia::render('ProfessionalSchools/Courses', [
             'professionalSchool' => $this->row($professionalSchool),
             'programmes' => $professionalSchool->programmes()->orderBy('name')->get(['id', 'name', 'code']),
-            'courses' => $professionalSchool->courses()->with('programme:id,name')->orderBy('name')->get(),
+            'courses' => $courseQuery->get(),
+            'canManageStructure' => $request->user()->isSuperAdmin() || $request->user()->hasPermission('manageSchools'),
         ]);
     }
 
@@ -166,12 +170,17 @@ class ProfessionalSchoolController extends Controller
     public function modules(Request $request, ProfessionalSchool $professionalSchool): Response
     {
         $this->authorizeRecord($request->user(), $professionalSchool);
+        $courseQuery = $professionalSchool->courses()->orderBy('name');
+        $moduleQuery = $professionalSchool->modules()->with(['programme:id,name', 'course:id,name'])->orderBy('name');
+        $this->scopeFacilitatorCourses($courseQuery, $request->user());
+        $this->scopeFacilitatorModules($moduleQuery, $request->user());
 
         return Inertia::render('ProfessionalSchools/Modules', [
             'professionalSchool' => $this->row($professionalSchool),
             'programmes' => $professionalSchool->programmes()->orderBy('name')->get(['id', 'name', 'code']),
-            'courses' => $professionalSchool->courses()->orderBy('name')->get(['id', 'programme_id', 'name', 'code']),
-            'modules' => $professionalSchool->modules()->with(['programme:id,name', 'course:id,name'])->orderBy('name')->get(),
+            'courses' => $courseQuery->get(['id', 'programme_id', 'name', 'code']),
+            'modules' => $moduleQuery->get(),
+            'canManageStructure' => $request->user()->isSuperAdmin() || $request->user()->hasPermission('manageSchools'),
         ]);
     }
 
@@ -267,30 +276,112 @@ class ProfessionalSchoolController extends Controller
         return back()->with('success', 'Training batch deleted.');
     }
 
+    public function facilitators(Request $request, ProfessionalSchool $professionalSchool): Response
+    {
+        $this->authorizeRecord($request->user(), $professionalSchool, update: true);
+
+        return Inertia::render('ProfessionalSchools/Facilitators', [
+            'professionalSchool' => $this->row($professionalSchool),
+            'courses' => $professionalSchool->courses()->with('programme:id,name')->orderBy('name')->get(['id', 'programme_id', 'name', 'code']),
+            'facilitators' => User::query()
+                ->where('role', User::ROLE_FACILITATOR)
+                ->where('professional_school_id', $professionalSchool->id)
+                ->with(['assignedCourses:id,name,code'])
+                ->orderBy('name')
+                ->get()
+                ->map(fn (User $facilitator) => $this->facilitatorRow($facilitator)),
+        ]);
+    }
+
+    public function storeFacilitator(Request $request, ProfessionalSchool $professionalSchool): RedirectResponse
+    {
+        $this->authorizeRecord($request->user(), $professionalSchool, update: true);
+        $data = $request->validate($this->facilitatorRules());
+
+        DB::transaction(function () use ($professionalSchool, $data): void {
+            $facilitator = User::query()->create([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'password' => Hash::make($data['password']),
+                'role' => User::ROLE_FACILITATOR,
+                'organization_id' => $professionalSchool->organization_id,
+                'professional_school_id' => $professionalSchool->id,
+                'active_context_type' => 'professional_school',
+                'active_context_id' => $professionalSchool->id,
+            ]);
+
+            $this->syncFacilitatorAssignments($facilitator, $professionalSchool, $data['course_ids']);
+        });
+
+        return back()->with('success', 'Facilitator created.');
+    }
+
+    public function updateFacilitator(Request $request, ProfessionalSchool $professionalSchool, User $facilitator): RedirectResponse
+    {
+        $this->authorizeRecord($request->user(), $professionalSchool, update: true);
+        $this->authorizeFacilitatorRecord($professionalSchool, $facilitator);
+        $data = $request->validate($this->facilitatorRules($facilitator));
+
+        DB::transaction(function () use ($facilitator, $professionalSchool, $data): void {
+            $payload = [
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'organization_id' => $professionalSchool->organization_id,
+                'professional_school_id' => $professionalSchool->id,
+                'active_context_type' => 'professional_school',
+                'active_context_id' => $professionalSchool->id,
+            ];
+
+            if (filled($data['password'] ?? null)) {
+                $payload['password'] = Hash::make($data['password']);
+            }
+
+            $facilitator->update($payload);
+            $this->syncFacilitatorAssignments($facilitator, $professionalSchool, $data['course_ids']);
+        });
+
+        return back()->with('success', 'Facilitator updated.');
+    }
+
+    public function destroyFacilitator(Request $request, ProfessionalSchool $professionalSchool, User $facilitator): RedirectResponse
+    {
+        $this->authorizeRecord($request->user(), $professionalSchool, update: true);
+        $this->authorizeFacilitatorRecord($professionalSchool, $facilitator);
+
+        $facilitator->delete();
+
+        return back()->with('success', 'Facilitator deleted.');
+    }
+
     public function questionBanks(Request $request, ProfessionalSchool $professionalSchool): Response
     {
         $this->authorizeRecord($request->user(), $professionalSchool);
+        $courseQuery = $professionalSchool->courses()->orderBy('name');
+        $moduleQuery = $professionalSchool->modules()->orderBy('name');
+        $bankQuery = $professionalSchool->questionBanks()
+            ->with(['programme:id,name', 'course:id,name', 'module:id,name', 'subject:id,name'])
+            ->withCount('questions')
+            ->orderBy('name');
+        $this->scopeFacilitatorCourses($courseQuery, $request->user());
+        $this->scopeFacilitatorModules($moduleQuery, $request->user());
+        $this->scopeFacilitatorQuestionBanks($bankQuery, $request->user());
 
         return Inertia::render('ProfessionalSchools/QuestionBanks', [
             'professionalSchool' => $this->row($professionalSchool),
             'programmes' => $professionalSchool->programmes()->orderBy('name')->get(['id', 'name', 'code']),
-            'courses' => $professionalSchool->courses()->orderBy('name')->get(['id', 'programme_id', 'name', 'code']),
-            'modules' => $professionalSchool->modules()->orderBy('name')->get(['id', 'programme_id', 'course_id', 'name', 'code']),
+            'courses' => $courseQuery->get(['id', 'programme_id', 'name', 'code']),
+            'modules' => $moduleQuery->get(['id', 'programme_id', 'course_id', 'name', 'code']),
             'subjects' => Subject::query()->where('professional_school_id', $professionalSchool->id)->orderBy('name')->get(['id', 'name', 'code']),
-            'questionBanks' => $professionalSchool->questionBanks()
-                ->with(['programme:id,name', 'course:id,name', 'module:id,name', 'subject:id,name'])
-                ->withCount('questions')
-                ->orderBy('name')
-                ->get(),
+            'questionBanks' => $bankQuery->get(),
         ]);
     }
 
     public function storeQuestionBank(Request $request, ProfessionalSchool $professionalSchool): RedirectResponse
     {
-        $this->authorizeRecord($request->user(), $professionalSchool, update: true);
+        $this->authorizeQuestionBankContent($request->user(), $professionalSchool);
 
         $data = $request->validate([
-            'programme_id' => ['required', 'exists:programmes,id'],
+            'programme_id' => ['nullable', 'exists:programmes,id'],
             'course_id' => ['required', 'exists:courses,id'],
             'module_id' => ['required', 'exists:modules,id'],
             'subject_id' => ['nullable', 'exists:subjects,id'],
@@ -300,10 +391,11 @@ class ProfessionalSchoolController extends Controller
             'status' => ['required', Rule::in([QuestionBank::STATUS_DRAFT, QuestionBank::STATUS_ACTIVE, QuestionBank::STATUS_ARCHIVED])],
         ]);
 
-        abort_unless($professionalSchool->programmes()->whereKey($data['programme_id'])->exists(), 422);
-        abort_unless($professionalSchool->courses()->whereKey($data['course_id'])->where('programme_id', $data['programme_id'])->exists(), 422);
+        $course = $professionalSchool->courses()->whereKey($data['course_id'])->firstOrFail();
+        $data['programme_id'] = $course->programme_id;
         abort_unless($professionalSchool->modules()->whereKey($data['module_id'])->where('course_id', $data['course_id'])->exists(), 422);
         abort_unless(! filled($data['subject_id'] ?? null) || Subject::query()->whereKey($data['subject_id'])->where('professional_school_id', $professionalSchool->id)->exists(), 422);
+        $this->authorizeFacilitatorCourseModule($request->user(), $data['course_id'], $data['module_id']);
 
         if (! filled($data['subject_id'] ?? null)) {
             $module = $professionalSchool->modules()->with('course:id,name,code')->whereKey($data['module_id'])->firstOrFail();
@@ -324,11 +416,17 @@ class ProfessionalSchoolController extends Controller
     public function questions(Request $request, ProfessionalSchool $professionalSchool): Response
     {
         $this->authorizeRecord($request->user(), $professionalSchool);
+        $questionBankScope = fn (Builder $query) => $this->scopeFacilitatorQuestionBanks($query->where('professional_school_id', $professionalSchool->id), $request->user());
+        $bankQuery = $professionalSchool->questionBanks()
+            ->where('status', QuestionBank::STATUS_ACTIVE)
+            ->with(['course:id,name', 'module:id,name'])
+            ->orderBy('name');
+        $this->scopeFacilitatorQuestionBanks($bankQuery, $request->user());
 
         return Inertia::render('ProfessionalSchools/Questions', [
             'professionalSchool' => $this->row($professionalSchool),
             'questions' => Question::query()
-                ->whereHas('questionBank', fn ($query) => $query->where('professional_school_id', $professionalSchool->id))
+                ->whereHas('questionBank', $questionBankScope)
                 ->with(['questionBank:id,name,course_id,module_id', 'questionBank.course:id,name', 'questionBank.module:id,name', 'subject:id,name', 'topic:id,name', 'options'])
                 ->latest()
                 ->get()
@@ -344,10 +442,7 @@ class ProfessionalSchoolController extends Controller
                     'options_count' => $question->options->count(),
                     'status' => $question->status,
                 ]),
-            'questionBanks' => $professionalSchool->questionBanks()
-                ->where('status', QuestionBank::STATUS_ACTIVE)
-                ->with(['course:id,name', 'module:id,name'])
-                ->orderBy('name')
+            'questionBanks' => $bankQuery
                 ->get(['id', 'name', 'code', 'course_id', 'module_id', 'subject_id'])
                 ->map(fn (QuestionBank $bank) => [
                     'id' => $bank->id,
@@ -362,7 +457,7 @@ class ProfessionalSchoolController extends Controller
 
     public function questionTemplate(Request $request, ProfessionalSchool $professionalSchool): StreamedResponse
     {
-        $this->authorizeRecord($request->user(), $professionalSchool, update: true);
+        $this->authorizeQuestionBankContent($request->user(), $professionalSchool);
 
         return response()->streamDownload(function (): void {
             $output = fopen('php://output', 'w');
@@ -374,7 +469,7 @@ class ProfessionalSchoolController extends Controller
 
     public function importQuestions(Request $request, ProfessionalSchool $professionalSchool): RedirectResponse
     {
-        $this->authorizeRecord($request->user(), $professionalSchool, update: true);
+        $this->authorizeQuestionBankContent($request->user(), $professionalSchool);
 
         $data = $request->validate([
             'file' => ['required', 'file', 'mimes:csv,txt', 'max:4096'],
@@ -384,6 +479,7 @@ class ProfessionalSchoolController extends Controller
         $questionBank = $professionalSchool->questionBanks()
             ->whereKey($data['question_bank_id'])
             ->firstOrFail();
+        abort_unless($this->facilitatorCanAccessBank($request->user(), $questionBank), 403);
 
         $created = 0;
         $failed = [];
@@ -642,6 +738,80 @@ class ProfessionalSchoolController extends Controller
         abort_if($update && ! ($user->isSuperAdmin() || $user->hasPermission('manageSchools')), 403);
     }
 
+    private function authorizeQuestionBankContent(User $user, ProfessionalSchool $professionalSchool): void
+    {
+        $this->authorizeRecord($user, $professionalSchool);
+        abort_unless($user->isSuperAdmin() || $user->hasPermission('manageSchools') || $user->hasPermission('manageQuestionBank'), 403);
+    }
+
+    private function scopeFacilitatorCourses($query, User $user): void
+    {
+        if (! $user->isFacilitator()) {
+            return;
+        }
+
+        $query->whereIn('id', $user->assignedCourses()->select('courses.id'));
+    }
+
+    private function scopeFacilitatorModules($query, User $user): void
+    {
+        if (! $user->isFacilitator()) {
+            return;
+        }
+
+        $query->where(function (Builder $scope) use ($user): void {
+            $scope
+                ->whereIn('course_id', $user->assignedCourses()->select('courses.id'))
+                ->orWhereIn('id', $user->assignedModules()->select('modules.id'));
+        });
+    }
+
+    private function scopeFacilitatorQuestionBanks($query, User $user): void
+    {
+        if (! $user->isFacilitator()) {
+            return;
+        }
+
+        $query->where(function (Builder $scope) use ($user): void {
+            $scope
+                ->whereIn('course_id', $user->assignedCourses()->select('courses.id'))
+                ->orWhereIn('module_id', $user->assignedModules()->select('modules.id'));
+        });
+    }
+
+    private function facilitatorCanAccessBank(User $user, QuestionBank $questionBank): bool
+    {
+        if (! $user->isFacilitator()) {
+            return true;
+        }
+
+        return (string) $questionBank->professional_school_id === (string) $user->professional_school_id
+            && (
+                ($questionBank->course_id && $user->assignedCourses()->whereKey($questionBank->course_id)->exists())
+                || ($questionBank->module_id && $user->assignedModules()->whereKey($questionBank->module_id)->exists())
+            );
+    }
+
+    private function authorizeFacilitatorCourseModule(User $user, string|int $courseId, string|int $moduleId): void
+    {
+        if (! $user->isFacilitator()) {
+            return;
+        }
+
+        $allowed = $user->assignedCourses()->whereKey($courseId)->exists()
+            && ProfessionalModule::query()
+                ->whereKey($moduleId)
+                ->where('course_id', $courseId)
+                ->where(function (Builder $query) use ($user): void {
+                    $query
+                        ->whereIn('course_id', $user->assignedCourses()->select('courses.id'))
+                        ->orWhereIn('id', $user->assignedModules()->select('modules.id'));
+                })
+                ->exists();
+
+        abort_unless($allowed, 403);
+    }
+
     private function rules(?ProfessionalSchool $professionalSchool = null): array
     {
         return [
@@ -676,6 +846,47 @@ class ProfessionalSchoolController extends Controller
         ];
     }
 
+    private function facilitatorRules(?User $facilitator = null): array
+    {
+        return [
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($facilitator)],
+            'password' => [$facilitator ? 'nullable' : 'required', 'string', 'min:8', 'max:255'],
+            'course_ids' => ['required', 'array', 'min:1'],
+            'course_ids.*' => ['required', 'integer', 'exists:courses,id', 'distinct'],
+        ];
+    }
+
+    private function authorizeFacilitatorRecord(ProfessionalSchool $professionalSchool, User $facilitator): void
+    {
+        abort_unless($facilitator->role === User::ROLE_FACILITATOR && (string) $facilitator->professional_school_id === (string) $professionalSchool->id, 404);
+    }
+
+    private function syncFacilitatorAssignments(User $facilitator, ProfessionalSchool $professionalSchool, array $courseIds): void
+    {
+        $courses = $professionalSchool->courses()
+            ->whereIn('id', $courseIds)
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+
+        abort_unless(count($courses) === count(array_unique($courseIds)), 422);
+
+        DB::table('course_facilitator')->where('user_id', $facilitator->id)->delete();
+
+        $now = now();
+        $rows = collect($courses)->map(fn ($courseId) => [
+            'user_id' => $facilitator->id,
+            'professional_school_id' => $professionalSchool->id,
+            'course_id' => $courseId,
+            'module_id' => null,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ])->values()->all();
+
+        DB::table('course_facilitator')->insert($rows);
+    }
+
     private function row(ProfessionalSchool $school): array
     {
         return [
@@ -693,6 +904,21 @@ class ProfessionalSchoolController extends Controller
             'programmes_count' => $school->programmes_count ?? 0,
             'candidates_count' => $school->candidates_count ?? 0,
             'exams_count' => $school->exams_count ?? 0,
+        ];
+    }
+
+    private function facilitatorRow(User $facilitator): array
+    {
+        return [
+            'id' => $facilitator->id,
+            'name' => $facilitator->name,
+            'email' => $facilitator->email,
+            'course_ids' => $facilitator->assignedCourses->pluck('id')->unique()->values()->all(),
+            'courses' => $facilitator->assignedCourses->unique('id')->map(fn (Course $course) => [
+                'id' => $course->id,
+                'name' => $course->name,
+                'code' => $course->code,
+            ])->values()->all(),
         ];
     }
 
