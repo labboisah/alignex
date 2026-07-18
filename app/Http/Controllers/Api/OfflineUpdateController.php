@@ -130,8 +130,8 @@ class OfflineUpdateController extends Controller
     private function artifactVersion(string $artifact): string
     {
         $packagePath = match ($artifact) {
-            'server' => base_path('offline-server/package.json'),
-            'client_app' => base_path('offline-candidate-browser/package.json'),
+            'server' => $this->appPath('offline_server_path', 'package.json'),
+            'client_app' => $this->appPath('candidate_app_path', 'package.json'),
             default => null,
         };
 
@@ -142,6 +142,11 @@ class OfflineUpdateController extends Controller
         $package = json_decode((string) file_get_contents($packagePath), true);
 
         return is_array($package) && is_string($package['version'] ?? null) ? $package['version'] : '0.0.0';
+    }
+
+    private function appPath(string $key, string $childPath): string
+    {
+        return rtrim((string) config("alignex.apps.{$key}"), '\\/').DIRECTORY_SEPARATOR.$childPath;
     }
 
     private function authenticateSyncAdmin(Request $request): ?User

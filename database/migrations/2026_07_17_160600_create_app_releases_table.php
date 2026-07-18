@@ -49,8 +49,8 @@ return new class extends Migration
             ]);
         }
 
-        $this->seedExistingRelease('server', public_path('downloads/offline-server/AlignEx-Center-Server-win-unpacked.zip'), base_path('offline-server/package.json'));
-        $this->seedExistingRelease('client_app', $this->latestClientAppInstaller(), base_path('offline-candidate-browser/package.json'));
+        $this->seedExistingRelease('server', public_path('downloads/offline-server/AlignEx-Center-Server-win-unpacked.zip'), $this->appPath('offline_server_path', 'package.json'));
+        $this->seedExistingRelease('client_app', $this->latestClientAppInstaller(), $this->appPath('candidate_app_path', 'package.json'));
     }
 
     public function down(): void
@@ -107,5 +107,10 @@ return new class extends Migration
         $package = json_decode((string) file_get_contents($path), true);
 
         return is_array($package) && is_string($package['version'] ?? null) ? $package['version'] : '0.0.0';
+    }
+
+    private function appPath(string $key, string $childPath): string
+    {
+        return rtrim((string) config("alignex.apps.{$key}"), '\\/').DIRECTORY_SEPARATOR.$childPath;
     }
 };

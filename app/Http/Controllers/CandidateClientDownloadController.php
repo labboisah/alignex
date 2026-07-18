@@ -26,8 +26,8 @@ class CandidateClientDownloadController extends Controller
         $installer = collect([
             ...(glob(public_path('downloads/candidate-client/AlignEx-Client-App-Setup-*.exe')) ?: []),
             ...(glob(public_path('downloads/candidate-client/AlignEx-Candidate-Client-Setup-*.exe')) ?: []),
-            ...(glob(base_path('offline-candidate-browser/dist-release/AlignEx-Client-App-Setup-*.exe')) ?: []),
-            ...(glob(base_path('offline-candidate-browser/dist-release/AlignEx-Candidate-Client-Setup-*.exe')) ?: []),
+            ...(glob($this->candidateAppPath('dist-release/AlignEx-Client-App-Setup-*.exe')) ?: []),
+            ...(glob($this->candidateAppPath('dist-release/AlignEx-Candidate-Client-Setup-*.exe')) ?: []),
         ])
             ->filter(fn (string $path): bool => is_file($path))
             ->sortByDesc(fn (string $path): int => filemtime($path) ?: 0)
@@ -38,5 +38,10 @@ class CandidateClientDownloadController extends Controller
         return response()->download($installer, basename($installer), [
             'Content-Type' => 'application/octet-stream',
         ]);
+    }
+
+    private function candidateAppPath(string $childPath): string
+    {
+        return rtrim((string) config('alignex.apps.candidate_app_path'), '\\/').DIRECTORY_SEPARATOR.$childPath;
     }
 }
