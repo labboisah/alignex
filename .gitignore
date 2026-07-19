@@ -17,7 +17,6 @@
 **/node_modules
 /offline-server
 /offline-candidate-browser
-/public/build
 /public/downloads/offline-server
 /public/fonts-manifest.dev.json
 /public/hot
