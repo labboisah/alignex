@@ -6,6 +6,7 @@ use App\Models\Center;
 use App\Models\Candidate;
 use App\Models\Exam;
 use App\Models\Organization;
+use App\Models\PricingPlan;
 use App\Models\Role;
 use App\Models\School;
 use App\Models\User;
@@ -109,7 +110,13 @@ class RbacTest extends TestCase
         try {
             File::put($path, 'fake offline server package');
 
-            $schoolAdmin = User::factory()->create(['role' => User::ROLE_SCHOOL_ADMIN]);
+            $plan = PricingPlan::query()->where('slug', 'enterprise')->firstOrFail();
+            $plan->update(['features' => array_merge($plan->features ?? [], ['offline_activation' => true])]);
+            $school = School::factory()->create(['pricing_plan_id' => $plan->id]);
+            $schoolAdmin = User::factory()->create([
+                'role' => User::ROLE_SCHOOL_ADMIN,
+                'school_id' => $school->id,
+            ]);
 
             $this->assertFalse($schoolAdmin->hasPermission('downloadOfflineServer'));
 
@@ -124,6 +131,27 @@ class RbacTest extends TestCase
 
             if (File::exists($backupPath)) {
                 File::move($backupPath, $path);
+            }
+        }
+    }
+
+    public function test_offline_server_download_accepts_versioned_release_zip(): void
+    {
+        $path = public_path('downloads/offline-server/AlignEx-Center-Server-1.2.3.zip');
+        File::ensureDirectoryExists(dirname($path));
+
+        try {
+            File::put($path, 'fake versioned offline server package');
+
+            $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+
+            $this->actingAs($superAdmin)
+                ->get('/offline-server/download')
+                ->assertOk()
+                ->assertDownload('AlignEx-Center-Server-1.2.3.zip');
+        } finally {
+            if (File::exists($path)) {
+                File::delete($path);
             }
         }
     }

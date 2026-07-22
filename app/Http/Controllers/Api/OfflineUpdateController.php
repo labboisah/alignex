@@ -50,7 +50,7 @@ class OfflineUpdateController extends Controller
     private function artifact(Request $request, string $artifact): ?array
     {
         $path = match ($artifact) {
-            'server' => public_path('downloads/offline-server/AlignEx-Center-Server-win-unpacked.zip'),
+            'server' => $this->latestServerPackage(),
             'client_app' => $this->latestClientAppInstaller(),
             default => null,
         };
@@ -123,6 +123,19 @@ class OfflineUpdateController extends Controller
             ...(glob(public_path('downloads/candidate-client/AlignEx-Candidate-Client-Setup-*.exe')) ?: []),
         ])
             ->filter(fn (string $path): bool => is_file($path))
+            ->sortByDesc(fn (string $path): int => filemtime($path) ?: 0)
+            ->first();
+    }
+
+    private function latestServerPackage(): ?string
+    {
+        return collect([
+            public_path('downloads/offline-server/AlignEx-Center-Server-win-unpacked.zip'),
+            ...(glob(public_path('downloads/offline-server/AlignEx-Center-Server*.zip')) ?: []),
+            ...(glob($this->appPath('offline_server_path', 'dist-release/AlignEx-Center-Server*.zip')) ?: []),
+            ...(glob($this->appPath('offline_server_path', 'release/AlignEx-Center-Server*.zip')) ?: []),
+        ])
+            ->filter(fn (string $path): bool => is_file($path) && filesize($path) > 0)
             ->sortByDesc(fn (string $path): int => filemtime($path) ?: 0)
             ->first();
     }

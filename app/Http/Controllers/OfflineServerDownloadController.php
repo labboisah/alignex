@@ -23,12 +23,30 @@ class OfflineServerDownloadController extends Controller
             ]);
         }
 
-        $path = public_path('downloads/offline-server/AlignEx-Center-Server-win-unpacked.zip');
+        $path = $this->latestServerPackage();
 
-        abort_unless(is_file($path) && filesize($path) > 0, 404, 'Offline server package has not been compiled yet.');
+        abort_unless($path, 404, 'Offline server package has not been compiled yet.');
 
-        return response()->download($path, 'AlignEx-Center-Server-win-unpacked.zip', [
+        return response()->download($path, basename($path), [
             'Content-Type' => 'application/zip',
         ]);
+    }
+
+    private function latestServerPackage(): ?string
+    {
+        return collect([
+            public_path('downloads/offline-server/AlignEx-Center-Server-win-unpacked.zip'),
+            ...(glob(public_path('downloads/offline-server/AlignEx-Center-Server*.zip')) ?: []),
+            ...(glob($this->offlineServerPath('dist-release/AlignEx-Center-Server*.zip')) ?: []),
+            ...(glob($this->offlineServerPath('release/AlignEx-Center-Server*.zip')) ?: []),
+        ])
+            ->filter(fn (string $path): bool => is_file($path) && filesize($path) > 0)
+            ->sortByDesc(fn (string $path): int => filemtime($path) ?: 0)
+            ->first();
+    }
+
+    private function offlineServerPath(string $childPath): string
+    {
+        return rtrim((string) config('alignex.apps.offline_server_path'), '\\/').DIRECTORY_SEPARATOR.$childPath;
     }
 }
