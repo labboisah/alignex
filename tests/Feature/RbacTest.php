@@ -137,8 +137,18 @@ class RbacTest extends TestCase
 
     public function test_offline_server_download_accepts_versioned_release_zip(): void
     {
+        $defaultPath = public_path('downloads/offline-server/AlignEx-Center-Server-win-unpacked.zip');
+        $backupPath = $defaultPath.'.test-backup';
         $path = public_path('downloads/offline-server/AlignEx-Center-Server-1.2.3.zip');
         File::ensureDirectoryExists(dirname($path));
+
+        if (File::exists($backupPath)) {
+            File::delete($backupPath);
+        }
+
+        if (File::exists($defaultPath)) {
+            File::move($defaultPath, $backupPath);
+        }
 
         try {
             File::put($path, 'fake versioned offline server package');
@@ -153,7 +163,22 @@ class RbacTest extends TestCase
             if (File::exists($path)) {
                 File::delete($path);
             }
+
+            if (File::exists($backupPath)) {
+                File::move($backupPath, $defaultPath);
+            }
         }
+    }
+
+    public function test_offline_server_download_redirects_to_external_package_url_when_configured(): void
+    {
+        config(['alignex.apps.offline_server_download_url' => 'https://drive.google.com/file/d/example/view?usp=sharing']);
+
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+
+        $this->actingAs($superAdmin)
+            ->get('/offline-server/download')
+            ->assertRedirect('https://drive.google.com/file/d/example/view?usp=sharing');
     }
 
     public function test_sidebar_renders_correctly_by_role(): void

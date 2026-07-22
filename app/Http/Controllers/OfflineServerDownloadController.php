@@ -6,12 +6,19 @@ use App\Models\AppRelease;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 
 class OfflineServerDownloadController extends Controller
 {
-    public function __invoke(Request $request): BinaryFileResponse
+    public function __invoke(Request $request): BinaryFileResponse|RedirectResponse
     {
         abort_unless($request->user(), 403);
+
+        $downloadUrl = trim((string) config('alignex.apps.offline_server_download_url'));
+
+        if ($downloadUrl !== '') {
+            return redirect()->away($downloadUrl);
+        }
 
         $release = Schema::hasTable('app_releases')
             ? AppRelease::query()->latestActiveFor(AppRelease::ARTIFACT_SERVER)->first()
