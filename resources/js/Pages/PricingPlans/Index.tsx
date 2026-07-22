@@ -342,6 +342,7 @@ const defaultFeatureItems = [
     { key: 'api_integration', label: 'API integration', enabled: false },
     { key: 'offline_activation', label: 'Offline activation', enabled: true },
     { key: 'exam_package_import', label: 'Exam package import', enabled: true },
+    { key: 'offline_question_authoring', label: 'Offline question authoring', enabled: false },
     { key: 'result_package_export', label: 'Result package export', enabled: true },
     { key: 'email_notifications', label: 'Email notifications', enabled: false },
     { key: 'sms_notifications', label: 'SMS notifications', enabled: false },

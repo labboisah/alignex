@@ -32,6 +32,7 @@ class PlanFeatures
             'api_integration' => 'API integration',
             'offline_activation' => 'Offline activation',
             'exam_package_import' => 'Exam package import',
+            'offline_question_authoring' => 'Offline question authoring',
             'result_package_export' => 'Result package export',
             'email_notifications' => 'Email notifications',
             'sms_notifications' => 'SMS notifications',
