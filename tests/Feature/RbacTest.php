@@ -181,6 +181,17 @@ class RbacTest extends TestCase
             ->assertRedirect('https://drive.google.com/file/d/example/view?usp=sharing');
     }
 
+    public function test_candidate_client_download_redirects_to_external_installer_url_when_configured(): void
+    {
+        config(['alignex.apps.candidate_app_download_url' => 'https://drive.google.com/file/d/client-example/view?usp=sharing']);
+
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+
+        $this->actingAs($superAdmin)
+            ->get('/candidate-client/download')
+            ->assertRedirect('https://drive.google.com/file/d/client-example/view?usp=sharing');
+    }
+
     public function test_sidebar_renders_correctly_by_role(): void
     {
         $expected = [
