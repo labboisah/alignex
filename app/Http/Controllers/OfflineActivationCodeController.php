@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\OfflineActivationCode;
+use App\Models\OfflineServerActivation;
+use App\Support\AccessControl;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -38,6 +41,7 @@ class OfflineActivationCodeController extends Controller
                 'expires_at' => $code->expires_at?->toISOString(),
                 'license_expires_at' => $code->license_expires_at?->toISOString(),
                 'last_activated_at' => $code->last_activated_at?->toISOString(),
+                'last_device_id' => $code->last_device_id,
                 'last_admin_email' => $code->last_admin_email,
                 'created_at' => $code->created_at?->toISOString(),
             ]);
@@ -46,6 +50,32 @@ class OfflineActivationCodeController extends Controller
             'codes' => $codes,
             'canGenerateCode' => $yearlyCode === null,
             'generationLockedUntil' => $yearlyCode?->created_at?->copy()->addYear()->toISOString(),
+        ]);
+    }
+
+    public function resetIndex(Request $request): Response
+    {
+        abort_unless($request->user()?->isSuperAdmin(), 403);
+
+        $codes = OfflineActivationCode::query()
+            ->with([
+                'creator:id,name,email,role,organization_id,center_id,school_id,secondary_school_id,professional_school_id,cbt_center_id',
+                'creator.organization:id,name',
+                'creator.center:id,name',
+                'creator.school:id,name',
+                'creator.secondarySchool:id,name',
+                'creator.professionalSchool:id,name',
+                'creator.cbtCenter:id,name',
+                'organization:id,name',
+                'cbtCenter:id,name',
+            ])
+            ->latest()
+            ->limit(200)
+            ->get()
+            ->map(fn (OfflineActivationCode $code): array => $this->activationManagementRow($code));
+
+        return Inertia::render('OfflineActivationCodes/ResetIndex', [
+            'codes' => $codes,
         ]);
     }
 
@@ -87,6 +117,32 @@ class OfflineActivationCodeController extends Controller
             ->with('activation_code', $plainCode);
     }
 
+    public function reset(Request $request, OfflineActivationCode $offlineActivationCode): RedirectResponse
+    {
+        abort_unless($request->user()?->isSuperAdmin(), 403);
+
+        DB::transaction(function () use ($offlineActivationCode): void {
+            OfflineServerActivation::query()
+                ->where('offline_activation_code_id', $offlineActivationCode->id)
+                ->where('status', 'activated')
+                ->update([
+                    'status' => 'revoked',
+                    'updated_at' => now(),
+                ]);
+
+            $offlineActivationCode->forceFill([
+                'activation_count' => 0,
+                'last_activated_at' => null,
+                'last_device_id' => null,
+                'last_admin_email' => null,
+            ])->save();
+        });
+
+        return redirect()
+            ->route('offline-activation-codes.reset-index')
+            ->with('success', 'Activation code reset. It can now be used on another device.');
+    }
+
     private function decryptCode(OfflineActivationCode $code): string
     {
         if (! $code->code_encrypted) {
@@ -107,5 +163,56 @@ class OfflineActivationCodeController extends Controller
             ->where('created_at', '>=', now()->subYear())
             ->latest()
             ->first();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function activationManagementRow(OfflineActivationCode $code): array
+    {
+        $creator = $code->creator;
+        $owner = $this->activationOwner($code);
+
+        return [
+            'id' => $code->id,
+            'code' => $this->decryptCode($code),
+            'label' => $code->label,
+            'status' => $code->status,
+            'created_by' => $creator?->name,
+            'creator_email' => $creator?->email,
+            'creator_role' => $creator?->role ? AccessControl::roleLabel($creator->role) : null,
+            'owner_type' => $owner['type'],
+            'owner_name' => $owner['name'],
+            'organization_name' => $code->organization?->name ?? $creator?->organization?->name,
+            'center_name' => $code->cbtCenter?->name ?? $creator?->cbtCenter?->name ?? $creator?->center?->name,
+            'activation_count' => $code->activation_count,
+            'max_activations' => $code->max_activations,
+            'license_expires_at' => $code->license_expires_at?->toISOString(),
+            'last_activated_at' => $code->last_activated_at?->toISOString(),
+            'last_device_id' => $code->last_device_id,
+            'last_admin_email' => $code->last_admin_email,
+            'created_at' => $code->created_at?->toISOString(),
+            'can_reset' => $code->activation_count > 0 || filled($code->last_device_id),
+        ];
+    }
+
+    /**
+     * @return array{type: string, name: string|null}
+     */
+    private function activationOwner(OfflineActivationCode $code): array
+    {
+        $creator = $code->creator;
+
+        return match (true) {
+            $code->cbtCenter !== null => ['type' => 'CBT Center', 'name' => $code->cbtCenter->name],
+            $creator?->cbtCenter !== null => ['type' => 'CBT Center', 'name' => $creator->cbtCenter->name],
+            $creator?->center !== null => ['type' => 'Center', 'name' => $creator->center->name],
+            $creator?->secondarySchool !== null => ['type' => 'Secondary School', 'name' => $creator->secondarySchool->name],
+            $creator?->professionalSchool !== null => ['type' => 'Professional School', 'name' => $creator->professionalSchool->name],
+            $creator?->school !== null => ['type' => 'School', 'name' => $creator->school->name],
+            $code->organization !== null => ['type' => 'Organization', 'name' => $code->organization->name],
+            $creator?->organization !== null => ['type' => 'Organization', 'name' => $creator->organization->name],
+            default => ['type' => 'Platform', 'name' => null],
+        };
     }
 }

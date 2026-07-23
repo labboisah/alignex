@@ -82,6 +82,7 @@ const iconByLabel = {
     'Offline Server': Download,
     'Client App': MonitorDown,
     'Activation Codes': ShieldCheck,
+    'Manage Activation': ShieldCheck,
     Settings,
     'Center Settings': Settings,
     'Secondary Schools': Building2,

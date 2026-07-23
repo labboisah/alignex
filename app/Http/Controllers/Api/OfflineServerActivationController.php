@@ -53,11 +53,12 @@ class OfflineServerActivationController extends Controller
             return response()->json(['message' => 'This admin is not allowed to activate this offline server.'], 403);
         }
 
-        if ($activationCode->activations()->where('device_id', '!=', $validated['device_id'])->exists()) {
-            return response()->json(['message' => 'This activation code has already been used on another device. Generate a new yearly code when eligible.'], 409);
+        if ($activationCode->activations()->where('status', 'activated')->where('device_id', '!=', $validated['device_id'])->exists()) {
+            return response()->json(['message' => 'This activation code has already been used on another device. Reset it from the portal before activating a different device.'], 409);
         }
 
         $existingDeviceActivation = $activationCode->activations()
+            ->where('status', 'activated')
             ->where('device_id', $validated['device_id'])
             ->latest()
             ->first();
@@ -117,6 +118,8 @@ class OfflineServerActivationController extends Controller
             'plan' => $planFeatures->planSummaryForOwner($planOwner),
             'plan_features' => $planFeatures->featuresForOwner($planOwner),
             'admin_name' => $admin->name,
+            'device_id' => $validated['device_id'],
+            'same_device' => $existingDeviceActivation !== null,
             'activated_at' => $activation->activated_at?->toISOString(),
             'expires_at' => $activation->expires_at?->toISOString(),
             'status' => 'activated',

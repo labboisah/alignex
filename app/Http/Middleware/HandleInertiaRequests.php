@@ -135,6 +135,7 @@ class HandleInertiaRequests extends Middleware
                 ['label' => 'Admin', 'children' => [
                     ['label' => 'Users', 'href' => '/users', 'permission' => 'manageUsers'],
                     ['label' => 'Access Controls', 'href' => '/access-controls', 'permission' => 'manageAccessControls'],
+                    ['label' => 'Manage Activation', 'href' => '/admin/manage-activation'],
                 ]],
                 ['label' => 'Reports', 'children' => [
                     ['label' => 'Reports', 'href' => '/reports', 'permission' => 'viewReports'],

@@ -66,6 +66,12 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
     Route::post('/offline-activation-codes', [OfflineActivationCodeController::class, 'store'])
         ->middleware(['permission:downloadOfflineServer', 'plan.feature:offline_activation'])
         ->name('offline-activation-codes.store');
+    Route::get('/admin/manage-activation', [OfflineActivationCodeController::class, 'resetIndex'])
+        ->middleware('role:super_admin')
+        ->name('offline-activation-codes.reset-index');
+    Route::post('/admin/manage-activation/{offlineActivationCode}/reset', [OfflineActivationCodeController::class, 'reset'])
+        ->middleware('role:super_admin')
+        ->name('offline-activation-codes.reset');
     Route::patch('/current-context', [CurrentContextController::class, 'update'])->name('current-context.update');
     Route::delete('/current-context', [CurrentContextController::class, 'destroy'])->name('current-context.destroy');
     Route::get('/access-denied', fn () => Inertia::render('AccessDenied'))->name('access-denied');
