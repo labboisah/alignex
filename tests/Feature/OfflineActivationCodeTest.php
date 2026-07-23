@@ -4,10 +4,12 @@ namespace Tests\Feature;
 
 use App\Models\OfflineActivationCode;
 use App\Models\OfflineServerActivation;
+use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class OfflineActivationCodeTest extends TestCase
@@ -70,16 +72,16 @@ class OfflineActivationCodeTest extends TestCase
         ])->assertConflict();
 
         $this->actingAs($organizationAdmin)
-            ->post("/admin/manage-activation/{$activationCode->id}/reset")
-            ->assertForbidden();
-
-        $this->actingAs($organizationAdmin)
             ->get('/admin/manage-activation')
             ->assertForbidden();
 
         $this->actingAs($admin)
             ->get('/admin/manage-activation')
-            ->assertOk();
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('OfflineActivationCodes/ResetIndex')
+                ->where('codes.0.code', $plainCode)
+            );
 
         $this->actingAs($admin)
             ->post("/admin/manage-activation/{$activationCode->id}/reset")
@@ -99,5 +101,31 @@ class OfflineActivationCodeTest extends TestCase
 
         $this->assertSame(1, $activationCode->refresh()->activation_count);
         $this->assertSame('device-two', $activationCode->last_device_id);
+    }
+
+    public function test_super_admin_context_navigation_includes_manage_activation(): void
+    {
+        $organization = Organization::factory()->create();
+        $admin = User::factory()->create([
+            'role' => User::ROLE_SUPER_ADMIN,
+            'active_context_type' => 'organization',
+            'active_context_id' => $organization->id,
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->get('/dashboard');
+
+        $response
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('auth.navigation.0.label', 'Dashboard')
+                ->etc()
+            );
+
+        $navigation = $response->viewData('page')['props']['auth']['navigation'];
+
+        $this->assertTrue(collect($navigation)
+            ->flatMap(fn (array $item) => $item['children'] ?? [$item])
+            ->contains(fn (array $item) => ($item['label'] ?? null) === 'Manage Activation' && ($item['href'] ?? null) === '/admin/manage-activation'));
     }
 }

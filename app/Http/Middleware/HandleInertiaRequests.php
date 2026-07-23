@@ -309,6 +309,12 @@ class HandleInertiaRequests extends Middleware
             }
         }
 
+        if ($user->isSuperAdmin() && $contextType) {
+            $navigation->push(['label' => 'Admin', 'children' => [
+                ['label' => 'Manage Activation', 'href' => '/admin/manage-activation'],
+            ]]);
+        }
+
         return $this->filterNavigation($navigation->all(), $user);
     }
 
