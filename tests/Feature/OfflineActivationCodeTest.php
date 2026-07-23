@@ -123,9 +123,11 @@ class OfflineActivationCodeTest extends TestCase
             );
 
         $navigation = $response->viewData('page')['props']['auth']['navigation'];
+        $adminSections = collect($navigation)->filter(fn (array $item) => ($item['label'] ?? null) === 'Admin');
 
         $this->assertTrue(collect($navigation)
             ->flatMap(fn (array $item) => $item['children'] ?? [$item])
             ->contains(fn (array $item) => ($item['label'] ?? null) === 'Manage Activation' && ($item['href'] ?? null) === '/admin/manage-activation'));
+        $this->assertCount(1, $adminSections);
     }
 }

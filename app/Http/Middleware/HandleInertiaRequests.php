@@ -135,8 +135,8 @@ class HandleInertiaRequests extends Middleware
                 ['label' => 'Admin', 'children' => [
                     ['label' => 'Users', 'href' => '/users', 'permission' => 'manageUsers'],
                     ['label' => 'Access Controls', 'href' => '/access-controls', 'permission' => 'manageAccessControls'],
-                    ['label' => 'Manage Activation', 'href' => '/admin/manage-activation'],
                 ]],
+                ['label' => 'Manage Activation', 'href' => '/admin/manage-activation'],
                 ['label' => 'Reports', 'children' => [
                     ['label' => 'Reports', 'href' => '/reports', 'permission' => 'viewReports'],
                 ]],
@@ -310,9 +310,11 @@ class HandleInertiaRequests extends Middleware
         }
 
         if ($user->isSuperAdmin() && $contextType) {
-            $navigation->push(['label' => 'Admin', 'children' => [
-                ['label' => 'Manage Activation', 'href' => '/admin/manage-activation'],
-            ]]);
+            $manageActivation = ['label' => 'Manage Activation', 'href' => '/admin/manage-activation'];
+
+            if (! $navigation->contains(fn (array $item): bool => ($item['href'] ?? null) === $manageActivation['href'])) {
+                $navigation->push($manageActivation);
+            }
         }
 
         return $this->filterNavigation($navigation->all(), $user);

@@ -53,7 +53,7 @@ class DashboardContextFeatureTest extends TestCase
                 ->where('current_context', null)
                 ->where('role.scope', 'Platform-wide')
                 ->where('metrics.0.label', 'Total Organizations')
-                ->where('auth.navigation.1.label', 'Organizations')
+                ->where('auth.navigation.1.label', 'Platform')
             );
     }
 
