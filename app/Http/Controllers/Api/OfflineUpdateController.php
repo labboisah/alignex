@@ -128,6 +128,7 @@ class OfflineUpdateController extends Controller
     private function latestClientAppInstaller(): ?string
     {
         return collect([
+            public_path('downloads/candidate-client/AlignEx-Client-App-Setup-0.1.3.exe'),
             ...(glob(public_path('downloads/candidate-client/AlignEx-Client-App-Setup-*.exe')) ?: []),
             ...(glob(public_path('downloads/candidate-client/AlignEx-Candidate-Client-Setup-*.exe')) ?: []),
         ])
@@ -139,6 +140,7 @@ class OfflineUpdateController extends Controller
     private function latestServerPackage(): ?string
     {
         return collect([
+            public_path('downloads/offline-server/AlignEx-Center-Server-0.1.3-win-unpacked.zip'),
             public_path('downloads/offline-server/AlignEx-Center-Server-win-unpacked.zip'),
             ...(glob(public_path('downloads/offline-server/AlignEx-Center-Server*.zip')) ?: []),
             ...(glob($this->appPath('offline_server_path', 'dist-release/AlignEx-Center-Server*.zip')) ?: []),

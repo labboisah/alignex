@@ -17,7 +17,7 @@
 **/node_modules
 /offline-server
 /offline-candidate-browser
-/public/downloads/offline-server
+/public/downloads/offline-server/AlignEx-Center-Server-win-unpacked/
 /public/fonts-manifest.dev.json
 /public/hot
 /public/storage

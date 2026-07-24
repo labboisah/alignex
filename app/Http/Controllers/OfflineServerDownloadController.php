@@ -42,6 +42,7 @@ class OfflineServerDownloadController extends Controller
     private function latestServerPackage(): ?string
     {
         return collect([
+            public_path('downloads/offline-server/AlignEx-Center-Server-0.1.3-win-unpacked.zip'),
             public_path('downloads/offline-server/AlignEx-Center-Server-win-unpacked.zip'),
             ...(glob(public_path('downloads/offline-server/AlignEx-Center-Server*.zip')) ?: []),
             ...(glob($this->offlineServerPath('dist-release/AlignEx-Center-Server*.zip')) ?: []),

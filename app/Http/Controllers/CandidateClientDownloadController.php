@@ -31,6 +31,7 @@ class CandidateClientDownloadController extends Controller
         }
 
         $installer = collect([
+            public_path('downloads/candidate-client/AlignEx-Client-App-Setup-0.1.3.exe'),
             ...(glob(public_path('downloads/candidate-client/AlignEx-Client-App-Setup-*.exe')) ?: []),
             ...(glob(public_path('downloads/candidate-client/AlignEx-Candidate-Client-Setup-*.exe')) ?: []),
             ...(glob($this->candidateAppPath('dist-release/AlignEx-Client-App-Setup-*.exe')) ?: []),
