@@ -8,6 +8,7 @@ type CandidateProfile = {
     full_name: string;
     registration_number: string;
     phone?: string | null;
+    photo_url?: string | null;
 };
 
 type ExamDetails = {
@@ -47,6 +48,15 @@ type SavedAnswer = {
     time_spent_seconds?: number;
     device_fingerprint?: string;
     saved_at?: string | null;
+};
+
+type SubjectSection = {
+    key: string;
+    subject: string;
+    total: number;
+    answered: number;
+    percent: number;
+    questionIndexes: number[];
 };
 
 type ExamPayload = {
@@ -246,10 +256,36 @@ function StatusText({ ready }: { ready: boolean }) {
     return <span className={ready ? 'text-sm font-bold text-success' : 'text-sm font-bold text-warning'}>{ready ? 'Ready' : 'Will request'}</span>;
 }
 
+function CandidatePhoto({ candidate }: { candidate: CandidateProfile }) {
+    const initials = candidate.full_name
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase())
+        .join('') || 'CA';
+
+    if (candidate.photo_url) {
+        return (
+            <img
+                src={candidate.photo_url}
+                alt={candidate.full_name}
+                className="h-14 w-14 shrink-0 rounded-md border border-border bg-slate-100 object-cover"
+            />
+        );
+    }
+
+    return (
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md border border-border bg-slate-100 text-sm font-bold text-slate-600">
+            {initials}
+        </div>
+    );
+}
+
 function ExamScreenPage() {
     const navigate = useNavigate();
     const [payload, setPayload] = useState<ExamPayload | null>(storedPayload());
     const [currentIndex, setCurrentIndex] = useState(0);
+    const [selectedSubjectKey, setSelectedSubjectKey] = useState<string | null>(null);
     const [answers, setAnswers] = useState<Record<string, SavedAnswer>>(() => Object.fromEntries((payload?.answers ?? []).map((answer) => [answer.question_id, answer])));
     const [pending, setPending] = useState<Set<string>>(new Set());
     const [failed, setFailed] = useState<Record<string, SavedAnswer>>({});
@@ -358,17 +394,38 @@ function ExamScreenPage() {
         return () => window.clearTimeout(timer);
     }, [failed, online]);
 
+    const questions = useMemo(() => (payload ? questionList(payload) : []), [payload]);
+    const subjectSummaries = useMemo(() => subjectProgress(questions, answers), [questions, answers]);
+    const currentSubjectKey = subjectSummaries.find((summary) => summary.questionIndexes.includes(currentIndex))?.key ?? null;
+
+    useEffect(() => {
+        if (subjectSummaries.length === 0) {
+            setSelectedSubjectKey(null);
+            return;
+        }
+
+        setSelectedSubjectKey((key) => {
+            const hasSelectedSubject = key !== null && subjectSummaries.some((summary) => summary.key === key);
+
+            return currentSubjectKey ?? (hasSelectedSubject ? key : subjectSummaries[0].key);
+        });
+    }, [currentSubjectKey, subjectSummaries]);
+
     if (!payload) {
         return <CandidateShell><div className="p-8 text-center">Loading exam...</div></CandidateShell>;
     }
 
-    const questions = questionList(payload);
     const current = questions[currentIndex];
     const currentAnswer = answers[current.question_id];
     const answeredCount = questions.filter((question) => answers[question.question_id]?.selected_option_ids?.length).length;
     const unansweredCount = Math.max(0, questions.length - answeredCount);
     const flaggedCount = questions.filter((question) => answers[question.question_id]?.is_flagged).length;
-    const subjectSummaries = subjectProgress(questions, answers);
+    const currentSubject = subjectSummaries.find((summary) => summary.questionIndexes.includes(currentIndex)) ?? subjectSummaries[0];
+    const currentSubjectQuestionIndexes = currentSubject?.questionIndexes ?? [];
+    const currentSubjectQuestionIndex = Math.max(0, currentSubjectQuestionIndexes.indexOf(currentIndex));
+    const selectedSubject = subjectSummaries.find((summary) => summary.key === selectedSubjectKey) ?? currentSubject;
+    const selectedSubjectQuestionIndexes = selectedSubject?.questionIndexes ?? [];
+    const selectedSubjectQuestions = selectedSubjectQuestionIndexes.map((index) => questions[index]).filter((question): question is ExamQuestion => Boolean(question));
 
     const saveAnswer = async (answer: SavedAnswer) => {
         const answerForSave = {
@@ -468,13 +525,13 @@ function ExamScreenPage() {
         saveAnswer(answer);
     };
 
-    const goNext = () => setCurrentIndex((index) => Math.min(questions.length - 1, index + 1));
+    const goNext = () => setCurrentIndex((index) => nextQuestionIndex(index, subjectSummaries, questions.length));
     const goPrevious = () => {
         if (!payload.exam.settings.allow_back_navigation) {
             return;
         }
 
-        setCurrentIndex((index) => Math.max(0, index - 1));
+        setCurrentIndex((index) => previousQuestionIndex(index, subjectSummaries));
     };
 
     const toggleFlag = () => {
@@ -661,6 +718,7 @@ function ExamScreenPage() {
                         <div>
                             <div className="flex items-center gap-3">
                                 <img src="/images/logo.png" alt="AlignEx" className="h-10 w-10 object-contain" />
+                                <CandidatePhoto candidate={payload.candidate} />
                                 <div>
                                     <div className="font-bold text-slateDark">{payload.candidate.full_name}</div>
                                     <div className="text-xs text-slate-500">{payload.candidate.registration_number} | {payload.exam.title}</div>
@@ -686,8 +744,9 @@ function ExamScreenPage() {
                         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                             <div>
                                 <div className="text-sm font-semibold text-primary">
-                                    {current.subject_name ? `${current.subject_name} | ` : ''}Question {currentIndex + 1} of {questions.length}
+                                    {currentSubject?.subject ?? current.subject_name ?? 'General'} | Question {currentSubjectQuestionIndex + 1} of {currentSubject?.total ?? questions.length}
                                 </div>
+                                <div className="mt-1 text-xs font-semibold text-slate-500">Overall question {currentIndex + 1} of {questions.length}</div>
                                 <h1 className="mt-2 text-xl font-bold text-slateDark">{current.question_text}</h1>
                             </div>
                             <Button type="button" variant={currentAnswer?.is_flagged ? 'danger' : 'secondary'} onClick={toggleFlag}><Flag className="h-4 w-4" />Flag</Button>
@@ -715,19 +774,28 @@ function ExamScreenPage() {
                         {subjectSummaries.length > 1 && (
                             <div className="mb-4 space-y-2">
                                 {subjectSummaries.map((summary) => (
-                                    <div key={summary.subject} className="rounded-md border border-border p-2">
+                                    <button
+                                        key={summary.key}
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedSubjectKey(summary.key);
+                                            setCurrentIndex(summary.questionIndexes[0]);
+                                        }}
+                                        className={`w-full rounded-md border p-2 text-left transition ${summary.key === selectedSubject?.key ? 'border-primary bg-green-50' : 'border-border hover:border-primary'}`}
+                                    >
                                         <div className="truncate text-xs font-bold text-slateDark">{summary.subject}</div>
                                         <div className="mt-1 h-2 rounded bg-slate-100">
                                             <div className="h-2 rounded bg-primary" style={{ width: `${summary.percent}%` }} />
                                         </div>
                                         <div className="mt-1 text-xs text-slate-500">{summary.answered}/{summary.total} answered</div>
-                                    </div>
+                                    </button>
                                 ))}
                             </div>
                         )}
-                        <div className="mb-3 font-semibold text-slateDark">Question Palette</div>
+                        <div className="mb-3 font-semibold text-slateDark">{selectedSubject?.subject ?? 'Question'} Palette</div>
                         <div className="grid grid-cols-5 gap-2">
-                            {questions.map((question, index) => {
+                            {selectedSubjectQuestions.map((question, subjectIndex) => {
+                                const index = selectedSubjectQuestionIndexes[subjectIndex];
                                 const answer = answers[question.question_id];
                                 const state = pending.has(question.question_id)
                                     ? 'bg-amber-100 text-warning'
@@ -736,7 +804,7 @@ function ExamScreenPage() {
                                         : answer?.selected_option_ids?.length
                                             ? 'bg-green-50 text-success'
                                             : 'bg-slate-100 text-slate-600';
-                                return <button key={question.question_id} type="button" onClick={() => setCurrentIndex(index)} className={`h-10 rounded-md text-sm font-bold ${state} ${index === currentIndex ? 'ring-2 ring-primary' : ''}`}>{index + 1}</button>;
+                                return <button key={question.question_id} type="button" onClick={() => setCurrentIndex(index)} className={`h-10 rounded-md text-sm font-bold ${state} ${index === currentIndex ? 'ring-2 ring-primary' : ''}`}>{subjectIndex + 1}</button>;
                             })}
                         </div>
                         {Object.keys(failed).length > 0 && (
@@ -857,21 +925,67 @@ function questionList(payload: ExamPayload): ExamQuestion[] {
     return Array.isArray(payload.questions) ? payload.questions : payload.questions.data;
 }
 
-function subjectProgress(questions: ExamQuestion[], answers: Record<string, SavedAnswer>) {
-    const grouped = new Map<string, { subject: string; total: number; answered: number }>();
+function subjectProgress(questions: ExamQuestion[], answers: Record<string, SavedAnswer>): SubjectSection[] {
+    const grouped = new Map<string, SubjectSection>();
 
-    questions.forEach((question) => {
+    questions.forEach((question, index) => {
+        const key = subjectKey(question);
         const subject = question.subject_name ?? 'General';
-        const existing = grouped.get(subject) ?? { subject, total: 0, answered: 0 };
+        const existing = grouped.get(key) ?? { key, subject, total: 0, answered: 0, percent: 0, questionIndexes: [] };
         existing.total += 1;
         existing.answered += answers[question.question_id]?.selected_option_ids?.length ? 1 : 0;
-        grouped.set(subject, existing);
+        existing.questionIndexes.push(index);
+        grouped.set(key, existing);
     });
 
     return Array.from(grouped.values()).map((summary) => ({
         ...summary,
         percent: summary.total > 0 ? Math.round((summary.answered / summary.total) * 100) : 0,
     }));
+}
+
+function subjectKey(question: ExamQuestion) {
+    return question.subject_id ? `subject:${question.subject_id}` : `subject-name:${question.subject_name ?? 'General'}`;
+}
+
+function nextQuestionIndex(currentIndex: number, subjects: SubjectSection[], questionCount: number) {
+    const currentSubjectIndex = subjects.findIndex((subject) => subject.questionIndexes.includes(currentIndex));
+    const currentSubject = subjects[currentSubjectIndex];
+
+    if (!currentSubject) {
+        return Math.min(questionCount - 1, currentIndex + 1);
+    }
+
+    const currentPosition = currentSubject.questionIndexes.indexOf(currentIndex);
+    const nextInSubject = currentSubject.questionIndexes[currentPosition + 1];
+
+    if (nextInSubject !== undefined) {
+        return nextInSubject;
+    }
+
+    const nextSubject = subjects[currentSubjectIndex + 1];
+
+    return nextSubject?.questionIndexes[0] ?? currentIndex;
+}
+
+function previousQuestionIndex(currentIndex: number, subjects: SubjectSection[]) {
+    const currentSubjectIndex = subjects.findIndex((subject) => subject.questionIndexes.includes(currentIndex));
+    const currentSubject = subjects[currentSubjectIndex];
+
+    if (!currentSubject) {
+        return Math.max(0, currentIndex - 1);
+    }
+
+    const currentPosition = currentSubject.questionIndexes.indexOf(currentIndex);
+    const previousInSubject = currentSubject.questionIndexes[currentPosition - 1];
+
+    if (previousInSubject !== undefined) {
+        return previousInSubject;
+    }
+
+    const previousSubject = subjects[currentSubjectIndex - 1];
+
+    return previousSubject ? previousSubject.questionIndexes[previousSubject.questionIndexes.length - 1] : currentIndex;
 }
 
 function deviceFingerprint() {

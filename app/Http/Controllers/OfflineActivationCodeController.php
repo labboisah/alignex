@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\OfflineActivationCode;
 use App\Models\OfflineServerActivation;
+use App\Services\PlanFeatureService;
 use App\Support\AccessControl;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,28 +24,12 @@ class OfflineActivationCodeController extends Controller
         $user = $request->user();
         $yearlyCode = $this->yearlyCodeForUser($user->id);
         $codes = OfflineActivationCode::query()
-            ->with(['creator:id,name,email', 'organization:id,name', 'cbtCenter:id,name'])
+            ->with(['creator:id,name,email', 'organization:id,name', 'cbtCenter:id,name', 'activations'])
             ->when(! $user->isSuperAdmin(), fn ($query) => $query->where('created_by_user_id', $user->id))
             ->latest()
             ->limit(100)
             ->get()
-            ->map(fn (OfflineActivationCode $code): array => [
-                'id' => $code->id,
-                'code' => $this->decryptCode($code),
-                'label' => $code->label,
-                'status' => $code->status,
-                'created_by' => $code->creator?->name,
-                'organization_name' => $code->organization?->name,
-                'center_name' => $code->cbtCenter?->name,
-                'activation_count' => $code->activation_count,
-                'max_activations' => $code->max_activations,
-                'expires_at' => $code->expires_at?->toISOString(),
-                'license_expires_at' => $code->license_expires_at?->toISOString(),
-                'last_activated_at' => $code->last_activated_at?->toISOString(),
-                'last_device_id' => $code->last_device_id,
-                'last_admin_email' => $code->last_admin_email,
-                'created_at' => $code->created_at?->toISOString(),
-            ]);
+            ->map(fn (OfflineActivationCode $code): array => $this->activationCodeRow($code));
 
         return Inertia::render('OfflineActivationCodes/Index', [
             'codes' => $codes,
@@ -68,6 +53,7 @@ class OfflineActivationCodeController extends Controller
                 'creator.cbtCenter:id,name',
                 'organization:id,name',
                 'cbtCenter:id,name',
+                'activations' => fn ($query) => $query->latest('activated_at'),
             ])
             ->latest()
             ->limit(200)
@@ -96,6 +82,7 @@ class OfflineActivationCodeController extends Controller
         }
 
         $plainCode = 'AX-OFFLINE-'.Str::upper(Str::random(6)).'-'.Str::upper(Str::random(6));
+        $maxDevices = $this->maxDeviceActivationsForUser($user);
 
         OfflineActivationCode::query()->create([
             'created_by_user_id' => $user->id,
@@ -105,7 +92,7 @@ class OfflineActivationCodeController extends Controller
             'code_hash' => Hash::make($plainCode),
             'code_encrypted' => Crypt::encryptString($plainCode),
             'status' => OfflineActivationCode::STATUS_ACTIVE,
-            'max_activations' => 1,
+            'max_activations' => $maxDevices,
             'activation_count' => 0,
             'expires_at' => null,
             'license_expires_at' => now()->addYear(),
@@ -143,6 +130,25 @@ class OfflineActivationCodeController extends Controller
             ->with('success', 'Activation code reset. It can now be used on another device.');
     }
 
+    public function removeDevice(Request $request, OfflineActivationCode $offlineActivationCode, OfflineServerActivation $activation): RedirectResponse
+    {
+        abort_unless($request->user()?->isSuperAdmin(), 403);
+        abort_unless((int) $activation->offline_activation_code_id === (int) $offlineActivationCode->id, 404);
+
+        DB::transaction(function () use ($offlineActivationCode, $activation): void {
+            $activation->forceFill([
+                'status' => 'revoked',
+                'updated_at' => now(),
+            ])->save();
+
+            $this->syncActivationCodeUsage($offlineActivationCode);
+        });
+
+        return redirect()
+            ->route('offline-activation-codes.reset-index')
+            ->with('success', 'Device removed. The activation code can now be used on another device.');
+    }
+
     private function decryptCode(OfflineActivationCode $code): string
     {
         if (! $code->code_encrypted) {
@@ -172,6 +178,11 @@ class OfflineActivationCodeController extends Controller
     {
         $creator = $code->creator;
         $owner = $this->activationOwner($code);
+        $activeActivations = $code->activations
+            ->where('status', 'activated')
+            ->values();
+        $activeCount = $activeActivations->count();
+        $maxActivations = max((int) $code->max_activations, 1);
 
         return [
             'id' => $code->id,
@@ -185,15 +196,80 @@ class OfflineActivationCodeController extends Controller
             'owner_name' => $owner['name'],
             'organization_name' => $code->organization?->name ?? $creator?->organization?->name,
             'center_name' => $code->cbtCenter?->name ?? $creator?->cbtCenter?->name ?? $creator?->center?->name,
-            'activation_count' => $code->activation_count,
-            'max_activations' => $code->max_activations,
+            'activation_count' => $activeCount,
+            'max_activations' => $maxActivations,
+            'remaining_activations' => max(0, $maxActivations - $activeCount),
             'license_expires_at' => $code->license_expires_at?->toISOString(),
             'last_activated_at' => $code->last_activated_at?->toISOString(),
             'last_device_id' => $code->last_device_id,
             'last_admin_email' => $code->last_admin_email,
             'created_at' => $code->created_at?->toISOString(),
-            'can_reset' => $code->activation_count > 0 || filled($code->last_device_id),
+            'can_reset' => $activeCount > 0 || filled($code->last_device_id),
+            'devices' => $activeActivations
+                ->map(fn (OfflineServerActivation $activation): array => [
+                    'id' => $activation->id,
+                    'device_id' => $activation->device_id,
+                    'admin_email' => $activation->admin_email,
+                    'center_name' => $activation->center_name,
+                    'status' => $activation->status,
+                    'activated_at' => $activation->activated_at?->toISOString(),
+                    'expires_at' => $activation->expires_at?->toISOString(),
+                ])
+                ->all(),
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function activationCodeRow(OfflineActivationCode $code): array
+    {
+        $activeCount = $code->activations->where('status', 'activated')->count();
+        $maxActivations = max((int) $code->max_activations, 1);
+
+        return [
+            'id' => $code->id,
+            'code' => $this->decryptCode($code),
+            'label' => $code->label,
+            'status' => $code->status,
+            'created_by' => $code->creator?->name,
+            'organization_name' => $code->organization?->name,
+            'center_name' => $code->cbtCenter?->name,
+            'activation_count' => $activeCount,
+            'max_activations' => $maxActivations,
+            'remaining_activations' => max(0, $maxActivations - $activeCount),
+            'expires_at' => $code->expires_at?->toISOString(),
+            'license_expires_at' => $code->license_expires_at?->toISOString(),
+            'last_activated_at' => $code->last_activated_at?->toISOString(),
+            'last_device_id' => $code->last_device_id,
+            'last_admin_email' => $code->last_admin_email,
+            'created_at' => $code->created_at?->toISOString(),
+        ];
+    }
+
+    private function maxDeviceActivationsForUser($user): int
+    {
+        $plan = app(PlanFeatureService::class)->planForUser($user);
+        $limit = data_get($plan?->limits ?? [], 'max_devices');
+
+        return is_numeric($limit) && (int) $limit > 0 ? (int) $limit : 1;
+    }
+
+    private function syncActivationCodeUsage(OfflineActivationCode $code): void
+    {
+        $activeActivations = OfflineServerActivation::query()
+            ->where('offline_activation_code_id', $code->id)
+            ->where('status', 'activated')
+            ->latest('activated_at')
+            ->get();
+        $latest = $activeActivations->first();
+
+        $code->forceFill([
+            'activation_count' => $activeActivations->count(),
+            'last_activated_at' => $latest?->activated_at,
+            'last_device_id' => $latest?->device_id,
+            'last_admin_email' => $latest?->admin_email,
+        ])->save();
     }
 
     /**

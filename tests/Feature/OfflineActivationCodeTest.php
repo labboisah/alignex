@@ -46,7 +46,7 @@ class OfflineActivationCodeTest extends TestCase
             'center_name' => 'Main Center',
         ];
 
-        $this->postJson('/api/offline/activate', [
+        $firstActivationResponse = $this->postJson('/api/offline/activate', [
             ...$payload,
             'device_id' => 'device-one',
         ])
@@ -54,6 +54,7 @@ class OfflineActivationCodeTest extends TestCase
             ->assertJsonPath('device_id', 'device-one')
             ->assertJsonPath('same_device', false);
 
+        $this->assertNotEmpty($firstActivationResponse->json('sync_token'));
         $this->assertSame(1, $activationCode->refresh()->activation_count);
         $this->assertSame('device-one', $activationCode->last_device_id);
 
@@ -101,6 +102,48 @@ class OfflineActivationCodeTest extends TestCase
 
         $this->assertSame(1, $activationCode->refresh()->activation_count);
         $this->assertSame('device-two', $activationCode->last_device_id);
+    }
+
+    public function test_revoked_device_activation_cannot_communicate_with_platform(): void
+    {
+        $admin = User::factory()->create([
+            'email' => 'admin@example.test',
+            'password' => Hash::make('secret-password'),
+            'role' => User::ROLE_SUPER_ADMIN,
+        ]);
+
+        $plainCode = 'AX-OFFLINE-REVOKE-TEST';
+        $activationCode = OfflineActivationCode::query()->create([
+            'created_by_user_id' => $admin->id,
+            'label' => 'Offline server activation',
+            'code_hash' => Hash::make($plainCode),
+            'code_encrypted' => Crypt::encryptString($plainCode),
+            'status' => OfflineActivationCode::STATUS_ACTIVE,
+            'max_activations' => 1,
+            'activation_count' => 0,
+            'license_expires_at' => now()->addYear(),
+        ]);
+
+        $activationResponse = $this->postJson('/api/offline/activate', [
+            'activation_code' => $plainCode,
+            'device_id' => 'device-one',
+            'admin_email' => 'admin@example.test',
+            'admin_password' => 'secret-password',
+            'center_name' => 'Main Center',
+        ])->assertOk();
+
+        $syncToken = $activationResponse->json('sync_token');
+
+        $activationCode->activations()->update(['status' => 'revoked']);
+
+        $this->getJson('/api/offline/updates', [
+            'Authorization' => "Bearer {$syncToken}",
+            'X-AlignEx-Device-Id' => 'device-one',
+            'X-AlignEx-Admin-Email' => 'admin@example.test',
+            'X-AlignEx-Admin-Password' => 'secret-password',
+        ])
+            ->assertForbidden()
+            ->assertJsonPath('message', 'This offline server device activation is not active. Reactivate it or restore the device from Manage Activation.');
     }
 
     public function test_super_admin_context_navigation_includes_manage_activation(): void

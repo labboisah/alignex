@@ -6,6 +6,7 @@ use App\Models\CandidateExamAttempt;
 use App\Services\CandidateExamSessionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
 
 class CandidateExamPayloadResource extends JsonResource
 {
@@ -32,6 +33,7 @@ class CandidateExamPayloadResource extends JsonResource
                 'full_name' => trim($attempt->candidate?->first_name.' '.$attempt->candidate?->last_name),
                 'registration_number' => $attempt->candidate?->candidate_number,
                 'phone' => $attempt->candidate?->phone,
+                'photo_url' => $this->candidatePhotoUrl($attempt),
             ],
             'exam' => [
                 'id' => $attempt->exam?->id,
@@ -66,5 +68,21 @@ class CandidateExamPayloadResource extends JsonResource
                 'saved_at' => $answer->saved_at?->toISOString(),
             ])->values(),
         ];
+    }
+
+    private function candidatePhotoUrl(CandidateExamAttempt $attempt): ?string
+    {
+        $candidate = $attempt->candidate;
+        $photoPath = $candidate?->metadata['photo_path'] ?? $candidate?->photo;
+
+        if (! filled($photoPath)) {
+            return null;
+        }
+
+        if (str_starts_with($photoPath, 'http://') || str_starts_with($photoPath, 'https://') || str_starts_with($photoPath, '/')) {
+            return $photoPath;
+        }
+
+        return Storage::url($photoPath);
     }
 }

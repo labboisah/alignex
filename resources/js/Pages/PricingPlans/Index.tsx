@@ -71,7 +71,7 @@ const blankForm: FormData = {
     max_candidates: '',
     max_exams_per_month: '',
     max_admin_users: '',
-    max_devices: '',
+    max_devices: '1',
     official_live_exam_allowed: true,
     is_active: true,
     is_featured: false,
@@ -212,8 +212,8 @@ export default function PricingPlansIndex({ plans }: { plans: { data: PricingPla
                             <Field label="Admin Users" error={errors.max_admin_users}>
                                 <input className={inputClass} type="number" min="1" value={data.max_admin_users} onChange={(event) => setData('max_admin_users', event.target.value)} />
                             </Field>
-                            <Field label="Center Devices" error={errors.max_devices}>
-                                <input className={inputClass} type="number" min="1" value={data.max_devices} onChange={(event) => setData('max_devices', event.target.value)} />
+                            <Field label="Device Activations" error={errors.max_devices}>
+                                <input className={inputClass} type="number" min="1" value={data.max_devices} onChange={(event) => setData('max_devices', event.target.value)} required />
                             </Field>
                         </div>
 
@@ -261,6 +261,7 @@ export default function PricingPlansIndex({ plans }: { plans: { data: PricingPla
                         { key: 'name', header: 'Plan', render: (plan) => <span className="font-semibold text-slateDark">{plan.name}</span> },
                         { key: 'price', header: 'Price', render: (plan) => `${plan.formatted_price} ${plan.billing_label}` },
                         { key: 'delivery_modes', header: 'Delivery', render: (plan) => (plan.delivery_modes ?? []).join(', ') || 'N/A' },
+                        { key: 'max_devices', header: 'Devices', render: (plan) => valueFromLimit(plan, 'max_devices') || '1' },
                         { key: 'registrations_count', header: 'Registrations', render: (plan) => String(plan.registrations_count ?? 0) },
                         { key: 'status', header: 'Status', render: (plan) => <StatusBadge label={plan.is_active ? 'Active' : 'Inactive'} tone={plan.is_active ? 'success' : 'neutral'} /> },
                         {

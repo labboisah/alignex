@@ -44,6 +44,7 @@ export default function ShowExam({ exam, can }: { exam: { data: Exam }; can: { u
                     <Metric label="Total Marks" value={String(record.total_marks)} />
                     <Metric label="Pass Mark" value={String(record.pass_mark)} />
                     <Metric label="Duration" value={`${record.duration_minutes} minutes`} />
+                    <Metric label="Subjects" value={String(record.subjects_count ?? record.subjects?.length ?? 0)} />
                     <Metric label="Participants" value={String(record.participants_count ?? 0)} />
                     <Metric label="Question Bank" value={record.question_bank_name ?? 'N/A'} />
                     <Metric label="Papers" value={record.paper_generation_status ?? '0 generated'} />

@@ -8,16 +8,24 @@ use App\Models\CandidateExamAttempt;
 use App\Models\Exam;
 use App\Models\Question;
 use App\Models\User;
+use App\Services\OfflineActivationGuard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class OfflineExamPackageController extends Controller
 {
+    public function __construct(private readonly OfflineActivationGuard $activationGuard)
+    {
+    }
+
     public function show(Request $request, string $examCode): JsonResponse
     {
+        $this->activationGuard->requireActive($request);
+
         $user = $this->authenticateSyncAdmin($request);
 
         if (! $user) {
@@ -82,6 +90,10 @@ class OfflineExamPackageController extends Controller
             ->filter()
             ->unique('id')
             ->values();
+        $ownerType = $this->ownerType($exam);
+        $unitLabel = $this->unitLabel($ownerType);
+        $unitType = $this->unitType($ownerType);
+        $ownerName = $this->ownerName($exam);
 
         $package = [
             'manifest' => [
@@ -89,7 +101,11 @@ class OfflineExamPackageController extends Controller
                 'exam_id' => (string) $exam->id,
                 'exam_code' => (string) $exam->code,
                 'title' => (string) $exam->title,
-                'organization_name' => $this->ownerName($exam),
+                'organization_name' => $ownerName,
+                'institution_name' => $ownerName,
+                'institution_type' => $ownerType,
+                'exam_context' => $ownerType,
+                'unit_label' => $unitLabel,
                 'center_id' => (string) ($exam->center_id ?? $exam->cbt_center_id ?? 'online'),
                 'start_at' => optional($exam->starts_at)->toISOString() ?? now()->toISOString(),
                 'end_at' => optional($exam->ends_at)->toISOString() ?? now()->addMinutes((int) $exam->duration_minutes)->toISOString(),
@@ -104,11 +120,20 @@ class OfflineExamPackageController extends Controller
                 'exam_id' => (string) $exam->id,
                 'name' => (string) $subject->name,
                 'code' => $subject->code ? (string) $subject->code : null,
+                'unit_type' => $unitType,
+            ])->values(),
+            'units' => $subjects->map(fn ($subject) => [
+                'id' => (string) $subject->id,
+                'exam_id' => (string) $exam->id,
+                'name' => (string) $subject->name,
+                'code' => $subject->code ? (string) $subject->code : null,
+                'unit_type' => $unitType,
             ])->values(),
             'questions' => $questions->values()->map(fn (Question $question, int $index) => [
                 'id' => (string) $question->id,
                 'exam_id' => (string) $exam->id,
                 'subject_id' => (string) $question->subject_id,
+                'unit_id' => (string) $question->subject_id,
                 'question_type' => $this->offlineQuestionType((string) $question->question_type),
                 'body' => (string) $question->stem,
                 'marks' => (float) $question->marks,
@@ -153,6 +178,7 @@ class OfflineExamPackageController extends Controller
                     'exam_id' => (string) $exam->id,
                     'candidate_no' => (string) $candidate->candidate_number,
                     'full_name' => trim($candidate->first_name.' '.$candidate->last_name),
+                    'photo_url' => $this->candidatePhotoUrl($candidate),
                     'access_code_hash' => (string) ($attempt?->access_code_hash ?: Hash::make('offline-'.$exam->id.'-'.$candidate->id)),
                     'group_name' => null,
                 ];
@@ -260,6 +286,49 @@ class OfflineExamPackageController extends Controller
             ?? $exam->center?->name
             ?? config('app.name', 'AlignEx')
         );
+    }
+
+    private function ownerType(Exam $exam): string
+    {
+        return $exam->owner_type ?? match (true) {
+            $exam->professional_school_id !== null => Exam::OWNER_PROFESSIONAL_SCHOOL,
+            $exam->secondary_school_id !== null || $exam->school_id !== null => Exam::OWNER_SECONDARY_SCHOOL,
+            $exam->cbt_center_id !== null || $exam->center_id !== null => Exam::OWNER_CBT_CENTER,
+            default => Exam::OWNER_ORGANIZATION,
+        };
+    }
+
+    private function unitLabel(string $ownerType): string
+    {
+        return match ($ownerType) {
+            Exam::OWNER_PROFESSIONAL_SCHOOL => 'Course',
+            Exam::OWNER_ORGANIZATION => 'Section',
+            default => 'Subject',
+        };
+    }
+
+    private function unitType(string $ownerType): string
+    {
+        return match ($ownerType) {
+            Exam::OWNER_PROFESSIONAL_SCHOOL => 'course',
+            Exam::OWNER_ORGANIZATION => 'section',
+            default => 'subject',
+        };
+    }
+
+    private function candidatePhotoUrl(Candidate $candidate): ?string
+    {
+        $photoPath = $candidate->metadata['photo_path'] ?? $candidate->photo;
+
+        if (! filled($photoPath)) {
+            return null;
+        }
+
+        if (str_starts_with($photoPath, 'http://') || str_starts_with($photoPath, 'https://')) {
+            return $photoPath;
+        }
+
+        return url(str_starts_with($photoPath, '/') ? $photoPath : Storage::url($photoPath));
     }
 
     private function offlineQuestionType(string $type): string

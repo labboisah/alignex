@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AppRelease;
 use App\Models\User;
+use App\Services\OfflineActivationGuard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -13,8 +14,14 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class OfflineUpdateController extends Controller
 {
+    public function __construct(private readonly OfflineActivationGuard $activationGuard)
+    {
+    }
+
     public function index(Request $request): JsonResponse
     {
+        $this->activationGuard->requireActive($request);
+
         if (! $this->authenticateSyncAdmin($request)) {
             return response()->json(['message' => 'Offline sync admin credentials are invalid.'], 401);
         }
@@ -29,6 +36,8 @@ class OfflineUpdateController extends Controller
 
     public function download(Request $request, string $artifact): BinaryFileResponse|JsonResponse
     {
+        $this->activationGuard->requireActive($request);
+
         if (! $this->authenticateSyncAdmin($request)) {
             return response()->json(['message' => 'Offline sync admin credentials are invalid.'], 401);
         }

@@ -35,6 +35,7 @@ class CandidateExamApiTest extends TestCase
         ])
             ->assertOk()
             ->assertJsonPath('candidate.registration_number', $candidate->candidate_number)
+            ->assertJsonPath('candidate.photo_url', '/storage/candidate-photos/reg-100.jpg')
             ->assertJsonMissing(['is_correct' => true]);
 
         $token = $login->json('exam_token');
@@ -305,24 +306,26 @@ class CandidateExamApiTest extends TestCase
                 'allow_back_navigation' => true,
             ], $settings),
         ]);
-        ExamSubject::factory()->create([
-            'exam_id' => $exam->id,
-            'subject_id' => $subject->id,
-            'question_count' => 2,
-            'marks_per_question' => 1,
-            'total_marks' => 2,
-            'difficulty_distribution' => null,
-            'selection_rules' => null,
-        ]);
         $candidate = Candidate::factory()->create([
             'organization_id' => $organization->id,
             'candidate_number' => 'REG-100',
             'phone' => '08030000000',
+            'metadata' => ['photo_path' => 'candidate-photos/reg-100.jpg'],
         ]);
         $exam->candidates()->attach($candidate->id, ['status' => 'assigned']);
         $bank = QuestionBank::factory()->create([
             'organization_id' => $organization->id,
             'subject_id' => $subject->id,
+        ]);
+        ExamSubject::factory()->create([
+            'exam_id' => $exam->id,
+            'subject_id' => $subject->id,
+            'question_bank_id' => $bank->id,
+            'question_count' => 2,
+            'marks_per_question' => 1,
+            'total_marks' => 2,
+            'difficulty_distribution' => null,
+            'selection_rules' => null,
         ]);
 
         for ($questionIndex = 1; $questionIndex <= 3; $questionIndex++) {

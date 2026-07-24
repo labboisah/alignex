@@ -31,6 +31,7 @@ export default function ExamsIndex({ exams, can }: { exams: { data: Exam[] }; ca
                     { key: 'exam_code', header: 'Code' },
                     { key: 'exam_type_label', header: 'Type', render: (exam) => exam.exam_type_label ?? exam.exam_type },
                     { key: 'delivery_mode', header: 'Delivery' },
+                    { key: 'subjects_count', header: 'Subjects', render: (exam) => String(exam.subjects_count ?? 0) },
                     { key: 'start_at', header: 'Start' },
                     { key: 'total_marks', header: 'Marks', render: (exam) => String(exam.total_marks) },
                     { key: 'status', header: 'Status', render: (exam) => <StatusBadge label={exam.status_label} tone={exam.status === 'active' ? 'success' : exam.status === 'cancelled' ? 'danger' : exam.status === 'scheduled' ? 'info' : 'neutral'} /> },

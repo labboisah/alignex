@@ -64,6 +64,7 @@
       "exam_id": "exam-2026-demo-001",
       "candidate_no": "CAND-001",
       "full_name": "Ada Okafor",
+      "photo_url": "https://portal.example.test/storage/candidate-photos/cand-001.jpg",
       "access_code_hash": "$argon2id$hash-placeholder-001",
       "group_name": "Batch A"
     },
@@ -72,6 +73,7 @@
       "exam_id": "exam-2026-demo-001",
       "candidate_no": "CAND-002",
       "full_name": "Musa Bello",
+      "photo_url": null,
       "access_code_hash": "$argon2id$hash-placeholder-002",
       "group_name": "Batch A"
     }

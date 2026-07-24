@@ -1,0 +1,1 @@
+import{j as a}from"./app-D2sgyu3-.js";import{c as e}from"./button-BIteDXOg.js";function i({compact:o=!1,className:s}){return a.jsx("div",{className:e("flex items-center gap-3",s),children:a.jsx("img",{src:o?"/images/logo.png":"/images/brand-logo.png",alt:"AlignEx",className:o?"h-10 w-10 object-contain":"h-12 w-auto max-w-[190px] object-contain"})})}export{i as A};

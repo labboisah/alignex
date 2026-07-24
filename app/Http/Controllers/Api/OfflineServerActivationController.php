@@ -53,18 +53,20 @@ class OfflineServerActivationController extends Controller
             return response()->json(['message' => 'This admin is not allowed to activate this offline server.'], 403);
         }
 
-        if ($activationCode->activations()->where('status', 'activated')->where('device_id', '!=', $validated['device_id'])->exists()) {
-            return response()->json(['message' => 'This activation code has already been used on another device. Reset it from the portal before activating a different device.'], 409);
-        }
-
         $existingDeviceActivation = $activationCode->activations()
             ->where('status', 'activated')
             ->where('device_id', $validated['device_id'])
             ->latest()
             ->first();
 
-        if (! $existingDeviceActivation && $activationCode->activation_count >= $activationCode->max_activations) {
-            return response()->json(['message' => 'Activation code has reached its activation limit.'], 409);
+        $maxDevices = max((int) $activationCode->max_activations, 1);
+        $activeDeviceCount = $activationCode->activations()
+            ->where('status', 'activated')
+            ->when($existingDeviceActivation, fn ($query) => $query->whereKeyNot($existingDeviceActivation->id))
+            ->count();
+
+        if (! $existingDeviceActivation && $activeDeviceCount >= $maxDevices) {
+            return response()->json(['message' => "Activation code has reached its device limit ({$maxDevices}). Remove an old device from Manage Activation before activating another device."], 409);
         }
 
         $activation = DB::transaction(function () use ($activationCode, $validated, $request, $existingDeviceActivation, $adminEmail): OfflineServerActivation {
@@ -94,11 +96,17 @@ class OfflineServerActivationController extends Controller
                 ],
             );
 
+            $activeActivations = $activationCode->activations()
+                ->where('status', 'activated')
+                ->latest('activated_at')
+                ->get();
+            $latest = $activeActivations->first();
+
             $activationCode->forceFill([
-                'activation_count' => $existingDeviceActivation ? $activationCode->activation_count : $activationCode->activation_count + 1,
-                'last_activated_at' => $now,
-                'last_device_id' => $validated['device_id'],
-                'last_admin_email' => $adminEmail,
+                'activation_count' => $activeActivations->count(),
+                'last_activated_at' => $latest?->activated_at,
+                'last_device_id' => $latest?->device_id,
+                'last_admin_email' => $latest?->admin_email,
             ])->save();
 
             return $activation;
@@ -114,7 +122,7 @@ class OfflineServerActivationController extends Controller
             'center_name' => $activation->cbtCenter?->name ?? $activation->center_name ?? 'Offline Center',
             'center_id' => $activation->cbt_center_id ? (string) $activation->cbt_center_id : null,
             'portal_url' => $request->root(),
-            'sync_token' => null,
+            'sync_token' => $activation->license_key,
             'plan' => $planFeatures->planSummaryForOwner($planOwner),
             'plan_features' => $planFeatures->featuresForOwner($planOwner),
             'admin_name' => $admin->name,

@@ -78,7 +78,7 @@ class PricingPlanController extends Controller
             'max_candidates' => ['nullable', 'integer', 'min:1', 'max:100000000'],
             'max_exams_per_month' => ['nullable', 'integer', 'min:1', 'max:1000000'],
             'max_admin_users' => ['nullable', 'integer', 'min:1', 'max:1000000'],
-            'max_devices' => ['nullable', 'integer', 'min:1', 'max:1000000'],
+            'max_devices' => ['required', 'integer', 'min:1', 'max:1000000'],
             'official_live_exam_allowed' => ['boolean'],
             'is_active' => ['boolean'],
             'is_featured' => ['boolean'],
@@ -96,7 +96,7 @@ class PricingPlanController extends Controller
             'max_candidates' => $validated['max_candidates'] ?? null,
             'max_exams_per_month' => $validated['max_exams_per_month'] ?? null,
             'max_admin_users' => $validated['max_admin_users'] ?? null,
-            'max_devices' => $validated['max_devices'] ?? null,
+            'max_devices' => $validated['max_devices'],
         ];
         $featureFlags = collect($validated['feature_flags'] ?? [])
             ->flip()

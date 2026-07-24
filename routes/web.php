@@ -72,6 +72,9 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
     Route::post('/admin/manage-activation/{offlineActivationCode}/reset', [OfflineActivationCodeController::class, 'reset'])
         ->middleware('role:super_admin')
         ->name('offline-activation-codes.reset');
+    Route::delete('/admin/manage-activation/{offlineActivationCode}/devices/{activation}', [OfflineActivationCodeController::class, 'removeDevice'])
+        ->middleware('role:super_admin')
+        ->name('offline-activation-codes.devices.destroy');
     Route::get('/platform/offline-activation-resets', fn () => redirect()->route('offline-activation-codes.reset-index'))
         ->middleware('role:super_admin');
     Route::patch('/current-context', [CurrentContextController::class, 'update'])->name('current-context.update');
