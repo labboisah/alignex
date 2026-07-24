@@ -11,17 +11,24 @@ export type PortalNavItem = {
     children?: PortalNavItem[];
 };
 
-export function PortalSidebar({ items, className }: { items: PortalNavItem[]; className?: string }) {
+export function PortalSidebar({ items, className, mode = 'desktop' }: { items: PortalNavItem[]; className?: string; mode?: 'desktop' | 'mobile' }) {
     const { url, props } = usePage();
     const context = props.current_context as { type?: string } | null | undefined;
     const terms = getContextTerminology(context?.type);
 
     return (
-        <aside className={cn('hidden min-h-screen w-64 border-r border-border bg-white lg:block', className)}>
+        <aside
+            className={cn(
+                mode === 'desktop'
+                    ? 'hidden min-h-screen w-64 border-r border-border bg-white lg:block'
+                    : 'block h-full min-h-0 w-72 border-r border-border bg-white shadow-xl',
+                className,
+            )}
+        >
             <div className="flex h-16 items-center border-b border-border px-5">
                 <AppLogo />
             </div>
-            <nav className="space-y-1 p-3">
+            <nav className="max-h-[calc(100vh-4rem)] space-y-1 overflow-y-auto p-3">
                 {items.map((item) => {
                     const Icon = item.icon;
                     const childActive = item.children?.some((child) => isActive(url, child.href)) ?? false;

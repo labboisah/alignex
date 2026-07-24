@@ -16,12 +16,14 @@ import {
     ShieldCheck,
     SlidersHorizontal,
     Users,
+    X,
 } from 'lucide-react';
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { PortalNavItem, PortalSidebar } from './PortalSidebar';
 import { PortalTopbar } from './PortalTopbar';
 import { AlertBanner } from './AlertBanner';
 import { SetupGuide, SetupGuideIndicator } from './SetupGuideIndicator';
+import { Button } from '@/Components/ui/button';
 
 const iconByLabel = {
     Dashboard: LayoutDashboard,
@@ -129,13 +131,14 @@ export function PortalAppShell({
     const setupGuide = pageProps.auth?.setup_guide ?? null;
     const flash = pageProps.flash;
     const resolvedItems = navItems ?? sharedNav.map(resolveNavItem);
+    const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
     return (
         <div className="min-h-screen bg-surface text-slateDark">
             <div className="lg:flex">
                 <PortalSidebar items={resolvedItems} />
                 <div className="min-w-0 flex-1">
-                    <PortalTopbar title={title} actions={topbarActions} />
+                    <PortalTopbar title={title} actions={topbarActions} onMobileMenuClick={() => setMobileNavOpen(true)} />
                     <main className="px-4 py-6 lg:px-6">
                         {(flash?.success || flash?.error) && (
                             <div className="mb-5">
@@ -148,6 +151,30 @@ export function PortalAppShell({
                     <SetupGuideIndicator guide={setupGuide} />
                 </div>
             </div>
+            {mobileNavOpen && (
+                <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true">
+                    <button
+                        type="button"
+                        className="absolute inset-0 bg-slate-950/40"
+                        aria-label="Close navigation menu"
+                        onClick={() => setMobileNavOpen(false)}
+                    />
+                    <div className="relative h-full w-72 max-w-[85vw]">
+                        <div className="absolute right-3 top-3 z-10">
+                            <Button
+                                variant="ghost"
+                                type="button"
+                                className="h-10 w-10 bg-white px-0"
+                                onClick={() => setMobileNavOpen(false)}
+                                aria-label="Close navigation menu"
+                            >
+                                <X className="h-5 w-5" />
+                            </Button>
+                        </div>
+                        <PortalSidebar items={resolvedItems} mode="mobile" />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
