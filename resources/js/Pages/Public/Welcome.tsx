@@ -1,4 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
+import { useState } from 'react';
 import {
     Activity,
     ArrowRight,
@@ -13,6 +14,7 @@ import {
     GraduationCap,
     Laptop,
     LockKeyhole,
+    Menu,
     MonitorDot,
     RadioTower,
     ShieldCheck,
@@ -20,6 +22,7 @@ import {
     TabletSmartphone,
     Users,
     WifiOff,
+    X,
 } from 'lucide-react';
 import { Button } from '@/Components/ui/button';
 import { StatusBadge } from '@/Components/Platform';
@@ -152,33 +155,81 @@ export default function PublicWelcome({ landing = {} }: { landing?: LandingConte
 }
 
 function Navbar() {
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const navLinks = [
+        { href: '#overview', label: 'Overview' },
+        { href: '#solutions', label: 'Solutions' },
+        { href: '#delivery', label: 'Delivery' },
+        { href: '#security', label: 'Security' },
+        { href: '#workflow', label: 'Workflow' },
+    ];
+
     return (
         <header className="sticky top-0 z-30 border-b border-border bg-white/95 backdrop-blur">
-            <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 lg:px-8">
-                <Link href="/" className="flex items-center gap-3">
-                    <img src="/images/brand-logo.png" alt="AlignEx" className="h-12 w-auto max-w-[190px] object-contain" />
-                </Link>
-                <div className="hidden items-center gap-6 text-sm font-semibold text-slate-600 md:flex">
-                    <a href="#overview" className="hover:text-primary">Overview</a>
-                    <a href="#solutions" className="hover:text-primary">Solutions</a>
-                    <a href="#delivery" className="hover:text-primary">Delivery</a>
-                    <a href="#security" className="hover:text-primary">Security</a>
-                    <a href="#workflow" className="hover:text-primary">Workflow</a>
+            <nav className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <div className="flex h-16 items-center justify-between">
+                    <Link href="/" className="flex min-w-0 items-center gap-3">
+                        <img src="/images/brand-logo.png" alt="AlignEx" className="h-10 w-auto max-w-[150px] object-contain sm:h-12 sm:max-w-[190px]" />
+                    </Link>
+                    <div className="hidden items-center gap-6 text-sm font-semibold text-slate-600 lg:flex">
+                        {navLinks.map((link) => (
+                            <a key={link.href} href={link.href} className="hover:text-primary">{link.label}</a>
+                        ))}
+                    </div>
+                    <div className="hidden items-center gap-2 md:flex">
+                        <Button asChild variant="ghost">
+                            <Link href="/login">Login</Link>
+                        </Button>
+                        <Button asChild variant="ghost" className="hidden xl:inline-flex">
+                            <Link href="/verify-certificate">Verify Certificate</Link>
+                        </Button>
+                        <Button asChild variant="secondary">
+                            <Link href="/exam/login">Candidate Exam</Link>
+                        </Button>
+                        <Button asChild>
+                            <Link href="/register-admin">Register</Link>
+                        </Button>
+                    </div>
+                    <button
+                        type="button"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-border bg-white text-slate-700 md:hidden"
+                        aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+                        aria-expanded={mobileMenuOpen}
+                        onClick={() => setMobileMenuOpen((open) => !open)}
+                    >
+                        {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                    </button>
                 </div>
-                <div className="flex items-center gap-2">
-                    <Button asChild variant="ghost" className="hidden sm:inline-flex">
-                        <Link href="/login">Login</Link>
-                    </Button>
-                    <Button asChild variant="ghost" className="hidden xl:inline-flex">
-                        <Link href="/verify-certificate">Verify Certificate</Link>
-                    </Button>
-                    <Button asChild variant="secondary" className="hidden sm:inline-flex">
-                        <Link href="/exam/login">Candidate Exam</Link>
-                    </Button>
-                    <Button asChild>
-                        <Link href="/register-admin">Register</Link>
-                    </Button>
-                </div>
+                {mobileMenuOpen && (
+                    <div className="border-t border-border py-4 md:hidden">
+                        <div className="grid gap-1 text-sm font-semibold text-slate-600">
+                            {navLinks.map((link) => (
+                                <a
+                                    key={link.href}
+                                    href={link.href}
+                                    className="rounded-md px-3 py-2 hover:bg-green-50 hover:text-primary"
+                                    onClick={() => setMobileMenuOpen(false)}
+                                >
+                                    {link.label}
+                                </a>
+                            ))}
+                        </div>
+                        <div className="mt-4 grid gap-2">
+                            <Button asChild variant="secondary" className="w-full justify-center">
+                                <Link href="/login">Login</Link>
+                            </Button>
+                            <Button asChild variant="secondary" className="w-full justify-center">
+                                <Link href="/exam/login">Candidate Exam</Link>
+                            </Button>
+                            <Button asChild variant="secondary" className="w-full justify-center">
+                                <Link href="/verify-certificate">Verify Certificate</Link>
+                            </Button>
+                            <Button asChild className="w-full justify-center">
+                                <Link href="/register-admin">Register Institution</Link>
+                            </Button>
+                        </div>
+                    </div>
+                )}
             </nav>
         </header>
     );
@@ -187,30 +238,30 @@ function Navbar() {
 function HeroSection({ hero, metrics, activity, candidateMockup }: { hero: Required<NonNullable<LandingContent['hero']>>; metrics: LandingMetric[]; activity: NonNullable<LandingContent['activity']>; candidateMockup: NonNullable<LandingContent['candidateMockup']> }) {
     return (
         <section id="overview" className="border-b border-border bg-white">
-            <div className="mx-auto grid max-w-7xl gap-10 px-6 py-16 lg:grid-cols-[0.95fr_1.05fr] lg:px-8 lg:py-20">
+            <div className="mx-auto grid max-w-7xl gap-10 px-4 py-10 sm:px-6 sm:py-14 lg:grid-cols-[0.95fr_1.05fr] lg:px-8 lg:py-20">
                 <div className="flex flex-col justify-center">
-                    <img src="/images/brand-logo.png" alt="AlignEx" className="mb-8 h-20 w-fit max-w-full object-contain" />
+                    <img src="/images/brand-logo.png" alt="AlignEx" className="mb-6 h-16 w-fit max-w-full object-contain sm:mb-8 sm:h-20" />
                     <div className="mb-5 inline-flex w-fit items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-1 text-sm font-semibold text-primary">
                         <ShieldCheck className="h-4 w-4" />
                         {hero.eyebrow}
                     </div>
-                    <h1 className="max-w-4xl text-4xl font-bold leading-tight text-primaryDark sm:text-5xl lg:text-6xl">
+                    <h1 className="max-w-4xl text-3xl font-bold leading-tight text-primaryDark sm:text-5xl lg:text-6xl">
                         {hero.title}
                     </h1>
                     <p className="mt-6 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg">
                         {hero.description}
                     </p>
-                    <div className="mt-8 flex flex-wrap gap-3">
-                        <Button asChild className="h-11">
+                    <div className="mt-8 grid gap-3 sm:flex sm:flex-wrap">
+                        <Button asChild className="h-11 w-full justify-center sm:w-auto">
                             <Link href="/dashboard">Explore Platform <ArrowRight className="h-4 w-4" /></Link>
                         </Button>
-                        <Button asChild variant="secondary" className="h-11">
+                        <Button asChild variant="secondary" className="h-11 w-full justify-center sm:w-auto">
                             <Link href="/exam/login">Write Exam</Link>
                         </Button>
-                        <Button asChild variant="secondary" className="h-11">
+                        <Button asChild variant="secondary" className="h-11 w-full justify-center sm:w-auto">
                             <Link href="/verify-certificate">Verify Certificate</Link>
                         </Button>
-                        <Button asChild variant="secondary" className="h-11">
+                        <Button asChild variant="secondary" className="h-11 w-full justify-center sm:w-auto">
                             <a href="#delivery">See Delivery Flow</a>
                         </Button>
                     </div>
@@ -231,8 +282,8 @@ function HeroSection({ hero, metrics, activity, candidateMockup }: { hero: Requi
 
 function HeroMockup({ metrics, activity, candidateMockup }: { metrics: LandingMetric[]; activity: NonNullable<LandingContent['activity']>; candidateMockup: NonNullable<LandingContent['candidateMockup']> }) {
     return (
-        <div className="relative min-h-[440px]" id="mockups">
-            <div className="absolute left-0 top-0 w-[86%] rounded-lg border border-border bg-white shadow-xl">
+        <div className="relative grid gap-4 sm:min-h-[440px]" id="mockups">
+            <div className="relative rounded-lg border border-border bg-white shadow-xl sm:absolute sm:left-0 sm:top-0 sm:w-[86%]">
                 <MockupChrome title="Admin Dashboard" />
                 <div className="grid gap-4 p-4 sm:grid-cols-3">
                     {metrics.slice(0, 3).map(({ label, value }) => (
@@ -254,10 +305,10 @@ function HeroMockup({ metrics, activity, candidateMockup }: { metrics: LandingMe
                     </div>
                 </div>
             </div>
-            <div className="absolute bottom-6 right-0 w-[68%] rounded-lg border border-border bg-white shadow-xl">
+            <div className="relative rounded-lg border border-border bg-white shadow-xl sm:absolute sm:bottom-6 sm:right-0 sm:w-[68%]">
                 <MockupChrome title="Candidate Exam" compact />
                 <div className="p-4">
-                    <div className="flex items-center justify-between border-b border-border pb-3">
+                    <div className="flex flex-col gap-3 border-b border-border pb-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <div className="text-xs font-semibold text-primary">{candidateMockup.question_label}</div>
                             <div className="mt-1 text-sm font-bold">{candidateMockup.title}</div>
