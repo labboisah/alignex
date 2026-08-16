@@ -6,6 +6,7 @@ use App\Models\Candidate;
 use App\Models\CandidateExamAttempt;
 use App\Models\Center;
 use App\Models\Exam;
+use App\Models\Institution;
 use App\Models\Organization;
 use App\Models\Question;
 use App\Models\QuestionBank;
@@ -29,7 +30,7 @@ class PublicWelcomeController extends Controller
         $questionBanks = QuestionBank::query()->count();
         $questions = Question::query()->count();
         $subjects = Subject::query()->count();
-        $institutions = Organization::query()->count() + School::query()->count() + Center::query()->count();
+        $institutions = Institution::query()->count() + Organization::query()->count() + School::query()->count() + Center::query()->count();
         $attempts = CandidateExamAttempt::query()->count();
         $submittedAttempts = CandidateExamAttempt::query()
             ->whereIn('status', [

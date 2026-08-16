@@ -14,6 +14,13 @@ const terminology: Record<string, ContextTerminology> = {
         examLabel: 'Organization Exam',
         resultDocument: 'Result / Certificate',
     },
+    institution: {
+        learnerSingular: 'Student / Candidate',
+        learnerPlural: 'Students / Candidates',
+        questionStructure: 'Faculty / Department / Programme / Course / Question Bank',
+        examLabel: 'Institution Exam',
+        resultDocument: 'Academic Result / Certificate',
+    },
     secondary_school: {
         learnerSingular: 'Student',
         learnerPlural: 'Students',

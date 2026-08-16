@@ -13,6 +13,8 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExamController;
 use App\Http\Controllers\ExamMonitorController;
 use App\Http\Controllers\ExamPaperController;
+use App\Http\Controllers\InstitutionController;
+use App\Http\Controllers\InstitutionStructureController;
 use App\Http\Controllers\OfflineActivationCodeController;
 use App\Http\Controllers\OfflineServerDownloadController;
 use App\Http\Controllers\OrganizationController;
@@ -138,6 +140,24 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
     Route::get('/organizations/{organization}', [OrganizationController::class, 'show'])
         ->middleware('role:super_admin,organization_admin')
         ->name('organizations.show');
+
+    Route::middleware(['role:super_admin,institution_admin', 'permission:manageSchools'])->group(function (): void {
+        Route::get('/institutions', [InstitutionController::class, 'index'])->name('institutions.index');
+        Route::get('/institutions/create', [InstitutionController::class, 'create'])->name('institutions.create');
+        Route::post('/institutions', [InstitutionController::class, 'store'])->name('institutions.store');
+        Route::get('/institutions/{institution}', [InstitutionController::class, 'show'])->name('institutions.show');
+        Route::get('/institutions/{institution}/edit', [InstitutionController::class, 'edit'])->name('institutions.edit');
+        Route::patch('/institutions/{institution}', [InstitutionController::class, 'update'])->name('institutions.update');
+        Route::patch('/institutions/{institution}/deactivate', [InstitutionController::class, 'deactivate'])->name('institutions.deactivate');
+        Route::get('/institutions/{institution}/faculties', [InstitutionStructureController::class, 'faculties'])->name('institutions.faculties.index');
+        Route::post('/institutions/{institution}/faculties', [InstitutionStructureController::class, 'storeFaculty'])->name('institutions.faculties.store');
+        Route::get('/institutions/{institution}/departments', [InstitutionStructureController::class, 'departments'])->name('institutions.departments.index');
+        Route::post('/institutions/{institution}/departments', [InstitutionStructureController::class, 'storeDepartment'])->name('institutions.departments.store');
+        Route::get('/institutions/{institution}/programmes', [InstitutionStructureController::class, 'programmes'])->name('institutions.programmes.index');
+        Route::post('/institutions/{institution}/programmes', [InstitutionStructureController::class, 'storeProgramme'])->name('institutions.programmes.store');
+        Route::get('/institutions/{institution}/courses', [InstitutionStructureController::class, 'courses'])->name('institutions.courses.index');
+        Route::post('/institutions/{institution}/courses', [InstitutionStructureController::class, 'storeCourse'])->name('institutions.courses.store');
+    });
 
     Route::middleware(['role:super_admin,organization_admin,secondary_school_admin,school_admin,examiner', 'permission:manageSchools'])->group(function (): void {
         Route::get('/secondary-schools', [SecondarySchoolController::class, 'list'])->name('secondary-schools.index');

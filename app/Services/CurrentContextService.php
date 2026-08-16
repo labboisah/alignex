@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\CbtCenter;
+use App\Models\Institution;
 use App\Models\Organization;
 use App\Models\ProfessionalSchool;
 use App\Models\SecondarySchool;
@@ -12,7 +13,7 @@ use Illuminate\Validation\ValidationException;
 
 class CurrentContextService
 {
-    public const TYPES = ['organization', 'secondary_school', 'professional_school', 'cbt_center'];
+    public const TYPES = ['organization', 'institution', 'secondary_school', 'professional_school', 'cbt_center'];
 
     /**
      * @return array{type: string, id: int, name: string, source?: string}|null
@@ -76,6 +77,10 @@ class CurrentContextService
             $contexts->push($this->row('cbt_center', $user->center_id, $user->center->name, 'legacy_center'));
         }
 
+        if ($user->institution_id && $user->institution) {
+            $contexts->push($this->row('institution', $user->institution_id, $user->institution->name));
+        }
+
         if ($user->organization_id && $user->organization) {
             $organizationContexts = collect([$this->row('organization', $user->organization_id, $user->organization->name)])
                 ->merge($user->organization->secondarySchools()->orderBy('name')->get(['id', 'name'])->map(fn ($row) => $this->row('secondary_school', $row->id, $row->name)))
@@ -117,6 +122,7 @@ class CurrentContextService
     {
         return collect()
             ->merge(Organization::query()->orderBy('name')->limit(30)->get(['id', 'name'])->map(fn ($row) => $this->row('organization', $row->id, $row->name)))
+            ->merge(Institution::query()->orderBy('name')->limit(30)->get(['id', 'name'])->map(fn ($row) => $this->row('institution', $row->id, $row->name)))
             ->merge(SecondarySchool::query()->orderBy('name')->limit(30)->get(['id', 'name'])->map(fn ($row) => $this->row('secondary_school', $row->id, $row->name)))
             ->merge(ProfessionalSchool::query()->orderBy('name')->limit(30)->get(['id', 'name'])->map(fn ($row) => $this->row('professional_school', $row->id, $row->name)))
             ->merge(CbtCenter::query()->orderBy('name')->limit(30)->get(['id', 'name'])->map(fn ($row) => $this->row('cbt_center', $row->id, $row->name)))

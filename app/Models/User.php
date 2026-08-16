@@ -16,7 +16,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'role', 'status', 'organization_id', 'center_id', 'school_id', 'secondary_school_id', 'professional_school_id', 'cbt_center_id', 'active_context_type', 'active_context_id', 'password'])]
+#[Fillable(['name', 'email', 'role', 'status', 'organization_id', 'institution_id', 'faculty_id', 'department_id', 'center_id', 'school_id', 'secondary_school_id', 'professional_school_id', 'cbt_center_id', 'active_context_type', 'active_context_id', 'password'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -25,6 +25,7 @@ class User extends Authenticatable
 
     public const ROLE_SUPER_ADMIN = 'super_admin';
     public const ROLE_ORGANIZATION_ADMIN = 'organization_admin';
+    public const ROLE_INSTITUTION_ADMIN = 'institution_admin';
     public const ROLE_CENTER_ADMIN = 'center_admin';
     public const ROLE_SCHOOL_ADMIN = 'school_admin';
     public const ROLE_SECONDARY_SCHOOL_ADMIN = 'secondary_school_admin';
@@ -48,6 +49,7 @@ class User extends Authenticatable
     public const PORTAL_ROLES = [
         self::ROLE_SUPER_ADMIN,
         self::ROLE_ORGANIZATION_ADMIN,
+        self::ROLE_INSTITUTION_ADMIN,
         self::ROLE_CENTER_ADMIN,
         self::ROLE_SCHOOL_ADMIN,
         self::ROLE_SECONDARY_SCHOOL_ADMIN,
@@ -75,6 +77,21 @@ class User extends Authenticatable
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    public function institution(): BelongsTo
+    {
+        return $this->belongsTo(Institution::class);
+    }
+
+    public function faculty(): BelongsTo
+    {
+        return $this->belongsTo(Faculty::class);
+    }
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class);
     }
 
     public function center(): BelongsTo
@@ -173,6 +190,11 @@ class User extends Authenticatable
     public function isOrganizationAdmin(): bool
     {
         return $this->role === self::ROLE_ORGANIZATION_ADMIN;
+    }
+
+    public function isInstitutionAdmin(): bool
+    {
+        return $this->role === self::ROLE_INSTITUTION_ADMIN;
     }
 
     public function isExaminer(): bool
@@ -363,6 +385,7 @@ class User extends Authenticatable
         return match ($this->role) {
             self::ROLE_SUPER_ADMIN,
             self::ROLE_ORGANIZATION_ADMIN,
+            self::ROLE_INSTITUTION_ADMIN,
             self::ROLE_CENTER_ADMIN,
             self::ROLE_SCHOOL_ADMIN,
             self::ROLE_SECONDARY_SCHOOL_ADMIN,

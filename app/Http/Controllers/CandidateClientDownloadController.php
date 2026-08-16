@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AppRelease;
+use App\Support\AppArtifactFile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -24,7 +25,7 @@ class CandidateClientDownloadController extends Controller
             ? AppRelease::query()->latestActiveFor(AppRelease::ARTIFACT_CLIENT_APP)->first()
             : null;
 
-        if ($release && is_file($release->absolutePath()) && filesize($release->absolutePath()) > 0) {
+        if ($release && AppArtifactFile::isDownloadable($release->absolutePath(), AppRelease::ARTIFACT_CLIENT_APP)) {
             return response()->download($release->absolutePath(), $release->filename, [
                 'Content-Type' => 'application/octet-stream',
             ]);
@@ -37,7 +38,7 @@ class CandidateClientDownloadController extends Controller
             ...(glob($this->candidateAppPath('dist-release/AlignEx-Client-App-Setup-*.exe')) ?: []),
             ...(glob($this->candidateAppPath('dist-release/AlignEx-Candidate-Client-Setup-*.exe')) ?: []),
         ])
-            ->filter(fn (string $path): bool => is_file($path))
+            ->filter(fn (string $path): bool => AppArtifactFile::isDownloadable($path, AppRelease::ARTIFACT_CLIENT_APP))
             ->sortByDesc(fn (string $path): int => filemtime($path) ?: 0)
             ->first();
 

@@ -1,5 +1,5 @@
 export type EntityType = {
-    value: 'organization' | 'secondary_school' | 'professional_school' | 'cbt_center';
+    value: 'organization' | 'institution' | 'secondary_school' | 'professional_school' | 'cbt_center';
     label: string;
     description: string;
 };
@@ -14,7 +14,7 @@ export type RegistrationPlan = {
 
 export type AdminRegistration = Record<string, unknown> & {
     id: number;
-    entity_type: 'organization' | 'school' | 'secondary_school' | 'professional_school' | 'center' | 'cbt_center';
+    entity_type: 'organization' | 'institution' | 'school' | 'secondary_school' | 'professional_school' | 'center' | 'cbt_center';
     entity_type_label: string;
     entity_id?: number | null;
     pricing_plan_id?: number | null;

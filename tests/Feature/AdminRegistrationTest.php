@@ -62,6 +62,79 @@ class AdminRegistrationTest extends TestCase
         $this->assertDatabaseMissing('organizations', ['code' => 'EXAM-NGO']);
     }
 
+    public function test_guest_can_submit_institution_admin_registration_request(): void
+    {
+        $this->post('/register-admin', [
+            'entity_type' => AdminRegistrationRequest::TYPE_INSTITUTION,
+            'admin_name' => 'Institution Admin',
+            'admin_email' => 'institution-admin@example.test',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+            'entity_name' => 'Niger Delta University',
+            'entity_code' => 'NDU',
+            'location' => 'Wilberforce Island, Bayelsa',
+            'capacity' => 12000,
+            'contact_person' => 'Registrar Office',
+            'phone' => '08030000022',
+            'entity_email' => 'registrar@ndu.test',
+            'address' => 'Wilberforce Island, Bayelsa State',
+            'legal_registration_number' => 'NDU-2026',
+            'website' => 'https://ndu.test',
+            'years_in_operation' => 25,
+            'operating_scope' => 'National',
+            'accreditation_body' => 'National University Commission',
+            'accreditation_number' => 'NUC-0001',
+            'facility_summary' => 'Academic blocks, library, labs, and ICT centres.',
+            'exam_experience' => 'Runs semester and professional certificate exams.',
+            'expected_candidates' => 6000,
+        ])->assertRedirect(route('admin-registrations.thank-you', absolute: false));
+
+        $this->assertDatabaseHas('admin_registration_requests', [
+            'entity_type' => AdminRegistrationRequest::TYPE_INSTITUTION,
+            'admin_email' => 'institution-admin@example.test',
+            'entity_code' => 'NDU',
+            'status' => AdminRegistrationRequest::STATUS_PENDING,
+        ]);
+    }
+
+    public function test_super_admin_can_approve_institution_registration_and_create_login(): void
+    {
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $registration = AdminRegistrationRequest::factory()->create([
+            'entity_type' => AdminRegistrationRequest::TYPE_INSTITUTION,
+            'admin_email' => 'institution-admin@example.test',
+            'password' => Hash::make('password'),
+            'entity_name' => 'Niger Delta University',
+            'entity_code' => 'NDU',
+            'entity_email' => 'registrar@ndu.test',
+            'location' => 'Wilberforce Island, Bayelsa',
+            'capacity' => 12000,
+            'contact_person' => 'Registrar Office',
+            'phone' => '08030000022',
+            'address' => 'Wilberforce Island, Bayelsa State',
+            'facility_summary' => 'Academic blocks, library, labs, and ICT centres.',
+            'exam_experience' => 'Runs semester and professional certificate exams.',
+        ]);
+
+        $this->actingAs($superAdmin)
+            ->patch("/admin-registrations/{$registration->id}/approve", [
+                'review_notes' => 'Approved.',
+            ])
+            ->assertRedirect(route('admin-registrations.show', $registration, absolute: false));
+
+        $institution = \App\Models\Institution::query()->where('code', 'NDU')->firstOrFail();
+        $user = User::query()->where('email', 'institution-admin@example.test')->firstOrFail();
+
+        $this->assertSame(User::ROLE_INSTITUTION_ADMIN, $user->role);
+        $this->assertSame($institution->id, $user->institution_id);
+        $this->assertTrue(Hash::check('password', $user->password));
+        $this->assertDatabaseHas('admin_registration_requests', [
+            'id' => $registration->id,
+            'entity_id' => $institution->id,
+            'status' => AdminRegistrationRequest::STATUS_APPROVED,
+        ]);
+    }
+
     public function test_super_admin_can_approve_school_registration_and_create_login(): void
     {
         $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);

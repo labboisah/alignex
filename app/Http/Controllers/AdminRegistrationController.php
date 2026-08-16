@@ -136,6 +136,11 @@ class AdminRegistrationController extends Controller
                 'description' => 'NGOs, associations, companies, or groups that want to conduct exams.',
             ],
             [
+                'value' => AdminRegistrationRequest::TYPE_INSTITUTION,
+                'label' => 'Institution',
+                'description' => 'Higher institutions such as universities, polytechnics, colleges, and tertiary centres.',
+            ],
+            [
                 'value' => AdminRegistrationRequest::TYPE_SECONDARY_SCHOOL,
                 'label' => 'Secondary School',
                 'description' => 'Secondary schools that manage students, sessions, terms, classes, arms, subjects, and terminal exams.',

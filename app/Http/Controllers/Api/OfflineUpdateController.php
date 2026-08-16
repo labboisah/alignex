@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\AppRelease;
 use App\Models\User;
+use App\Support\AppArtifactFile;
 use App\Services\OfflineActivationGuard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -64,7 +65,7 @@ class OfflineUpdateController extends Controller
             default => null,
         };
 
-        if (! $path || ! is_file($path) || filesize($path) <= 0) {
+        if (! $path || ! AppArtifactFile::isDownloadable($path, $artifact)) {
             return null;
         }
 
@@ -93,7 +94,7 @@ class OfflineUpdateController extends Controller
 
         $release = AppRelease::query()->latestActiveFor($artifact)->first();
 
-        if (! $release || ! is_file($release->absolutePath()) || filesize($release->absolutePath()) <= 0) {
+        if (! $release || ! AppArtifactFile::isDownloadable($release->absolutePath(), $artifact)) {
             return null;
         }
 
@@ -132,7 +133,7 @@ class OfflineUpdateController extends Controller
             ...(glob(public_path('downloads/candidate-client/AlignEx-Client-App-Setup-*.exe')) ?: []),
             ...(glob(public_path('downloads/candidate-client/AlignEx-Candidate-Client-Setup-*.exe')) ?: []),
         ])
-            ->filter(fn (string $path): bool => is_file($path))
+            ->filter(fn (string $path): bool => AppArtifactFile::isDownloadable($path, AppRelease::ARTIFACT_CLIENT_APP))
             ->sortByDesc(fn (string $path): int => filemtime($path) ?: 0)
             ->first();
     }
@@ -146,7 +147,7 @@ class OfflineUpdateController extends Controller
             ...(glob($this->appPath('offline_server_path', 'dist-release/AlignEx-Center-Server*.zip')) ?: []),
             ...(glob($this->appPath('offline_server_path', 'release/AlignEx-Center-Server*.zip')) ?: []),
         ])
-            ->filter(fn (string $path): bool => is_file($path) && filesize($path) > 0)
+            ->filter(fn (string $path): bool => AppArtifactFile::isDownloadable($path, AppRelease::ARTIFACT_SERVER))
             ->sortByDesc(fn (string $path): int => filemtime($path) ?: 0)
             ->first();
     }

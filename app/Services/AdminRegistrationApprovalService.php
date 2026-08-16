@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AdminRegistrationRequest;
 use App\Models\Center;
 use App\Models\CbtCenter;
+use App\Models\Institution;
 use App\Models\Organization;
 use App\Models\ProfessionalSchool;
 use App\Models\School;
@@ -38,6 +39,20 @@ class AdminRegistrationApprovalService
                     ]),
                     User::ROLE_ORGANIZATION_ADMIN,
                 ],
+                AdminRegistrationRequest::TYPE_INSTITUTION => [
+                    Institution::create([
+                        'organization_id' => null,
+                        'name' => $registration->entity_name,
+                        'code' => $registration->entity_code,
+                        'institution_type' => 'university',
+                        'email' => $registration->entity_email,
+                        'phone' => $registration->phone,
+                        'address' => $registration->address ?: $registration->location,
+                        'description' => $registration->facility_summary ?: $registration->exam_experience,
+                        'status' => Institution::STATUS_ACTIVE,
+                    ]),
+                    User::ROLE_INSTITUTION_ADMIN,
+                ],
                 AdminRegistrationRequest::TYPE_SCHOOL => [
                     School::create($this->schoolOrCenterPayload($registration)),
                     User::ROLE_SCHOOL_ADMIN,
@@ -66,6 +81,7 @@ class AdminRegistrationApprovalService
                 'password' => $registration->password,
                 'role' => $role,
                 'organization_id' => $registration->entity_type === AdminRegistrationRequest::TYPE_ORGANIZATION ? $entity->id : null,
+                'institution_id' => $registration->entity_type === AdminRegistrationRequest::TYPE_INSTITUTION ? $entity->id : null,
                 'center_id' => $registration->entity_type === AdminRegistrationRequest::TYPE_CENTER ? $entity->id : null,
                 'school_id' => $registration->entity_type === AdminRegistrationRequest::TYPE_SCHOOL ? $entity->id : null,
                 'secondary_school_id' => $registration->entity_type === AdminRegistrationRequest::TYPE_SECONDARY_SCHOOL ? $entity->id : null,

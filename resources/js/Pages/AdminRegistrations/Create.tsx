@@ -6,7 +6,7 @@ import { Button } from '@/Components/ui/button';
 import { EntityType, RegistrationPlan } from './types';
 
 type FormData = {
-    entity_type: 'organization' | 'secondary_school' | 'professional_school' | 'cbt_center';
+    entity_type: 'organization' | 'institution' | 'secondary_school' | 'professional_school' | 'cbt_center';
     pricing_plan_id: string;
     admin_name: string;
     admin_email: string;
@@ -36,7 +36,7 @@ const inputClass = 'mt-1 block w-full rounded-md border-border shadow-sm focus:b
 export default function CreateAdminRegistration({ entityTypes, plans, selectedPlan }: { entityTypes: EntityType[]; plans: RegistrationPlan[]; selectedPlan?: string | null }) {
     const defaultPlan = plans.find((plan) => plan.slug === selectedPlan) ?? plans.find((plan) => plan.slug === 'free') ?? plans[0];
     const { data, setData, post, processing, errors, reset } = useForm<FormData>({
-        entity_type: 'organization',
+        entity_type: 'institution',
         pricing_plan_id: defaultPlan ? String(defaultPlan.id) : '',
         admin_name: '',
         admin_email: '',
@@ -245,6 +245,10 @@ function ErrorText({ message }: { message?: string }) {
 }
 
 function typeLabel(type: FormData['entity_type']) {
+    if (type === 'institution') {
+        return 'Institution';
+    }
+
     if (type === 'secondary_school') {
         return 'Secondary School';
     }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AppRelease;
+use App\Support\AppArtifactFile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -24,7 +25,7 @@ class OfflineServerDownloadController extends Controller
             ? AppRelease::query()->latestActiveFor(AppRelease::ARTIFACT_SERVER)->first()
             : null;
 
-        if ($release && is_file($release->absolutePath()) && filesize($release->absolutePath()) > 0) {
+        if ($release && AppArtifactFile::isDownloadable($release->absolutePath(), AppRelease::ARTIFACT_SERVER)) {
             return response()->download($release->absolutePath(), $release->filename, [
                 'Content-Type' => 'application/zip',
             ]);
@@ -48,7 +49,7 @@ class OfflineServerDownloadController extends Controller
             ...(glob($this->offlineServerPath('dist-release/AlignEx-Center-Server*.zip')) ?: []),
             ...(glob($this->offlineServerPath('release/AlignEx-Center-Server*.zip')) ?: []),
         ])
-            ->filter(fn (string $path): bool => is_file($path) && filesize($path) > 0)
+            ->filter(fn (string $path): bool => AppArtifactFile::isDownloadable($path, AppRelease::ARTIFACT_SERVER))
             ->sortByDesc(fn (string $path): int => filemtime($path) ?: 0)
             ->first();
     }

@@ -52,6 +52,7 @@ class DashboardSummaryService
                 'label' => AccessControl::roleLabel($user->role),
                 'scope' => match ($context['type'] ?? null) {
                     'organization' => 'Organization scope',
+                    'institution' => 'Institution scope',
                     'secondary_school' => 'Secondary school scope',
                     'professional_school' => 'Professional school scope',
                     'cbt_center' => 'CBT center scope',
@@ -90,6 +91,16 @@ class DashboardSummaryService
                 $this->metric('Total Question Banks', QuestionBank::query()->count(), 'All question banks.', 'Library'),
                 $this->metric('Pending Applications', AdminRegistrationRequest::query()->where('status', AdminRegistrationRequest::STATUS_PENDING)->count(), 'Admin registrations awaiting review.', 'ClipboardList'),
                 $this->metric('Submitted Results', $result['submitted'], 'Submitted attempts.', 'CheckCircle2'),
+            ],
+            'institution' => [
+                $this->metric('Faculties', \App\Models\Faculty::query()->where('institution_id', $id)->count(), 'Academic faculties in this institution.', 'Building2'),
+                $this->metric('Departments', \App\Models\Department::query()->where('institution_id', $id)->count(), 'Academic departments under the institution.', 'GraduationCap'),
+                $this->metric('Programmes', \App\Models\Programme::query()->where('institution_id', $id)->count(), 'Academic programmes and tracks.', 'ClipboardList'),
+                $this->metric('Courses', \App\Models\Course::query()->where('institution_id', $id)->count(), 'Courses available within the institution.', 'BookOpen'),
+                $this->metric('Question Banks', QuestionBank::query()->where('institution_id', $id)->count(), 'Assessment question banks.', 'FileQuestion'),
+                $this->metric('Active Exams', (clone $examScope)->where('status', Exam::STATUS_ACTIVE)->count(), 'Currently active institutional exams.', 'Activity'),
+                $this->metric('Submitted Attempts', $result['submitted'], 'All accepted submission records.', 'CheckCircle2'),
+                $this->metric('Failed Attempts', $result['failed'], 'Low-performing or failed attempts.', 'AlertTriangle'),
             ],
             'secondary_school' => [
                 $this->metric('Total Students', Student::query()->where('secondary_school_id', $id)->count(), 'Registered students.', 'Users'),

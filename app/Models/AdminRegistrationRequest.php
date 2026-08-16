@@ -41,6 +41,7 @@ class AdminRegistrationRequest extends Model
     use HasFactory;
 
     public const TYPE_ORGANIZATION = 'organization';
+    public const TYPE_INSTITUTION = 'institution';
     public const TYPE_SCHOOL = 'school';
     public const TYPE_SECONDARY_SCHOOL = 'secondary_school';
     public const TYPE_PROFESSIONAL_SCHOOL = 'professional_school';

@@ -50,6 +50,7 @@ class HandleInertiaRequests extends Middleware
                     'role' => $user->role,
                     'role_label' => AccessControl::roleLabel($user->role),
                     'organization_id' => $user->organization_id,
+                    'institution_id' => $user->institution_id,
                     'center_id' => $user->center_id,
                     'school_id' => $user->school_id,
                     'secondary_school_id' => $user->secondary_school_id,
@@ -120,11 +121,12 @@ class HandleInertiaRequests extends Middleware
             ? '/cbt-centers/'.$contextId
             : '/cbt-centers';
 
-        if ($user->isSuperAdmin() && ! $contextType) {
+        if ($user->isSuperAdmin()) {
             $navigation = collect([
                 ['label' => 'Dashboard', 'href' => '/dashboard'],
                 ['label' => 'Platform', 'children' => [
                     ['label' => 'Organizations', 'href' => '/organizations', 'permission' => 'manageOrganizations'],
+                    ['label' => 'Institutions', 'href' => '/institutions', 'permission' => 'manageSchools'],
                     ['label' => 'Applications', 'href' => '/admin-registrations', 'permission' => 'manageAdminRegistrations'],
                     ['label' => 'Pricing Plans', 'href' => '/pricing-plans', 'permission' => 'managePricingPlans'],
                     ['label' => 'App Releases', 'href' => '/app-releases', 'permission' => 'manageAppReleases'],
@@ -143,6 +145,29 @@ class HandleInertiaRequests extends Middleware
                 ['label' => 'Offline Server', 'href' => '/offline-server/download', 'feature' => 'offline_activation'],
                 ['label' => 'Client App', 'href' => '/candidate-client/download'],
                 ['label' => 'Activation Codes', 'href' => '/offline-activation-codes', 'permission' => 'downloadOfflineServer', 'feature' => 'offline_activation'],
+                ['label' => 'Documentation', 'href' => '/documentation'],
+            ]);
+        } elseif ($user->isInstitutionAdmin() && ! $contextType) {
+            $institutionBase = $user->institution_id ? '/institutions/'.$user->institution_id : '/institutions';
+            $navigation = collect([
+                ['label' => 'Dashboard', 'href' => '/dashboard'],
+                ['label' => 'Administration', 'children' => [
+                    ['label' => 'Institution Profile', 'href' => $institutionBase, 'permission' => 'manageSettings'],
+                    ['label' => 'Faculties', 'href' => $institutionBase.'/faculties', 'permission' => 'manageSchools'],
+                    ['label' => 'Departments', 'href' => $institutionBase.'/departments', 'permission' => 'manageSchools'],
+                    ['label' => 'Programmes', 'href' => $institutionBase.'/programmes', 'permission' => 'manageSchools'],
+                    ['label' => 'Courses', 'href' => $institutionBase.'/courses', 'permission' => 'manageSchools'],
+                ]],
+                ['label' => 'Assessment', 'children' => [
+                    ['label' => 'Question Bank', 'href' => $institutionBase.'/question-banks', 'permission' => 'manageQuestionBank'],
+                    ['label' => 'Questions', 'href' => $institutionBase.'/questions', 'permission' => 'manageQuestionBank'],
+                    ['label' => 'Exams', 'href' => '/exams', 'permission' => 'manageExams'],
+                ]],
+                ['label' => 'Reports', 'children' => [
+                    ['label' => 'Results', 'href' => '/results', 'permission' => 'viewReports'],
+                    ['label' => 'Academic Reports', 'href' => '/reports', 'permission' => 'viewReports'],
+                ]],
+                ['label' => 'Settings', 'href' => $institutionBase.'/edit', 'permission' => 'manageSettings'],
                 ['label' => 'Documentation', 'href' => '/documentation'],
             ]);
         } elseif ($user->isTeacher()) {
@@ -286,6 +311,30 @@ class HandleInertiaRequests extends Middleware
                     ['label' => 'Settings', 'href' => '/settings', 'permission' => 'manageSettings'],
                 ],
             });
+        }
+
+        if ($contextType === 'institution' && $user->institution_id) {
+            $institutionBase = '/institutions/'.$user->institution_id;
+            $navigation = collect([
+                ['label' => 'Dashboard', 'href' => '/dashboard'],
+                ['label' => 'Administration', 'children' => [
+                    ['label' => 'Faculties', 'href' => $institutionBase.'/faculties', 'permission' => 'manageSchools'],
+                    ['label' => 'Departments', 'href' => $institutionBase.'/departments', 'permission' => 'manageSchools'],
+                    ['label' => 'Programmes', 'href' => $institutionBase.'/programmes', 'permission' => 'manageSchools'],
+                    ['label' => 'Courses', 'href' => $institutionBase.'/courses', 'permission' => 'manageSchools'],
+                ]],
+                ['label' => 'Assessment', 'children' => [
+                    ['label' => 'Question Bank', 'href' => $institutionBase.'/question-banks', 'permission' => 'manageQuestionBank'],
+                    ['label' => 'Questions', 'href' => $institutionBase.'/questions', 'permission' => 'manageQuestionBank'],
+                    ['label' => 'Exams', 'href' => '/exams', 'permission' => 'manageExams'],
+                ]],
+                ['label' => 'Reports', 'children' => [
+                    ['label' => 'Results', 'href' => '/results', 'permission' => 'viewReports'],
+                    ['label' => 'Academic Reports', 'href' => '/reports', 'permission' => 'viewReports'],
+                ]],
+                ['label' => 'Settings', 'href' => $institutionBase.'/edit', 'permission' => 'manageSettings'],
+                ['label' => 'Documentation', 'href' => '/documentation'],
+            ]);
         }
 
         if ($contextType === 'organization' && $user->organization_id) {

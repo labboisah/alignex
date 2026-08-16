@@ -68,18 +68,18 @@ const iconMap = {
 
 const defaultSolutions: LandingCard[] = [
     {
+        title: 'Higher Institutions',
+        body: 'Support universities, polytechnics, colleges, and other tertiary institutions with structured exam delivery and administrative oversight.',
+        icon: 'GraduationCap',
+    },
+    {
         title: 'Secondary Schools',
         body: 'Plan terminal exams, mock tests, entrance assessments, and subject-based CBT sessions from one organized workspace.',
-        icon: 'GraduationCap',
+        icon: 'FileCheck2',
     },
     {
         title: 'Professional Exams',
         body: 'Run certification exams with candidate assignment, timed delivery, supervisor review, and controlled result release.',
-        icon: 'FileCheck2',
-    },
-    {
-        title: 'Recruitment Exams',
-        body: 'Screen applicants with secure exams, candidate tracking, anti-cheating records, and export-ready reports.',
         icon: 'Users',
     },
 ];
@@ -121,9 +121,9 @@ const defaultOperations: LandingMetric[] = [
 export default function PublicWelcome({ landing = {} }: { landing?: LandingContent }) {
     const hero = {
         eyebrow: landing.hero?.eyebrow ?? 'Trusted CBT operations',
-        title: landing.hero?.title ?? 'Examination delivery built for schools, centers, and professional bodies',
-        description: landing.hero?.description ?? 'AlignEx helps teams prepare question banks, assign candidates, deliver secure exams, monitor live sessions, manage offline centers, and release results with confidence.',
-        badges: landing.hero?.badges ?? ['Online and offline delivery', 'Live supervision', 'Controlled result release'],
+        title: landing.hero?.title ?? 'Examination delivery built for higher institutions, schools, and exam bodies',
+        description: landing.hero?.description ?? 'AlignEx helps universities, polytechnics, colleges, and professional exam teams prepare question banks, assign candidates, deliver secure exams, monitor live sessions, and release results with confidence.',
+        badges: landing.hero?.badges ?? ['University and polytechnic ready', 'Online and offline delivery', 'Live supervision'],
     };
     const solutions = landing.solutions ?? defaultSolutions;
     const features = landing.features ?? defaultFeatures;
@@ -253,7 +253,7 @@ function HeroSection({ hero, metrics, activity, candidateMockup }: { hero: Requi
                     </p>
                     <div className="mt-8 grid gap-3 sm:flex sm:flex-wrap">
                         <Button asChild className="h-11 w-full justify-center sm:w-auto">
-                            <Link href="/dashboard">Explore Platform <ArrowRight className="h-4 w-4" /></Link>
+                            <Link href="/register-admin">Register Institution <ArrowRight className="h-4 w-4" /></Link>
                         </Button>
                         <Button asChild variant="secondary" className="h-11 w-full justify-center sm:w-auto">
                             <Link href="/exam/login">Write Exam</Link>
@@ -272,6 +272,28 @@ function HeroSection({ hero, metrics, activity, candidateMockup }: { hero: Requi
                                 {item}
                             </div>
                         ))}
+                    </div>
+
+                    <div className="mt-8 rounded-xl border border-primary/20 bg-green-50 p-4 shadow-sm">
+                        <div className="flex items-center justify-between gap-3">
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Demo institution login</p>
+                                <p className="mt-1 text-sm text-slate-600">Use this account to preview the higher-institution flow.</p>
+                            </div>
+                            <Button asChild variant="secondary" size="sm">
+                                <Link href="/login">Open login</Link>
+                            </Button>
+                        </div>
+                        <div className="mt-4 grid gap-3 text-sm text-slate-700 sm:grid-cols-2">
+                            <div className="rounded-md border border-green-200 bg-white px-3 py-2">
+                                <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Email</span>
+                                <span className="mt-1 block font-medium text-primaryDark">institution.admin@alignex.test</span>
+                            </div>
+                            <div className="rounded-md border border-green-200 bg-white px-3 py-2">
+                                <span className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Password</span>
+                                <span className="mt-1 block font-medium text-primaryDark">password</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <HeroMockup metrics={metrics} activity={activity} candidateMockup={candidateMockup} />

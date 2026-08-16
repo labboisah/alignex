@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['owner_type', 'owner_id', 'organization_id', 'school_id', 'center_id', 'secondary_school_id', 'professional_school_id', 'cbt_center_id', 'programme_id', 'course_id', 'module_id', 'subject_id', 'created_by', 'name', 'code', 'description', 'status'])]
+#[Fillable(['owner_type', 'owner_id', 'organization_id', 'institution_id', 'faculty_id', 'department_id', 'school_id', 'center_id', 'secondary_school_id', 'professional_school_id', 'cbt_center_id', 'programme_id', 'course_id', 'module_id', 'subject_id', 'created_by', 'name', 'code', 'description', 'status'])]
 class QuestionBank extends Model
 {
     use HasFactory, HasUlids, SoftDeletes;
@@ -22,6 +22,21 @@ class QuestionBank extends Model
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    public function institution(): BelongsTo
+    {
+        return $this->belongsTo(Institution::class);
+    }
+
+    public function faculty(): BelongsTo
+    {
+        return $this->belongsTo(Faculty::class);
+    }
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class);
     }
 
     public function school(): BelongsTo

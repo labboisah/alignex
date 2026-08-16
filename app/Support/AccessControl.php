@@ -20,6 +20,10 @@ class AccessControl
                 'label' => 'Organization Admin',
                 'description' => 'Manages users, exam operations, settings, and reports inside one organization.',
             ],
+            User::ROLE_INSTITUTION_ADMIN => [
+                'label' => 'Institution Admin',
+                'description' => 'Manages one higher institution, faculties, departments, programmes, courses, exams, and institutional reports.',
+            ],
             User::ROLE_CENTER_ADMIN => [
                 'label' => 'Center Admin',
                 'description' => 'Manages one CBT center and delivery operations for allocated exams.',
@@ -153,6 +157,14 @@ class AccessControl
                 'manageCenters',
                 'manageSchools',
                 'manageUsers',
+                'manageQuestionBank',
+                'manageExams',
+                'viewReports',
+                'manageSettings',
+                'downloadOfflineServer',
+            ],
+            User::ROLE_INSTITUTION_ADMIN => [
+                'manageSchools',
                 'manageQuestionBank',
                 'manageExams',
                 'viewReports',

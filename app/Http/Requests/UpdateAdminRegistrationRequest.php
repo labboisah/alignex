@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Models\AdminRegistrationRequest;
 use App\Models\Center;
 use App\Models\CbtCenter;
+use App\Models\Institution;
 use App\Models\Organization;
 use App\Models\PricingPlan;
 use App\Models\ProfessionalSchool;
@@ -28,6 +29,7 @@ class UpdateAdminRegistrationRequest extends FormRequest
         return [
             'entity_type' => ['required', Rule::in([
                 AdminRegistrationRequest::TYPE_ORGANIZATION,
+                AdminRegistrationRequest::TYPE_INSTITUTION,
                 AdminRegistrationRequest::TYPE_SCHOOL,
                 AdminRegistrationRequest::TYPE_SECONDARY_SCHOOL,
                 AdminRegistrationRequest::TYPE_PROFESSIONAL_SCHOOL,
@@ -82,6 +84,7 @@ class UpdateAdminRegistrationRequest extends FormRequest
     {
         return match ($this->input('entity_type')) {
             AdminRegistrationRequest::TYPE_ORGANIZATION => Rule::unique(Organization::class, 'code'),
+            AdminRegistrationRequest::TYPE_INSTITUTION => Rule::unique(Institution::class, 'code'),
             AdminRegistrationRequest::TYPE_SCHOOL => Rule::unique(School::class, 'code'),
             AdminRegistrationRequest::TYPE_SECONDARY_SCHOOL => Rule::unique(SecondarySchool::class, 'code'),
             AdminRegistrationRequest::TYPE_PROFESSIONAL_SCHOOL => Rule::unique(ProfessionalSchool::class, 'code'),
@@ -95,6 +98,7 @@ class UpdateAdminRegistrationRequest extends FormRequest
     {
         return match ($this->input('entity_type')) {
             AdminRegistrationRequest::TYPE_ORGANIZATION => Rule::unique(Organization::class, 'email'),
+            AdminRegistrationRequest::TYPE_INSTITUTION => Rule::unique(Institution::class, 'email'),
             AdminRegistrationRequest::TYPE_SCHOOL => Rule::unique(School::class, 'email'),
             AdminRegistrationRequest::TYPE_SECONDARY_SCHOOL => Rule::unique(SecondarySchool::class, 'email'),
             AdminRegistrationRequest::TYPE_PROFESSIONAL_SCHOOL => Rule::unique(ProfessionalSchool::class, 'email'),
