@@ -21,6 +21,7 @@ type ExamDetails = {
         allow_back_navigation: boolean;
         require_fullscreen: boolean;
         require_webcam: boolean;
+        monitor_screenshots: boolean;
         max_tab_switches: number;
     };
 };
@@ -261,12 +262,15 @@ function ExamInstructionsPage() {
                         {payload.exam.starts_at && <Info label="Start Time" value={new Date(payload.exam.starts_at).toLocaleString()} />}
                     </div>
                     {!canStart && (
-                        <div className="mt-6 rounded-md border border-blue-200 bg-blue-50 p-4 text-info">
-                            <div className="flex items-center gap-2 text-sm font-bold">
-                                <Clock className="h-5 w-5" />
-                                Exam starts in {formatTime(startsIn)}
+                        <div className="mt-6 rounded-md border-2 border-blue-300 bg-blue-50 p-5 text-info">
+                            <div className="flex flex-wrap items-center gap-3">
+                                <Clock className="h-8 w-8" />
+                                <div>
+                                    <div className="text-sm font-black uppercase tracking-wide text-blue-700">Exam starts in</div>
+                                    <div className="mt-1 font-mono text-4xl font-black leading-none text-blue-900 md:text-5xl">{formatTime(startsIn)}</div>
+                                </div>
                             </div>
-                            <p className="mt-2 text-sm leading-6 text-slate-700">
+                            <p className="mt-3 text-sm font-semibold leading-6 text-slate-700">
                                 You are logged in, but the exam cannot be started until the scheduled start time.
                             </p>
                         </div>
@@ -348,7 +352,6 @@ function ExamScreenPage() {
     const [failed, setFailed] = useState<Record<string, SavedAnswer>>({});
     const [remaining, setRemaining] = useState(payload?.remaining_time ?? 0);
     const [online, setOnline] = useState(navigator.onLine);
-    const [saveStatus, setSaveStatus] = useState('Ready');
     const [submitting, setSubmitting] = useState(false);
     const [autoSubmitting, setAutoSubmitting] = useState(false);
     const [confirmSubmit, setConfirmSubmit] = useState(false);
@@ -492,7 +495,6 @@ function ExamScreenPage() {
         };
 
         setPending((next) => new Set(next).add(answerForSave.question_id));
-        setSaveStatus('Saving...');
 
         try {
             await api('/api/candidate/answer', {
@@ -505,10 +507,8 @@ function ExamScreenPage() {
                 return clone;
             });
             setAnswers((next) => ({ ...next, [answerForSave.question_id]: answerForSave }));
-            setSaveStatus('Saved');
         } catch {
             setFailed((next) => ({ ...next, [answerForSave.question_id]: answerForSave }));
-            setSaveStatus('Failed - pending sync');
         } finally {
             setPending((next) => {
                 const clone = new Set(next);
@@ -553,7 +553,7 @@ function ExamScreenPage() {
                 navigate('/exam/disqualified', { replace: true });
             }
         } catch {
-            setWarning('A monitoring event could not sync. Keep working while the system retries normal answer saves.');
+            setWarning('A monitoring event could not be recorded. Keep working and maintain your internet connection.');
         }
     };
 
@@ -657,7 +657,7 @@ function ExamScreenPage() {
             reportProctoringEvent('right_click');
         };
         const onPrintScreen = (event: KeyboardEvent) => {
-            if (event.key === 'PrintScreen') {
+            if (payload.exam.settings.monitor_screenshots && event.key === 'PrintScreen') {
                 reportProctoringEvent('print_screen_attempt', { severity: 'high' });
             }
         };
@@ -679,7 +679,7 @@ function ExamScreenPage() {
             window.removeEventListener('blur', onBlur);
             window.removeEventListener('keyup', onPrintScreen);
         };
-    }, [current?.question_id, currentIndex, payload.exam.settings.require_fullscreen]);
+    }, [current?.question_id, currentIndex, payload.exam.settings.monitor_screenshots, payload.exam.settings.require_fullscreen]);
 
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
@@ -785,8 +785,6 @@ function ExamScreenPage() {
                         <div className="flex flex-wrap items-center gap-3 text-sm font-semibold">
                             <span className="inline-flex items-center gap-1 text-slateDark"><Clock className="h-4 w-4" />{formatTime(remaining)}</span>
                             <span className={online ? 'inline-flex items-center gap-1 text-success' : 'inline-flex items-center gap-1 text-danger'}>{online ? <Wifi className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}{online ? 'Online' : 'Offline'}</span>
-                            <span className="text-slate-600">{saveStatus}</span>
-                            {Object.keys(failed).length > 0 && <span className="text-warning">Pending sync: {Object.keys(failed).length}</span>}
                         </div>
                     </div>
                 </div>
@@ -866,10 +864,10 @@ function ExamScreenPage() {
                         </div>
                         {Object.keys(failed).length > 0 && (
                             <div className="mt-5 rounded-md border border-amber-200 bg-amber-50 p-3">
-                                <div className="text-sm font-bold text-warning">Retry queue</div>
-                                <p className="mt-1 text-xs text-slate-600">{Object.keys(failed).length} answer(s) waiting to sync.</p>
+                                <div className="text-sm font-bold text-warning">Connection issue</div>
+                                <p className="mt-1 text-xs text-slate-600">Some answers still need to be saved. Keep your internet connected and try again.</p>
                                 <Button type="button" variant="secondary" className="mt-3 w-full" disabled={!online || pending.size > 0} onClick={() => Object.values(failed).forEach((answer) => saveAnswer(answer))}>
-                                    Retry Now
+                                    Save Again
                                 </Button>
                             </div>
                         )}

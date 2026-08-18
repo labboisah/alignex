@@ -9,6 +9,7 @@ use App\Models\ExamAuditLog;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class ExamMonitorService
@@ -153,10 +154,19 @@ class ExamMonitorService
     {
         $freshAttempt = $attempt->fresh(['candidate', 'answers', 'auditLogs', 'proctoringEvents']) ?? $attempt;
 
-        broadcast(new ExamMonitorEvent($exam->id, $type, [
-            'row' => $this->row($freshAttempt),
-            ...$extra,
-        ]));
+        try {
+            broadcast(new ExamMonitorEvent($exam->id, $type, [
+                'row' => $this->row($freshAttempt),
+                ...$extra,
+            ]));
+        } catch (\Throwable $exception) {
+            Log::warning('Exam monitor broadcast failed.', [
+                'exam_id' => $exam->id,
+                'attempt_id' => $attempt->id,
+                'event_type' => $type,
+                'message' => $exception->getMessage(),
+            ]);
+        }
     }
 
     public function resetAttempt(Exam $exam, CandidateExamAttempt $attempt, User $actor, string $reason): CandidateExamAttempt

@@ -53,6 +53,7 @@ export type ExamSettings = {
     allow_back_navigation: boolean;
     require_webcam: boolean;
     require_fullscreen: boolean;
+    monitor_screenshots: boolean;
     max_tab_switches: number | string;
     negative_marking: boolean;
     negative_mark_value: number | string;

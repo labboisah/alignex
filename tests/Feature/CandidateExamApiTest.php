@@ -193,6 +193,19 @@ class CandidateExamApiTest extends TestCase
             ->assertJsonValidationErrors('device_fingerprint');
     }
 
+    public function test_candidate_payload_includes_screenshot_monitoring_setting(): void
+    {
+        [$exam, $candidate] = $this->activeExamWithPaper(['monitor_screenshots' => true]);
+
+        $this->postJson('/api/candidate/login', [
+            'exam_code' => $exam->code,
+            'registration_number' => $candidate->candidate_number,
+            'device_fingerprint' => 'device-one',
+        ])
+            ->assertOk()
+            ->assertJsonPath('exam.settings.monitor_screenshots', true);
+    }
+
     public function test_submission_applies_negative_marking_server_side(): void
     {
         [$exam, $candidate] = $this->activeExamWithPaper([
@@ -351,6 +364,7 @@ class CandidateExamApiTest extends TestCase
                 'shuffle_options' => false,
                 'bind_device' => false,
                 'allow_back_navigation' => true,
+                'monitor_screenshots' => false,
             ], $settings),
         ]);
         $candidate = Candidate::factory()->create([

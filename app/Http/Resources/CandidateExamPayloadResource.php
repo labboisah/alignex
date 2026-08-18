@@ -49,6 +49,7 @@ class CandidateExamPayloadResource extends JsonResource
                     'allow_back_navigation' => (bool) data_get($attempt->exam?->settings ?? [], 'allow_back_navigation', true),
                     'require_fullscreen' => (bool) data_get($attempt->exam?->settings ?? [], 'require_fullscreen', false),
                     'require_webcam' => (bool) data_get($attempt->exam?->settings ?? [], 'require_webcam', false),
+                    'monitor_screenshots' => (bool) data_get($attempt->exam?->settings ?? [], 'monitor_screenshots', false),
                     'max_tab_switches' => (int) data_get($attempt->exam?->settings ?? [], 'max_tab_switches', 0),
                 ],
             ],

@@ -76,6 +76,7 @@ class StoreExamRequest extends FormRequest
             'settings.allow_back_navigation' => ['required', 'boolean'],
             'settings.require_webcam' => ['required', 'boolean'],
             'settings.require_fullscreen' => ['required', 'boolean'],
+            'settings.monitor_screenshots' => ['nullable', 'boolean'],
             'settings.max_tab_switches' => ['required', 'integer', 'min:0', 'max:100'],
             'settings.negative_marking' => ['required', 'boolean'],
             'settings.negative_mark_value' => ['nullable', 'numeric', 'min:0', 'max:1000'],
