@@ -74,6 +74,7 @@ class HandleInertiaRequests extends Middleware
             'available_contexts' => $availableContexts,
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
+                'error' => fn () => $request->session()->get('error'),
                 'activation_code' => fn () => $request->session()->get('activation_code'),
                 'import_summary' => fn () => $request->session()->get('import_summary'),
             ],
@@ -326,6 +327,7 @@ class HandleInertiaRequests extends Middleware
             $navigation = collect([
                 ['label' => 'Dashboard', 'href' => '/dashboard'],
                 ['label' => 'Administration', 'children' => [
+                    ['label' => 'Institution Profile', 'href' => $institutionBase, 'permission' => 'manageSettings'],
                     ['label' => 'Faculties', 'href' => $institutionBase.'/faculties', 'permission' => 'manageSchools'],
                     ['label' => 'Departments', 'href' => $institutionBase.'/departments', 'permission' => 'manageSchools'],
                     ['label' => 'Programmes', 'href' => $institutionBase.'/programmes', 'permission' => 'manageSchools'],

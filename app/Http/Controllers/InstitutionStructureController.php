@@ -237,11 +237,6 @@ class InstitutionStructureController extends Controller
         return Inertia::render('Institutions/Lecturers', [
             'institution' => $institution,
             'department' => $department->load('faculty:id,name,code'),
-            'courses' => $department->courses()
-                ->where('institution_id', $institution->id)
-                ->with('programme:id,name')
-                ->orderBy('name')
-                ->get(['id', 'programme_id', 'name', 'code']),
             'lecturers' => User::query()
                 ->where('role', User::ROLE_FACILITATOR)
                 ->where('institution_id', $institution->id)
@@ -252,6 +247,18 @@ class InstitutionStructureController extends Controller
                 ->orderBy('name')
                 ->get()
                 ->map(fn (User $lecturer) => $this->lecturerRow($lecturer)),
+        ]);
+    }
+
+    public function createLecturer(Request $request, Institution $institution, Department $department): Response
+    {
+        $this->authorizeInstitution($request->user(), $institution);
+        $this->authorizeBelongsToInstitution($department, $institution);
+
+        return Inertia::render('Institutions/LecturerCreate', [
+            'institution' => $institution,
+            'department' => $department->load('faculty:id,name,code'),
+            'courses' => $this->departmentCourseOptions($institution, $department),
         ]);
     }
 
@@ -280,7 +287,25 @@ class InstitutionStructureController extends Controller
             $this->syncLecturerAssignments($lecturer, $institution, $department, $data['course_ids']);
         });
 
-        return back()->with('success', 'Lecturer created.');
+        return redirect()
+            ->route('institutions.departments.lecturers.index', [$institution, $department])
+            ->with('success', 'Lecturer created.');
+    }
+
+    public function editLecturer(Request $request, Institution $institution, Department $department, User $lecturer): Response
+    {
+        $this->authorizeInstitution($request->user(), $institution);
+        $this->authorizeBelongsToInstitution($department, $institution);
+        $this->authorizeLecturerRecord($institution, $department, $lecturer);
+
+        return Inertia::render('Institutions/LecturerEdit', [
+            'institution' => $institution,
+            'department' => $department->load('faculty:id,name,code'),
+            'lecturer' => $this->lecturerRow($lecturer->load(['assignedCourses' => fn ($query) => $query
+                ->where('courses.department_id', $department->id)
+                ->orderBy('name')])),
+            'courses' => $this->departmentCourseOptions($institution, $department),
+        ]);
     }
 
     public function updateLecturer(Request $request, Institution $institution, Department $department, User $lecturer): RedirectResponse
@@ -312,7 +337,9 @@ class InstitutionStructureController extends Controller
             $this->syncLecturerAssignments($lecturer, $institution, $department, $data['course_ids']);
         });
 
-        return back()->with('success', 'Lecturer updated.');
+        return redirect()
+            ->route('institutions.departments.lecturers.index', [$institution, $department])
+            ->with('success', 'Lecturer updated.');
     }
 
     public function destroyLecturer(Request $request, Institution $institution, Department $department, User $lecturer): RedirectResponse
@@ -480,5 +507,23 @@ class InstitutionStructureController extends Controller
                 'code' => $course->code,
             ])->values()->all(),
         ];
+    }
+
+    private function departmentCourseOptions(Institution $institution, Department $department)
+    {
+        return $department->courses()
+            ->where('institution_id', $institution->id)
+            ->with('programme:id,name')
+            ->orderBy('name')
+            ->get(['id', 'programme_id', 'name', 'code'])
+            ->map(fn (Course $course) => [
+                'id' => $course->id,
+                'name' => $course->name,
+                'code' => $course->code,
+                'programme' => $course->programme ? [
+                    'name' => $course->programme->name,
+                ] : null,
+            ])
+            ->values();
     }
 }

@@ -190,6 +190,10 @@ class QuestionController extends Controller
         $rows = $this->csvRows($request->file('file')->getRealPath());
         $created = 0;
 
+        if ($rows === []) {
+            return back()->withErrors(['file' => 'The uploaded CSV does not contain any question rows.']);
+        }
+
         DB::transaction(function () use ($request, $rows, $questionBank, $subjectId, $topicId, &$created): void {
             foreach ($rows as $index => $row) {
                 $correctAnswer = strtoupper(trim($row['correct_answer'] ?? ''));
@@ -212,20 +216,28 @@ class QuestionController extends Controller
                     ],
                 ];
 
-                validator($data, (new StoreQuestionRequest())->rules())
-                    ->after(function ($validator) use ($data): void {
-                        $filledOptions = collect($data['options'])
-                            ->filter(fn (array $option) => filled($option['option_text'] ?? null));
+                try {
+                    validator($data, (new StoreQuestionRequest())->rules())
+                        ->after(function ($validator) use ($data): void {
+                            $filledOptions = collect($data['options'])
+                                ->filter(fn (array $option) => filled($option['option_text'] ?? null));
 
-                        if ($filledOptions->count() < 2) {
-                            $validator->errors()->add('options', 'At least two options are required.');
-                        }
+                            if ($filledOptions->count() < 2) {
+                                $validator->errors()->add('options', 'At least two options are required.');
+                            }
 
-                        if ($filledOptions->filter(fn (array $option) => $option['is_correct'])->count() !== 1) {
-                            $validator->errors()->add('options', 'Choose exactly one correct answer.');
-                        }
-                    })
-                    ->validate();
+                            if ($filledOptions->filter(fn (array $option) => $option['is_correct'])->count() !== 1) {
+                                $validator->errors()->add('options', 'Choose exactly one correct answer.');
+                            }
+                        })
+                        ->validate();
+                } catch (ValidationException $exception) {
+                    $message = collect($exception->errors())->flatten()->first() ?? 'Check the row values and try again.';
+
+                    throw ValidationException::withMessages([
+                        'file' => 'Row '.($index + 2).': '.$message,
+                    ]);
+                }
 
                 $question = Question::create([
                     'question_bank_id' => $data['question_bank_id'],

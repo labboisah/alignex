@@ -1,7 +1,7 @@
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { Download, Eye, Pencil, Plus, Trash2, Upload } from 'lucide-react';
-import { FormEvent } from 'react';
-import { ActionDropdown, DataTable, PageHeader, PortalAppShell, ProtectedAction, StatusBadge } from '@/Components/Platform';
+import { FormEvent, useState } from 'react';
+import { ActionDropdown, AlertBanner, DataTable, PageHeader, PortalAppShell, ProtectedAction, StatusBadge } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
 import { Question, QuestionBankOption, SubjectOption, TopicOption } from './types';
 
@@ -84,6 +84,7 @@ function BulkTools({ templateHref, uploadHref, questionBanks, subjects, topics, 
         question_bank_id: '',
         topic_id: '',
     });
+    const [uploadStatus, setUploadStatus] = useState<{ tone: 'success' | 'danger'; title: string } | null>(null);
 
     const courseOptions = Array.from(
         new Map(
@@ -103,6 +104,8 @@ function BulkTools({ templateHref, uploadHref, questionBanks, subjects, topics, 
 
     const submit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
+        setUploadStatus(null);
+
         post(uploadHref, {
             forceFormData: true,
             preserveScroll: true,
@@ -111,73 +114,86 @@ function BulkTools({ templateHref, uploadHref, questionBanks, subjects, topics, 
                     setData({ ...data, subject_id: isInstitution ? '' : data.subject_id, topic_id: '' });
                 }
             },
-            onSuccess: () => reset('file'),
+            onSuccess: () => {
+                reset('file');
+                setUploadStatus({ tone: 'success', title: 'Questions uploaded successfully.' });
+            },
+            onError: (formErrors) => {
+                const firstError = Object.values(formErrors)[0];
+                setUploadStatus({
+                    tone: 'danger',
+                    title: typeof firstError === 'string' ? firstError : 'Question upload failed. Check the form and try again.',
+                });
+            },
         });
     };
 
     return (
-        <form onSubmit={submit} className={`mb-5 grid gap-3 rounded-md border border-border bg-white p-4 shadow-sm lg:items-end ${isCbt || isSecondary || isInstitution ? 'lg:grid-cols-[auto_1fr_1fr_1fr_auto]' : 'lg:grid-cols-[auto_1fr_1fr_1fr_1fr_auto]'}`}>
-            <Button asChild type="button" variant="secondary">
-                <a href={templateHref}>
-                    <Download className="h-4 w-4" />
-                    Template
-                </a>
-            </Button>
-            {isInstitution ? (
+        <div className="mb-5 space-y-3">
+            {uploadStatus && <AlertBanner tone={uploadStatus.tone} title={uploadStatus.title} />}
+            <form onSubmit={submit} className={`grid gap-3 rounded-md border border-border bg-white p-4 shadow-sm lg:items-end ${isCbt || isSecondary || isInstitution ? 'lg:grid-cols-[auto_1fr_1fr_1fr_auto]' : 'lg:grid-cols-[auto_1fr_1fr_1fr_1fr_auto]'}`}>
+                <Button asChild type="button" variant="secondary">
+                    <a href={templateHref}>
+                        <Download className="h-4 w-4" />
+                        Template
+                    </a>
+                </Button>
+                {isInstitution ? (
+                    <label className="text-sm font-semibold text-slateDark">
+                        Course
+                        <select
+                            className="mt-1 block h-10 w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                            value={data.course_id}
+                            onChange={(event) => setData({ ...data, course_id: event.target.value, question_bank_id: '', subject_id: '', topic_id: '' })}
+                            required
+                        >
+                            <option value="">Choose course</option>
+                            {courseOptions.map((course) => <option key={course.id} value={course.id}>{course.name}</option>)}
+                        </select>
+                    </label>
+                ) : (
+                    <label className="text-sm font-semibold text-slateDark">
+                        {isProfessional ? 'Course / Module Mapping' : 'Subject'}
+                        <select
+                            className="mt-1 block h-10 w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                            value={data.subject_id}
+                            onChange={(event) => setData({ ...data, subject_id: event.target.value, question_bank_id: '', topic_id: '' })}
+                            required
+                        >
+                            <option value="">{isProfessional ? 'Choose mapping' : 'Choose subject'}</option>
+                            {subjects.data.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}
+                        </select>
+                        {errors.subject_id && <span className="mt-1 block text-sm text-danger">{errors.subject_id}</span>}
+                    </label>
+                )}
                 <label className="text-sm font-semibold text-slateDark">
-                    Course
-                    <select
-                        className="mt-1 block h-10 w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                        value={data.course_id}
-                        onChange={(event) => setData({ ...data, course_id: event.target.value, question_bank_id: '', subject_id: '', topic_id: '' })}
-                        required
-                    >
-                        <option value="">Choose course</option>
-                        {courseOptions.map((course) => <option key={course.id} value={course.id}>{course.name}</option>)}
+                    Question Bank
+                    <select className="mt-1 block h-10 w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm" value={data.question_bank_id} onChange={(event) => setData('question_bank_id', event.target.value)} required>
+                        <option value="">{isInstitution ? (data.course_id ? 'Choose bank' : 'Choose course first') : (data.subject_id ? 'Choose bank' : 'Choose subject first')}</option>
+                        {availableBanks.map((bank) => <option key={bank.id} value={bank.id}>{bank.name}</option>)}
                     </select>
+                    {errors.question_bank_id && <span className="mt-1 block text-sm text-danger">{errors.question_bank_id}</span>}
                 </label>
-            ) : (
+                {!isCbt && !isSecondary && !isInstitution && (
+                    <label className="text-sm font-semibold text-slateDark">
+                        {isProfessional ? 'Module Detail' : 'Topic'}
+                        <select className="mt-1 block h-10 w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm" value={data.topic_id} onChange={(event) => setData('topic_id', event.target.value)}>
+                            <option value="">None</option>
+                            {availableTopics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}
+                        </select>
+                        {errors.topic_id && <span className="mt-1 block text-sm text-danger">{errors.topic_id}</span>}
+                    </label>
+                )}
                 <label className="text-sm font-semibold text-slateDark">
-                    {isProfessional ? 'Course / Module Mapping' : 'Subject'}
-                    <select
-                        className="mt-1 block h-10 w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                        value={data.subject_id}
-                        onChange={(event) => setData({ ...data, subject_id: event.target.value, question_bank_id: '', topic_id: '' })}
-                        required
-                    >
-                        <option value="">{isProfessional ? 'Choose mapping' : 'Choose subject'}</option>
-                        {subjects.data.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}
-                    </select>
-                    {errors.subject_id && <span className="mt-1 block text-sm text-danger">{errors.subject_id}</span>}
+                    Upload CSV
+                    <input className="mt-1 block w-full rounded-md border border-border text-sm file:mr-3 file:h-10 file:border-0 file:bg-slate-100 file:px-3 file:text-sm file:font-semibold" type="file" accept=".csv,text/csv" onChange={(event) => setData('file', event.target.files?.[0] ?? null)} />
+                    {errors.file && <span className="mt-1 block text-sm text-danger">{errors.file}</span>}
                 </label>
-            )}
-            <label className="text-sm font-semibold text-slateDark">
-                Question Bank
-                <select className="mt-1 block h-10 w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm" value={data.question_bank_id} onChange={(event) => setData('question_bank_id', event.target.value)} required>
-                    <option value="">{isInstitution ? (data.course_id ? 'Choose bank' : 'Choose course first') : (data.subject_id ? 'Choose bank' : 'Choose subject first')}</option>
-                    {availableBanks.map((bank) => <option key={bank.id} value={bank.id}>{bank.name}</option>)}
-                </select>
-                {errors.question_bank_id && <span className="mt-1 block text-sm text-danger">{errors.question_bank_id}</span>}
-            </label>
-            {!isCbt && !isSecondary && !isInstitution && (
-                <label className="text-sm font-semibold text-slateDark">
-                    {isProfessional ? 'Module Detail' : 'Topic'}
-                    <select className="mt-1 block h-10 w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm" value={data.topic_id} onChange={(event) => setData('topic_id', event.target.value)}>
-                        <option value="">None</option>
-                        {availableTopics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}
-                    </select>
-                    {errors.topic_id && <span className="mt-1 block text-sm text-danger">{errors.topic_id}</span>}
-                </label>
-            )}
-            <label className="text-sm font-semibold text-slateDark">
-                Upload CSV
-                <input className="mt-1 block w-full rounded-md border border-border text-sm file:mr-3 file:h-10 file:border-0 file:bg-slate-100 file:px-3 file:text-sm file:font-semibold" type="file" accept=".csv,text/csv" onChange={(event) => setData('file', event.target.files?.[0] ?? null)} />
-                {errors.file && <span className="mt-1 block text-sm text-danger">{errors.file}</span>}
-            </label>
-            <Button type="submit" disabled={processing || !data.file || (isInstitution ? !data.course_id : !data.subject_id) || !data.question_bank_id}>
-                <Upload className="h-4 w-4" />
-                Upload
-            </Button>
-        </form>
+                <Button type="submit" disabled={processing || !data.file || (isInstitution ? !data.course_id : !data.subject_id) || !data.question_bank_id}>
+                    <Upload className="h-4 w-4" />
+                    Upload
+                </Button>
+            </form>
+        </div>
     );
 }
