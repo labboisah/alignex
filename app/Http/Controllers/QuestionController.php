@@ -31,7 +31,7 @@ class QuestionController extends Controller
         return Inertia::render('Questions/Index', [
             'questions' => QuestionResource::collection(
                 $this->scopedQuestions($request)
-                    ->with(['questionBank.course', 'questionBank.module', 'subject', 'topic', 'options'])
+                    ->with(['questionBank.institution', 'questionBank.course', 'questionBank.module', 'subject', 'topic', 'options'])
                     ->latest()
                     ->get()
             ),
@@ -55,15 +55,15 @@ class QuestionController extends Controller
     {
         $data = $request->validated();
         $questionBank = $this->authorizedQuestionBank($request, $data['question_bank_id']);
-        $this->ensureSubjectMatchesQuestionBank($data['subject_id'], $questionBank);
-        $topicId = $this->topicIdForQuestion($request, $data['topic_id'] ?? null, $data['subject_id']);
+        $subjectId = $this->subjectIdForQuestionBank($data['subject_id'] ?? null, $questionBank);
+        $topicId = $this->topicIdForQuestion($request, $data['topic_id'] ?? null, $subjectId);
 
-        $question = DB::transaction(function () use ($request, $data, $topicId): Question {
+        $question = DB::transaction(function () use ($request, $data, $subjectId, $topicId): Question {
             $imagePath = $request->file('image')?->store('question-images', 'public');
 
             $question = Question::create([
                 'question_bank_id' => $data['question_bank_id'],
-                'subject_id' => $data['subject_id'],
+                'subject_id' => $subjectId,
                 'topic_id' => $topicId,
                 'created_by' => $request->user()->id,
                 'question_type' => Question::TYPE_SINGLE_CHOICE,
@@ -88,7 +88,7 @@ class QuestionController extends Controller
         Gate::authorize('view', $question);
 
         return Inertia::render('Questions/Show', [
-            'question' => QuestionResource::make($question->load(['questionBank.course', 'questionBank.module', 'subject', 'topic', 'options'])),
+            'question' => QuestionResource::make($question->load(['questionBank.institution', 'questionBank.course', 'questionBank.module', 'subject', 'topic', 'options'])),
             'can' => [
                 'update' => $request->user()->can('update', $question),
                 'delete' => $request->user()->can('delete', $question),
@@ -101,7 +101,7 @@ class QuestionController extends Controller
         Gate::authorize('update', $question);
 
         return Inertia::render('Questions/Edit', [
-            'question' => QuestionResource::make($question->load(['questionBank.course', 'questionBank.module', 'subject', 'topic', 'options'])),
+            'question' => QuestionResource::make($question->load(['questionBank.institution', 'questionBank.course', 'questionBank.module', 'subject', 'topic', 'options'])),
             ...$this->formOptions($request),
         ]);
     }
@@ -110,10 +110,10 @@ class QuestionController extends Controller
     {
         $data = $request->validated();
         $questionBank = $this->authorizedQuestionBank($request, $data['question_bank_id']);
-        $this->ensureSubjectMatchesQuestionBank($data['subject_id'], $questionBank);
-        $topicId = $this->topicIdForQuestion($request, $data['topic_id'] ?? null, $data['subject_id']);
+        $subjectId = $this->subjectIdForQuestionBank($data['subject_id'] ?? null, $questionBank);
+        $topicId = $this->topicIdForQuestion($request, $data['topic_id'] ?? null, $subjectId);
 
-        DB::transaction(function () use ($request, $question, $data, $topicId): void {
+        DB::transaction(function () use ($request, $question, $data, $subjectId, $topicId): void {
             $imagePath = $question->image_path;
 
             if ($request->boolean('remove_image') && $imagePath) {
@@ -131,7 +131,7 @@ class QuestionController extends Controller
 
             $question->update([
                 'question_bank_id' => $data['question_bank_id'],
-                'subject_id' => $data['subject_id'],
+                'subject_id' => $subjectId,
                 'topic_id' => $topicId,
                 'stem' => $data['stem'],
                 'image_path' => $imagePath,
@@ -179,24 +179,24 @@ class QuestionController extends Controller
         $request->validate([
             'file' => ['required', 'file', 'mimes:csv,txt', 'max:4096'],
             'question_bank_id' => ['required', 'string', 'exists:question_banks,id'],
-            'subject_id' => ['required', 'string', 'exists:subjects,id'],
+            'subject_id' => ['nullable', 'string', 'exists:subjects,id'],
             'topic_id' => ['nullable', 'string', 'exists:topics,id'],
         ]);
 
         $questionBank = $this->authorizedQuestionBank($request, $request->string('question_bank_id')->toString());
-        $this->ensureSubjectMatchesQuestionBank($request->string('subject_id')->toString(), $questionBank);
-        $topicId = $this->topicIdForQuestion($request, $request->input('topic_id'), $request->string('subject_id')->toString());
+        $subjectId = $this->subjectIdForQuestionBank($request->input('subject_id'), $questionBank);
+        $topicId = $this->topicIdForQuestion($request, $request->input('topic_id'), $subjectId);
 
         $rows = $this->csvRows($request->file('file')->getRealPath());
         $created = 0;
 
-        DB::transaction(function () use ($request, $rows, $questionBank, $topicId, &$created): void {
+        DB::transaction(function () use ($request, $rows, $questionBank, $subjectId, $topicId, &$created): void {
             foreach ($rows as $index => $row) {
                 $correctAnswer = strtoupper(trim($row['correct_answer'] ?? ''));
 
                 $data = [
                     'question_bank_id' => $questionBank->id,
-                    'subject_id' => $questionBank->subject_id,
+                    'subject_id' => $subjectId,
                     'topic_id' => $topicId,
                     'difficulty' => trim($row['difficulty'] ?? 'medium') ?: 'medium',
                     'marks' => trim($row['marks'] ?? '1') ?: '1',
@@ -277,6 +277,7 @@ class QuestionController extends Controller
         if (($context['type'] ?? null) === 'organization') {
             $query
                 ->where('organization_id', $context['id'])
+                ->whereNull('institution_id')
                 ->whereNull('secondary_school_id')
                 ->whereNull('professional_school_id')
                 ->whereNull('cbt_center_id');
@@ -310,10 +311,17 @@ class QuestionController extends Controller
             return;
         }
 
+        if (($context['type'] ?? null) === 'institution') {
+            $query->where('institution_id', $context['id']);
+
+            return;
+        }
+
         $query
             ->when(! $user->isSuperAdmin() && $user->organization_id, fn ($bankQuery) => $bankQuery->where('organization_id', $user->organization_id))
             ->when(! $user->isSuperAdmin() && $user->school_id, fn ($bankQuery) => $bankQuery->where('school_id', $user->school_id))
             ->when(! $user->isSuperAdmin() && $user->center_id, fn ($bankQuery) => $bankQuery->where('center_id', $user->center_id))
+            ->when(! $user->isSuperAdmin() && $user->institution_id, fn ($bankQuery) => $bankQuery->where('institution_id', $user->institution_id))
             ->when(! $user->isSuperAdmin() && $user->secondary_school_id, fn ($bankQuery) => $bankQuery->where('secondary_school_id', $user->secondary_school_id))
             ->when(! $user->isSuperAdmin() && $user->professional_school_id, fn ($bankQuery) => $bankQuery->where('professional_school_id', $user->professional_school_id))
             ->when(! $user->isSuperAdmin() && $user->cbt_center_id, fn ($bankQuery) => $bankQuery->where('cbt_center_id', $user->cbt_center_id))
@@ -341,6 +349,21 @@ class QuestionController extends Controller
         return $questionBank;
     }
 
+    private function subjectIdForQuestionBank(?string $subjectId, QuestionBank $questionBank): ?string
+    {
+        if ($questionBank->institution_id) {
+            return null;
+        }
+
+        if (! $subjectId) {
+            throw ValidationException::withMessages(['subject_id' => 'Choose a subject for the selected question bank.']);
+        }
+
+        $this->ensureSubjectMatchesQuestionBank($subjectId, $questionBank);
+
+        return $subjectId;
+    }
+
     private function ensureSubjectMatchesQuestionBank(string $subjectId, QuestionBank $questionBank): void
     {
         if ($questionBank->subject_id !== $subjectId) {
@@ -364,11 +387,11 @@ class QuestionController extends Controller
         }
     }
 
-    private function topicIdForQuestion(Request $request, ?string $topicId, string $subjectId): ?string
+    private function topicIdForQuestion(Request $request, ?string $topicId, ?string $subjectId): ?string
     {
-        if ($this->isSecondaryContext($request)) {
+        if ($this->isSecondaryContext($request) || $this->isInstitutionContext($request) || ! $subjectId) {
             if (filled($topicId)) {
-                throw ValidationException::withMessages(['topic_id' => 'Secondary school questions do not use topics. Choose only class, subject, bank, and question.']);
+                throw ValidationException::withMessages(['topic_id' => 'This question scope does not use topics. Choose only the bank and question details.']);
             }
 
             return null;
@@ -385,6 +408,14 @@ class QuestionController extends Controller
 
         return ($context['type'] ?? null) === 'secondary_school'
             || $request->user()?->secondary_school_id !== null;
+    }
+
+    private function isInstitutionContext(Request $request): bool
+    {
+        $context = app(CurrentContextService::class)->current($request->user());
+
+        return ($context['type'] ?? null) === 'institution'
+            || $request->user()?->institution_id !== null;
     }
 
     private function syncOptions(Question $question, array $options): void
@@ -429,8 +460,7 @@ class QuestionController extends Controller
         return [
             'questionBanks' => QuestionBankResource::collection(
                 $this->scopedQuestionBanks($request)
-                    ->whereNotNull('subject_id')
-                    ->with(['subject', 'course', 'module'])
+                    ->with(['subject', 'institution', 'course', 'module'])
                     ->orderBy('name')
                     ->get()
             ),

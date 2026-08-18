@@ -13,6 +13,7 @@ type Props = {
 export default function QuestionBanksIndex({ questionBanks, can }: Props) {
     const currentContext = usePage().props.current_context as { type?: string } | undefined;
     const isProfessional = currentContext?.type === 'professional_school' || questionBanks.data.some((bank) => bank.professional_school_id);
+    const isInstitution = currentContext?.type === 'institution' || questionBanks.data.some((bank) => bank.institution_id);
 
     return (
         <PortalAppShell title="Question Bank">
@@ -20,7 +21,7 @@ export default function QuestionBanksIndex({ questionBanks, can }: Props) {
             <PageHeader
                 eyebrow="Assessment"
                 title="Question Bank"
-                description={isProfessional ? 'Manage question-bank containers by course, module, and scope.' : 'Manage question-bank containers by subject and scope.'}
+                description={isInstitution || isProfessional ? 'Manage question-bank containers by course and scope.' : 'Manage question-bank containers by subject and scope.'}
                 actions={
                     <ProtectedAction allowed={can.create}>
                         <Button asChild type="button">
@@ -33,15 +34,15 @@ export default function QuestionBanksIndex({ questionBanks, can }: Props) {
                 }
             />
 
-            <BulkTools templateHref="/question-bank/template" uploadHref="/question-bank/import" />
+            {!isInstitution && <BulkTools templateHref="/question-bank/template" uploadHref="/question-bank/import" />}
 
             <DataTable<QuestionBank>
                 rows={questionBanks.data}
                 emptyTitle="No question banks found"
                 columns={[
                     { key: 'name', header: 'Name', render: (bank) => <span className="font-semibold text-slateDark">{bank.name}</span> },
-                    { key: 'structure', header: isProfessional ? 'Course / Module' : 'Subject', render: (bank) => isProfessional ? [bank.course_name, bank.module_name].filter(Boolean).join(' / ') || bank.subject_name || 'N/A' : bank.subject_name ?? 'N/A' },
-                    { key: 'scope', header: 'Scope', render: (bank) => bank.organization_name ?? bank.professional_school_name ?? bank.secondary_school_name ?? bank.cbt_center_name ?? bank.school_name ?? bank.center_name ?? 'Platform' },
+                    { key: 'structure', header: isInstitution ? 'Course' : isProfessional ? 'Course / Module' : 'Subject', render: (bank) => isInstitution ? [bank.course_name, bank.department_name].filter(Boolean).join(' / ') || 'N/A' : isProfessional ? [bank.course_name, bank.module_name].filter(Boolean).join(' / ') || bank.subject_name || 'N/A' : bank.subject_name ?? 'N/A' },
+                    { key: 'scope', header: 'Scope', render: (bank) => bank.institution_name ?? bank.organization_name ?? bank.professional_school_name ?? bank.secondary_school_name ?? bank.cbt_center_name ?? bank.school_name ?? bank.center_name ?? 'Platform' },
                     { key: 'questions_count', header: 'Questions', render: (bank) => String(bank.questions_count ?? 0) },
                     { key: 'status', header: 'Status', render: (bank) => <StatusBadge label={bank.status_label} tone={bank.status === 'active' ? 'success' : bank.status === 'archived' ? 'neutral' : 'warning'} /> },
                     {

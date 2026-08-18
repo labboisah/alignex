@@ -15,10 +15,25 @@ export type SubjectOption = {
     code: string;
 };
 
+export type CourseOption = {
+    id: number | string;
+    name: string;
+    code: string;
+    faculty_name?: string | null;
+    department_name?: string | null;
+    programme_name?: string | null;
+};
+
 export type QuestionBank = Record<string, unknown> & {
     id: string;
     organization_id?: number | null;
     organization_name?: string | null;
+    institution_id?: number | null;
+    institution_name?: string | null;
+    faculty_id?: number | null;
+    faculty_name?: string | null;
+    department_id?: number | null;
+    department_name?: string | null;
     school_id?: number | null;
     school_name?: string | null;
     center_id?: number | null;

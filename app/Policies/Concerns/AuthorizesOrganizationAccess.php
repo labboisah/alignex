@@ -21,6 +21,10 @@ trait AuthorizesOrganizationAccess
             return true;
         }
 
+        if (isset($model->institution_id) && $user->canAccessInstitution($model->institution_id)) {
+            return true;
+        }
+
         if (isset($model->secondary_school_id) && $user->canAccessSecondarySchool($model->secondary_school_id)) {
             return true;
         }

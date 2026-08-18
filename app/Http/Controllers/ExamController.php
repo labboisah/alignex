@@ -12,8 +12,10 @@ use App\Models\Candidate;
 use App\Models\CandidateGroup;
 use App\Models\Center;
 use App\Models\CbtCenter;
+use App\Models\Course;
 use App\Models\Exam;
 use App\Models\ExamType;
+use App\Models\Institution;
 use App\Models\Organization;
 use App\Models\ProfessionalSchool;
 use App\Models\QuestionBank;
@@ -46,7 +48,7 @@ class ExamController extends Controller
         return Inertia::render('Exams/Index', [
             'exams' => ExamResource::collection(
                 $this->scopedExams($request)
-                    ->with(['organization', 'school', 'center', 'secondarySchool', 'professionalSchool', 'cbtCenter', 'examType', 'questionBank'])
+                    ->with(['organization', 'institution', 'faculty', 'department', 'school', 'center', 'secondarySchool', 'professionalSchool', 'cbtCenter', 'examType', 'questionBank'])
                     ->withCount(['examSubjects', 'participants', 'attempts'])
                     ->latest()
                     ->get()
@@ -75,7 +77,7 @@ class ExamController extends Controller
         $exam = app(ExamStatusService::class)->sync($exam);
 
         return Inertia::render('Exams/Show', [
-            'exam' => ExamResource::make($exam->load(['organization', 'school', 'center', 'secondarySchool', 'professionalSchool', 'cbtCenter', 'examType', 'questionBank', 'examSubjects.subject', 'examSubjects.questionBank', 'candidates'])->loadCount(['participants', 'attempts', 'examSubjects'])),
+            'exam' => ExamResource::make($exam->load(['organization', 'institution', 'faculty', 'department', 'school', 'center', 'secondarySchool', 'professionalSchool', 'cbtCenter', 'examType', 'questionBank', 'examSubjects.subject', 'examSubjects.questionBank', 'candidates'])->loadCount(['participants', 'attempts', 'examSubjects'])),
             'can' => [
                 'update' => $request->user()->can('update', $exam),
                 'cancel' => $request->user()->can('update', $exam) && $exam->status !== Exam::STATUS_CANCELLED,
@@ -90,7 +92,7 @@ class ExamController extends Controller
         $exam = app(ExamStatusService::class)->sync($exam);
 
         return Inertia::render('Exams/Edit', [
-            'exam' => ExamResource::make($exam->load(['organization', 'school', 'center', 'secondarySchool', 'professionalSchool', 'cbtCenter', 'examType', 'questionBank', 'examSubjects.subject', 'examSubjects.questionBank', 'candidates'])->loadCount(['participants', 'attempts', 'examSubjects'])),
+            'exam' => ExamResource::make($exam->load(['organization', 'institution', 'faculty', 'department', 'school', 'center', 'secondarySchool', 'professionalSchool', 'cbtCenter', 'examType', 'questionBank', 'examSubjects.subject', 'examSubjects.questionBank', 'candidates'])->loadCount(['participants', 'attempts', 'examSubjects'])),
             ...$this->formOptions($request),
         ]);
     }
@@ -224,6 +226,9 @@ class ExamController extends Controller
     {
         $data = $request->validated();
         $tenant = $this->tenantFor($request, $data, $exam);
+        if (($tenant['exam_owner_type'] ?? null) === Exam::OWNER_INSTITUTION) {
+            $tenant = $this->tenantForInstitutionCourse($tenant, $data);
+        }
         $examType = $this->examTypeFor($data['exam_type']);
         $examCategory = $data['exam_category'] ?? $this->categoryForLegacyType($data['exam_type'], $tenant['exam_owner_type']);
         $examMode = $data['exam_mode'] ?? $data['mode'];
@@ -249,10 +254,10 @@ class ExamController extends Controller
             'academic_term_id' => $data['academic_term_id'] ?? $data['term_id'] ?? null,
             'school_class_id' => $data['school_class_id'] ?? null,
             'class_arm_id' => null,
-            'subject_id' => $data['subject_id'] ?? (in_array($tenant['exam_owner_type'], [Exam::OWNER_PROFESSIONAL_SCHOOL, Exam::OWNER_CBT_CENTER], true) ? null : ($data['subjects'][0]['subject_id'] ?? null)),
+            'subject_id' => $data['subject_id'] ?? (in_array($tenant['exam_owner_type'], [Exam::OWNER_PROFESSIONAL_SCHOOL, Exam::OWNER_CBT_CENTER, Exam::OWNER_INSTITUTION], true) ? null : ($data['subjects'][0]['subject_id'] ?? null)),
             'question_bank_id' => $data['question_bank_id'] ?? $this->firstQuestionBankId($data['subjects'] ?? []) ?? null,
-            'programme_id' => $data['programme_id'] ?? null,
-            'course_id' => $data['course_id'] ?? null,
+            'programme_id' => $tenant['exam_owner_type'] === Exam::OWNER_INSTITUTION ? ($tenant['programme_id'] ?? null) : ($data['programme_id'] ?? null),
+            'course_id' => $tenant['exam_owner_type'] === Exam::OWNER_INSTITUTION ? ($tenant['course_id'] ?? null) : ($data['course_id'] ?? null),
             'module_id' => $data['module_id'] ?? null,
             'training_batch_id' => $data['training_batch_id'] ?? null,
             'exam_type_id' => $examType->id,
@@ -321,11 +326,13 @@ class ExamController extends Controller
         $exam->examSubjects()->delete();
 
         foreach (array_values($data['subjects']) as $index => $subject) {
-            $this->authorizeSubject($request, $subject['subject_id']);
+            if ($tenant['exam_owner_type'] !== Exam::OWNER_INSTITUTION) {
+                $this->authorizeSubject($request, $subject['subject_id']);
+            }
             $bankIds = $this->resolveQuestionBankIds($subject, $data);
-            $this->authorizeSubjectQuestionBanks($tenant, $bankIds, $subject['subject_id'], true, $request->user());
+            $this->authorizeSubjectQuestionBanks($tenant, $bankIds, $subject['subject_id'] ?? '', true, $request->user());
             $exam->examSubjects()->create([
-                'subject_id' => $subject['subject_id'],
+                'subject_id' => $tenant['exam_owner_type'] === Exam::OWNER_INSTITUTION ? null : $subject['subject_id'],
                 'question_bank_id' => $bankIds[0] ?? null,
                 'display_order' => $index + 1,
                 'question_count' => $subject['number_of_questions'],
@@ -375,6 +382,34 @@ class ExamController extends Controller
         return [];
     }
 
+    private function tenantForInstitutionCourse(array $tenant, array $data): array
+    {
+        $courseId = collect($data['subjects'] ?? [])
+            ->pluck('course_id')
+            ->filter()
+            ->first() ?? $data['course_id'] ?? null;
+
+        $course = Course::query()
+            ->whereKey($courseId)
+            ->where('institution_id', $tenant['institution_id'] ?? null)
+            ->first();
+
+        if (! $course) {
+            throw ValidationException::withMessages(['course_id' => 'Choose a course within this institution.']);
+        }
+
+        return [
+            ...$tenant,
+            'organization_id' => $course->institution?->organization_id,
+            'institution_id' => $course->institution_id,
+            'faculty_id' => $course->faculty_id,
+            'department_id' => $course->department_id,
+            'programme_id' => $course->programme_id,
+            'course_id' => $course->id,
+        ];
+    }
+
+
     private function professionalBatchCandidateIds(array $tenant, array $data): array
     {
         if (empty($data['training_batch_id'])) {
@@ -402,12 +437,15 @@ class ExamController extends Controller
         $secondarySchool = $request->route('secondarySchool');
         $professionalSchool = $request->route('professionalSchool');
         $cbtCenter = $request->route('cbtCenter');
+        $context = app(CurrentContextService::class)->current($user);
+        $institutionId = (($context['type'] ?? null) === 'institution' ? $context['id'] : null) ?? $user->institution_id;
 
         return Exam::query()
             ->when($organization, fn ($query) => $query->where('organization_id', $organization->id))
             ->when($secondarySchool, fn ($query) => $query->where('secondary_school_id', $secondarySchool->id))
             ->when($professionalSchool, fn ($query) => $query->where('professional_school_id', $professionalSchool->id))
             ->when($cbtCenter, fn ($query) => $query->where('cbt_center_id', $cbtCenter->id))
+            ->when($institutionId, fn ($query) => $query->where('institution_id', $institutionId))
             ->when($user->isTeacher() || $user->isFacilitator(), fn ($query) => $query->where('exam_category', Exam::CATEGORY_ASSESSMENT))
             ->when(! $user->isTeacher() && ! $user->isFacilitator() && $request->filled('category'), fn ($query) => $query->where('exam_category', $request->query('category')))
             ->when($request->filled('mode'), fn ($query) => $query->where(fn ($inner) => $inner->where('exam_mode', $request->query('mode'))->orWhere('mode', $request->query('mode'))))
@@ -416,6 +454,7 @@ class ExamController extends Controller
             ->when(! $user->isSuperAdmin() && $user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
             ->when(! $user->isSuperAdmin() && $user->school_id, fn ($query) => $query->where('school_id', $user->school_id))
             ->when(! $user->isSuperAdmin() && $user->center_id, fn ($query) => $query->where('center_id', $user->center_id))
+            ->when(! $user->isSuperAdmin() && ! $institutionId && $user->institution_id, fn ($query) => $query->where('institution_id', $user->institution_id))
             ->when(! $user->isSuperAdmin() && $user->secondary_school_id, fn ($query) => $query->where('secondary_school_id', $user->secondary_school_id))
             ->when(! $user->isSuperAdmin() && $user->professional_school_id, fn ($query) => $query->where('professional_school_id', $user->professional_school_id))
             ->when(! $user->isSuperAdmin() && $user->cbt_center_id, fn ($query) => $query->where('cbt_center_id', $user->cbt_center_id));
@@ -458,6 +497,9 @@ class ExamController extends Controller
         if ($exam) {
             return [
                 'organization_id' => $exam->organization_id,
+                'institution_id' => $exam->institution_id,
+                'faculty_id' => $exam->faculty_id,
+                'department_id' => $exam->department_id,
                 'school_id' => $exam->school_id,
                 'center_id' => $exam->center_id,
                 'secondary_school_id' => $exam->secondary_school_id,
@@ -466,6 +508,7 @@ class ExamController extends Controller
                 'exam_owner_type' => $exam->exam_owner_type ?? $exam->owner_type ?? $exam->effectiveOwnerType(),
                 'exam_owner_id' => $exam->exam_owner_id ?? $exam->owner_id ?? $this->ownerIdFor($exam->effectiveOwnerType(), [
                     'organization_id' => $exam->organization_id,
+                    'institution_id' => $exam->institution_id,
                     'school_id' => $exam->school_id,
                     'center_id' => $exam->center_id,
                     'secondary_school_id' => $exam->secondary_school_id,
@@ -489,6 +532,11 @@ class ExamController extends Controller
 
         if ($request->route('cbtCenter') && ($user->isSuperAdmin() || $user->canAccessCbtCenter($request->route('cbtCenter')->id) || $user->canAccessOrganization($request->route('cbtCenter')->organization_id))) {
             return $this->tenantPayload(Exam::OWNER_CBT_CENTER, $request->route('cbtCenter')->id);
+        }
+
+        $institutionId = $this->institutionIdForRequest($request, $data);
+        if ($institutionId) {
+            return $this->tenantPayload(Exam::OWNER_INSTITUTION, $institutionId);
         }
 
         if (filled($data['secondary_school_id'] ?? null) && ($user->isSuperAdmin() || SecondarySchool::query()
@@ -534,6 +582,9 @@ class ExamController extends Controller
 
         $tenant = [
             'organization_id' => $data['organization_id'] ?: null,
+            'institution_id' => $data['institution_id'] ?? null,
+            'faculty_id' => null,
+            'department_id' => null,
             'school_id' => $data['school_id'] ?: null,
             'center_id' => $data['center_id'] ?: null,
             'secondary_school_id' => $data['secondary_school_id'] ?? null,
@@ -554,6 +605,9 @@ class ExamController extends Controller
     {
         return [
             'organization_id' => $exam->organization_id,
+            'institution_id' => $exam->institution_id,
+            'faculty_id' => $exam->faculty_id,
+            'department_id' => $exam->department_id,
             'school_id' => $exam->school_id,
             'center_id' => $exam->center_id,
             'secondary_school_id' => $exam->secondary_school_id,
@@ -562,6 +616,7 @@ class ExamController extends Controller
             'exam_owner_type' => $exam->exam_owner_type ?? $exam->owner_type ?? $exam->effectiveOwnerType(),
             'exam_owner_id' => $exam->exam_owner_id ?? $exam->owner_id ?? $this->ownerIdFor($exam->effectiveOwnerType(), [
                 'organization_id' => $exam->organization_id,
+                'institution_id' => $exam->institution_id,
                 'school_id' => $exam->school_id,
                 'center_id' => $exam->center_id,
                 'secondary_school_id' => $exam->secondary_school_id,
@@ -596,7 +651,7 @@ class ExamController extends Controller
             'candidateGroups' => $this->candidateGroupOptions($request),
             'questionBanks' => $this->questionBankOptions($request),
             'programmes' => $this->professionalOptions($request, 'programmes'),
-            'courses' => $this->professionalOptions($request, 'courses', ['id', 'programme_id', 'name', 'code']),
+            'courses' => $this->institutionIdForRequest($request, []) ? $this->institutionCourseOptions($request) : $this->professionalOptions($request, 'courses', ['id', 'programme_id', 'name', 'code']),
             'modules' => $this->professionalOptions($request, 'modules', ['id', 'programme_id', 'course_id', 'name', 'code']),
             'trainingBatches' => $this->professionalOptions($request, 'trainingBatches', ['id', 'programme_id', 'name', 'code']),
             'studentGroups' => $this->secondaryStudentGroups($request),
@@ -681,6 +736,41 @@ class ExamController extends Controller
 
         return $query->get($columns);
     }
+
+    private function institutionCourseOptions(Request $request)
+    {
+        $institutionId = $this->institutionIdForRequest($request, []);
+
+        if (! $institutionId) {
+            return [];
+        }
+
+        return Course::query()
+            ->where('institution_id', $institutionId)
+            ->orderBy('name')
+            ->get(['id', 'programme_id', 'name', 'code']);
+    }
+
+    private function institutionIdForRequest(Request $request, array $data): ?int
+    {
+        $context = app(CurrentContextService::class)->current($request->user());
+        $institutionId = $data['institution_id'] ?? null
+            ?: ((($context['type'] ?? null) === 'institution') ? $context['id'] : null)
+            ?: $request->user()?->institution_id;
+
+        if (! $institutionId) {
+            return null;
+        }
+
+        return Institution::query()
+            ->whereKey($institutionId)
+            ->when(! $request->user()?->isSuperAdmin(), fn ($query) => $query
+                ->where(fn ($scope) => $scope
+                    ->whereKey($request->user()?->institution_id)
+                    ->orWhere('organization_id', $request->user()?->organization_id)))
+            ->value('id');
+    }
+
 
     private function secondaryOptions(Request $request, $query, array $columns)
     {
@@ -826,17 +916,21 @@ class ExamController extends Controller
     private function questionBankOptions(Request $request)
     {
         $user = $request->user();
+        $context = app(CurrentContextService::class)->current($user);
+        $institutionId = (($context['type'] ?? null) === 'institution' ? $context['id'] : null) ?? $user->institution_id;
 
         return QuestionBank::query()
+            ->when($institutionId, fn ($query) => $query->where('institution_id', $institutionId))
             ->when($user->isTeacher(), fn ($query) => $query->whereIn('subject_id', $user->assignedSubjects()->select('subjects.id')))
             ->when($user->isFacilitator(), fn ($query) => $this->scopeFacilitatorQuestionBanks($query, $user))
-            ->when(! $user->isSuperAdmin(), function ($query) use ($user): void {
+            ->when(! $user->isSuperAdmin() && ! $institutionId, function ($query) use ($user): void {
                 $query->where(function ($inner) use ($user): void {
                     $inner->whereRaw('1 = 0')
                         ->when($user->organization_id, fn ($scope) => $scope->orWhere('organization_id', $user->organization_id))
                         ->when($user->secondary_school_id, fn ($scope) => $scope->orWhere('secondary_school_id', $user->secondary_school_id))
                         ->when($user->school_id, fn ($scope) => $scope->orWhere('school_id', $user->school_id))
                         ->when($user->professional_school_id, fn ($scope) => $scope->orWhere('professional_school_id', $user->professional_school_id))
+                        ->when($user->institution_id, fn ($scope) => $scope->orWhere('institution_id', $user->institution_id))
                         ->when($user->cbt_center_id, fn ($scope) => $scope->orWhere('cbt_center_id', $user->cbt_center_id));
                 });
             })
@@ -893,12 +987,17 @@ class ExamController extends Controller
 
         foreach ($normalized as $questionBankId) {
             $ownerType = $tenant['exam_owner_type'] ?? null;
-            $query = QuestionBank::query()
-                ->whereKey($questionBankId)
-                ->where('subject_id', $subjectId);
+            $query = QuestionBank::query()->whereKey($questionBankId);
+
+            if ($ownerType !== Exam::OWNER_INSTITUTION) {
+                $query->where('subject_id', $subjectId);
+            }
 
             match ($ownerType) {
                 Exam::OWNER_ORGANIZATION => $query->where('organization_id', $tenant['organization_id'] ?? null),
+                Exam::OWNER_INSTITUTION => $query
+                    ->where('institution_id', $tenant['institution_id'] ?? null)
+                    ->where('course_id', $tenant['course_id'] ?? null),
                 Exam::OWNER_SECONDARY_SCHOOL => $query
                     ->when($tenant['secondary_school_id'] ?? null, fn ($scope) => $scope->where('secondary_school_id', $tenant['secondary_school_id']))
                     ->when($tenant['school_id'] ?? null, fn ($scope) => $scope->where('school_id', $tenant['school_id'])),
@@ -1017,6 +1116,7 @@ class ExamController extends Controller
     private function ownerTypeFor(array $tenant): ?string
     {
         return match (true) {
+            filled($tenant['institution_id'] ?? null) => Exam::OWNER_INSTITUTION,
             filled($tenant['organization_id'] ?? null) => Exam::OWNER_ORGANIZATION,
             filled($tenant['secondary_school_id'] ?? null) || filled($tenant['school_id'] ?? null) => Exam::OWNER_SECONDARY_SCHOOL,
             filled($tenant['professional_school_id'] ?? null) => Exam::OWNER_PROFESSIONAL_SCHOOL,
@@ -1029,6 +1129,7 @@ class ExamController extends Controller
     {
         return match ($ownerType) {
             Exam::OWNER_ORGANIZATION => $tenant['organization_id'] ?? null,
+            Exam::OWNER_INSTITUTION => $tenant['institution_id'] ?? null,
             Exam::OWNER_SECONDARY_SCHOOL => $tenant['secondary_school_id'] ?? $tenant['school_id'] ?? null,
             Exam::OWNER_PROFESSIONAL_SCHOOL => $tenant['professional_school_id'] ?? null,
             Exam::OWNER_CBT_CENTER => $tenant['cbt_center_id'] ?? $tenant['center_id'] ?? null,
@@ -1040,6 +1141,9 @@ class ExamController extends Controller
     {
         $payload = [
             'organization_id' => null,
+            'institution_id' => null,
+            'faculty_id' => null,
+            'department_id' => null,
             'school_id' => null,
             'center_id' => null,
             'secondary_school_id' => null,
@@ -1053,6 +1157,7 @@ class ExamController extends Controller
 
         match ($ownerType) {
             Exam::OWNER_ORGANIZATION => $payload['organization_id'] = $ownerId,
+            Exam::OWNER_INSTITUTION => $payload['institution_id'] = $ownerId,
             Exam::OWNER_SECONDARY_SCHOOL => filled($tenant['school_id'] ?? null) ? $payload['school_id'] = $tenant['school_id'] : $payload['secondary_school_id'] = $ownerId,
             Exam::OWNER_PROFESSIONAL_SCHOOL => $payload['professional_school_id'] = $ownerId,
             Exam::OWNER_CBT_CENTER => filled($tenant['center_id'] ?? null) ? $payload['center_id'] = $tenant['center_id'] : $payload['cbt_center_id'] = $ownerId,

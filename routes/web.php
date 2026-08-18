@@ -308,7 +308,7 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
         ]))->name('settings.index');
     });
 
-    Route::middleware('role:super_admin,organization_admin,examiner,teacher,facilitator,school_admin,secondary_school_admin,professional_school_admin,center_admin,cbt_center_admin,supervisor')->group(function (): void {
+    Route::middleware('role:super_admin,organization_admin,institution_admin,examiner,teacher,facilitator,school_admin,secondary_school_admin,professional_school_admin,center_admin,cbt_center_admin,supervisor')->group(function (): void {
         Route::middleware('permission:manageQuestionBank')->group(function (): void {
             Route::get('/subjects/template', [SubjectController::class, 'template'])->name('subjects.template');
             Route::post('/subjects/import', [SubjectController::class, 'import'])->name('subjects.import');

@@ -17,7 +17,7 @@ class StoreQuestionRequest extends FormRequest
     {
         return [
             'question_bank_id' => ['required', 'string', 'exists:question_banks,id'],
-            'subject_id' => ['required', 'string', 'exists:subjects,id'],
+            'subject_id' => ['nullable', 'string', 'exists:subjects,id'],
             'topic_id' => ['nullable', 'string', 'exists:topics,id'],
             'difficulty' => ['required', Rule::in(['easy', 'medium', 'hard'])],
             'marks' => ['required', 'numeric', 'min:0.01', 'max:1000'],

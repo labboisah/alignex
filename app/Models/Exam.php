@@ -13,6 +13,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
     'organization_id',
+    'institution_id',
+    'faculty_id',
+    'department_id',
     'center_id',
     'school_id',
     'secondary_school_id',
@@ -67,6 +70,7 @@ class Exam extends Model
     public const OWNER_SECONDARY_SCHOOL = 'secondary_school';
     public const OWNER_PROFESSIONAL_SCHOOL = 'professional_school';
     public const OWNER_CBT_CENTER = 'cbt_center';
+    public const OWNER_INSTITUTION = 'institution';
 
     public const CATEGORY_TERMINAL = 'terminal';
     public const CATEGORY_RECRUITMENT = 'recruitment';
@@ -84,6 +88,7 @@ class Exam extends Model
         self::OWNER_SECONDARY_SCHOOL,
         self::OWNER_PROFESSIONAL_SCHOOL,
         self::OWNER_CBT_CENTER,
+        self::OWNER_INSTITUTION,
     ];
 
     public const CATEGORIES = [
@@ -115,6 +120,7 @@ class Exam extends Model
         return $this->exam_owner_type
             ?? $this->owner_type
             ?? match (true) {
+                $this->institution_id !== null => self::OWNER_INSTITUTION,
                 $this->organization_id !== null => self::OWNER_ORGANIZATION,
                 $this->secondary_school_id !== null || $this->school_id !== null => self::OWNER_SECONDARY_SCHOOL,
                 $this->professional_school_id !== null => self::OWNER_PROFESSIONAL_SCHOOL,
@@ -131,6 +137,21 @@ class Exam extends Model
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    public function institution(): BelongsTo
+    {
+        return $this->belongsTo(Institution::class);
+    }
+
+    public function faculty(): BelongsTo
+    {
+        return $this->belongsTo(Faculty::class);
+    }
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class);
     }
 
     public function school(): BelongsTo

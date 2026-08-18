@@ -19,6 +19,7 @@ class QuestionResource extends JsonResource
             'question_bank_name' => $this->whenLoaded('questionBank', fn () => $this->questionBank?->name),
             'question_bank_course_name' => $this->whenLoaded('questionBank', fn () => $this->questionBank?->course?->name),
             'question_bank_module_name' => $this->whenLoaded('questionBank', fn () => $this->questionBank?->module?->name),
+            'institution_id' => $this->whenLoaded('questionBank', fn () => $this->questionBank?->institution_id),
             'professional_school_id' => $this->whenLoaded('questionBank', fn () => $this->questionBank?->professional_school_id),
             'subject_id' => $this->subject_id,
             'subject_name' => $this->whenLoaded('subject', fn () => $this->subject?->name),

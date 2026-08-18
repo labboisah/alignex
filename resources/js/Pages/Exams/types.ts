@@ -18,7 +18,7 @@ export type TenantOption = {
 };
 
 export type CurrentContext = {
-    type: 'organization' | 'secondary_school' | 'professional_school' | 'cbt_center';
+    type: 'organization' | 'institution' | 'secondary_school' | 'professional_school' | 'cbt_center';
     id: number | string;
     name: string;
     source?: 'legacy_school' | 'legacy_center' | string;
@@ -67,6 +67,10 @@ export type Exam = Record<string, unknown> & {
     id: string;
     organization_id?: number | null;
     organization_name?: string | null;
+    institution_id?: number | null;
+    institution_name?: string | null;
+    faculty_id?: number | null;
+    department_id?: number | null;
     center_id?: number | null;
     center_name?: string | null;
     school_id?: number | null;

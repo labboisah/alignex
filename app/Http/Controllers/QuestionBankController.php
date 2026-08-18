@@ -7,11 +7,14 @@ use App\Http\Requests\UpdateQuestionBankRequest;
 use App\Http\Resources\QuestionBankResource;
 use App\Http\Resources\SubjectResource;
 use App\Models\Center;
+use App\Models\Course;
 use App\Models\Exam;
+use App\Models\Institution;
 use App\Models\Organization;
 use App\Models\QuestionBank;
 use App\Models\School;
 use App\Models\Subject;
+use App\Services\CurrentContextService;
 use App\Support\ReferenceCode;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -30,7 +33,7 @@ class QuestionBankController extends Controller
         return Inertia::render('QuestionBanks/Index', [
             'questionBanks' => QuestionBankResource::collection(
                 $this->scopedQuestionBanks($request)
-                    ->with(['organization', 'school', 'center', 'subject', 'secondarySchool', 'professionalSchool', 'cbtCenter', 'programme', 'course', 'module'])
+                    ->with(['organization', 'institution', 'faculty', 'department', 'school', 'center', 'subject', 'secondarySchool', 'professionalSchool', 'cbtCenter', 'programme', 'course', 'module'])
                     ->withCount('questions')
                     ->latest()
                     ->get()
@@ -48,6 +51,7 @@ class QuestionBankController extends Controller
         return Inertia::render('QuestionBanks/Create', [
             'statuses' => $this->statuses(),
             'subjects' => SubjectResource::collection($this->scopedSubjects($request)->orderBy('name')->get()),
+            'courses' => $this->institutionCourses($request),
             ...$this->scopeOptions($request),
         ]);
     }
@@ -55,6 +59,10 @@ class QuestionBankController extends Controller
     public function store(StoreQuestionBankRequest $request): RedirectResponse
     {
         $data = $request->validated();
+        if ($this->institutionId($request)) {
+            return $this->storeInstitutionBank($request, $data);
+        }
+
         $subject = $this->authorizedSubject($request, $data['subject_id']);
         $tenant = $this->tenantFromSubject($subject);
         $data['code'] = $this->referenceCode($data['code'] ?? null, $data['name'], $tenant);
@@ -74,7 +82,7 @@ class QuestionBankController extends Controller
         Gate::authorize('view', $questionBank);
 
         return Inertia::render('QuestionBanks/Show', [
-            'questionBank' => QuestionBankResource::make($questionBank->load(['organization', 'school', 'center', 'subject', 'secondarySchool', 'professionalSchool', 'cbtCenter', 'programme', 'course', 'module'])->loadCount('questions')),
+            'questionBank' => QuestionBankResource::make($questionBank->load(['organization', 'institution', 'faculty', 'department', 'school', 'center', 'subject', 'secondarySchool', 'professionalSchool', 'cbtCenter', 'programme', 'course', 'module'])->loadCount('questions')),
             'can' => [
                 'update' => $request->user()->can('update', $questionBank),
                 'delete' => $request->user()->can('delete', $questionBank),
@@ -87,15 +95,20 @@ class QuestionBankController extends Controller
         Gate::authorize('update', $questionBank);
 
         return Inertia::render('QuestionBanks/Edit', [
-            'questionBank' => QuestionBankResource::make($questionBank->load(['organization', 'school', 'center', 'subject', 'secondarySchool', 'professionalSchool', 'cbtCenter', 'programme', 'course', 'module'])->loadCount('questions')),
+            'questionBank' => QuestionBankResource::make($questionBank->load(['organization', 'institution', 'faculty', 'department', 'school', 'center', 'subject', 'secondarySchool', 'professionalSchool', 'cbtCenter', 'programme', 'course', 'module'])->loadCount('questions')),
             'statuses' => $this->statuses(),
             'subjects' => SubjectResource::collection($this->scopedSubjects($request)->orderBy('name')->get()),
+            'courses' => $this->institutionCourses($request),
         ]);
     }
 
     public function update(UpdateQuestionBankRequest $request, QuestionBank $questionBank): RedirectResponse
     {
         $data = $request->validated();
+        if ($questionBank->institution_id || $this->institutionId($request)) {
+            return $this->updateInstitutionBank($request, $questionBank, $data);
+        }
+
         $subject = $this->authorizedSubject($request, $data['subject_id']);
         $tenant = $this->tenantFromSubject($subject);
         $data['code'] = $this->referenceCode($data['code'] ?? null, $data['name'], $tenant, $questionBank);
@@ -168,14 +181,17 @@ class QuestionBankController extends Controller
     {
         $user = $request->user();
         $organization = $request->route('organization');
+        $institutionId = $this->institutionId($request);
 
         return QuestionBank::query()
             ->when($organization, fn ($query) => $query->where('organization_id', $organization->id))
+            ->when($institutionId, fn ($query) => $query->where('institution_id', $institutionId))
             ->when($user->isTeacher(), fn ($query) => $query->whereIn('subject_id', $user->assignedSubjects()->select('subjects.id')))
             ->when($user->isFacilitator(), fn ($query) => $this->scopeFacilitatorQuestionBanks($query, $user))
             ->when(! $user->isSuperAdmin() && $user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
             ->when(! $user->isSuperAdmin() && $user->school_id, fn ($query) => $query->where('school_id', $user->school_id))
             ->when(! $user->isSuperAdmin() && $user->center_id, fn ($query) => $query->where('center_id', $user->center_id))
+            ->when(! $user->isSuperAdmin() && ! $institutionId && $user->institution_id, fn ($query) => $query->where('institution_id', $user->institution_id))
             ->when(! $user->isSuperAdmin() && $user->secondary_school_id, fn ($query) => $query->where('secondary_school_id', $user->secondary_school_id))
             ->when(! $user->isSuperAdmin() && $user->professional_school_id, fn ($query) => $query->where('professional_school_id', $user->professional_school_id))
             ->when(! $user->isSuperAdmin() && $user->cbt_center_id, fn ($query) => $query->where('cbt_center_id', $user->cbt_center_id));
@@ -235,12 +251,16 @@ class QuestionBankController extends Controller
     {
         $exists = QuestionBank::query()
             ->where('code', $code)
+            ->when($tenant['institution_id'] ?? null, fn ($query) => $query
+                ->where('institution_id', $tenant['institution_id'])
+                ->where('course_id', $tenant['course_id'] ?? null))
+            ->when(! ($tenant['institution_id'] ?? null), fn ($query) => $query
             ->where('organization_id', $tenant['organization_id'])
             ->where('school_id', $tenant['school_id'])
             ->where('center_id', $tenant['center_id'])
             ->where('secondary_school_id', $tenant['secondary_school_id'] ?? null)
             ->where('professional_school_id', $tenant['professional_school_id'] ?? null)
-            ->where('cbt_center_id', $tenant['cbt_center_id'] ?? null)
+                ->where('cbt_center_id', $tenant['cbt_center_id'] ?? null))
             ->when($ignore, fn ($query) => $query->whereKeyNot($ignore->id))
             ->exists();
 
@@ -257,12 +277,16 @@ class QuestionBankController extends Controller
         }
 
         return ReferenceCode::unique($name, QuestionBank::query()
+            ->when($tenant['institution_id'] ?? null, fn ($query) => $query
+                ->where('institution_id', $tenant['institution_id'])
+                ->where('course_id', $tenant['course_id'] ?? null))
+            ->when(! ($tenant['institution_id'] ?? null), fn ($query) => $query
             ->where('organization_id', $tenant['organization_id'])
             ->where('school_id', $tenant['school_id'])
             ->where('center_id', $tenant['center_id'])
             ->where('secondary_school_id', $tenant['secondary_school_id'] ?? null)
             ->where('professional_school_id', $tenant['professional_school_id'] ?? null)
-            ->where('cbt_center_id', $tenant['cbt_center_id'] ?? null), $ignore);
+                ->where('cbt_center_id', $tenant['cbt_center_id'] ?? null)), $ignore);
     }
 
     private function tenantFromSubject(Subject $subject): array
@@ -280,6 +304,9 @@ class QuestionBankController extends Controller
                 ?? $subject->cbt_center_id
                 ?? $subject->organization_id,
             'organization_id' => $subject->organization_id,
+            'institution_id' => null,
+            'faculty_id' => null,
+            'department_id' => null,
             'school_id' => $subject->school_id,
             'center_id' => $subject->center_id,
             'secondary_school_id' => $subject->secondary_school_id,
@@ -320,6 +347,118 @@ class QuestionBankController extends Controller
                 ? Center::query()->orderBy('name')->get(['id', 'name', 'code'])
                 : [],
         ];
+    }
+
+    private function storeInstitutionBank(StoreQuestionBankRequest $request, array $data): RedirectResponse
+    {
+        $course = $this->authorizedInstitutionCourse($request, $data['course_id']);
+        $tenant = $this->tenantFromCourse($course);
+        $data['code'] = $this->referenceCode($data['code'] ?? null, $data['name'], $tenant);
+        $this->ensureUniqueCode($data['code'], $tenant);
+
+        QuestionBank::create([
+            ...$data,
+            ...$tenant,
+            'subject_id' => null,
+            'created_by' => $request->user()->id,
+        ]);
+
+        return redirect()->route('question-bank.index')->with('success', 'Question bank created.');
+    }
+
+    private function updateInstitutionBank(UpdateQuestionBankRequest $request, QuestionBank $questionBank, array $data): RedirectResponse
+    {
+        $course = $this->authorizedInstitutionCourse($request, $data['course_id']);
+        $tenant = $this->tenantFromCourse($course);
+        $data['code'] = $this->referenceCode($data['code'] ?? null, $data['name'], $tenant, $questionBank);
+        $this->ensureUniqueCode($data['code'], $tenant, $questionBank);
+
+        $questionBank->update([
+            ...$data,
+            ...$tenant,
+            'subject_id' => null,
+        ]);
+
+        return redirect()->route('question-bank.index')->with('success', 'Question bank updated.');
+    }
+
+    private function authorizedInstitutionCourse(Request $request, int|string $courseId): Course
+    {
+        $course = Course::query()
+            ->whereKey($courseId)
+            ->where('institution_id', $this->institutionId($request))
+            ->first();
+
+        if (! $course) {
+            throw ValidationException::withMessages(['course_id' => 'Choose a course within this institution.']);
+        }
+
+        return $course;
+    }
+
+    private function tenantFromCourse(Course $course): array
+    {
+        return [
+            'owner_type' => Exam::OWNER_INSTITUTION,
+            'owner_id' => $course->institution_id,
+            'organization_id' => $course->institution?->organization_id,
+            'institution_id' => $course->institution_id,
+            'faculty_id' => $course->faculty_id,
+            'department_id' => $course->department_id,
+            'school_id' => null,
+            'center_id' => null,
+            'secondary_school_id' => null,
+            'professional_school_id' => null,
+            'cbt_center_id' => null,
+            'programme_id' => $course->programme_id,
+            'course_id' => $course->id,
+            'module_id' => null,
+        ];
+    }
+
+    private function institutionId(Request $request): ?int
+    {
+        $context = app(CurrentContextService::class)->current($request->user());
+        $institutionId = $request->route('institution')?->id
+            ?? (($context['type'] ?? null) === 'institution' ? $context['id'] : null)
+            ?? $request->user()?->institution_id;
+
+        if (! $institutionId) {
+            return null;
+        }
+
+        return Institution::query()
+            ->whereKey($institutionId)
+            ->where(fn ($query) => $query
+                ->whereKey($institutionId)
+                ->when(! $request->user()?->isSuperAdmin(), fn ($scope) => $scope
+                    ->where(fn ($inner) => $inner
+                        ->where('id', $request->user()?->institution_id)
+                        ->orWhere('organization_id', $request->user()?->organization_id))))
+            ->value('id');
+    }
+
+    private function institutionCourses(Request $request)
+    {
+        $institutionId = $this->institutionId($request);
+
+        if (! $institutionId) {
+            return [];
+        }
+
+        return Course::query()
+            ->where('institution_id', $institutionId)
+            ->with(['faculty:id,name', 'department:id,name', 'programme:id,name'])
+            ->orderBy('name')
+            ->get(['id', 'institution_id', 'faculty_id', 'department_id', 'programme_id', 'name', 'code'])
+            ->map(fn (Course $course) => [
+                'id' => $course->id,
+                'name' => $course->name,
+                'code' => $course->code,
+                'faculty_name' => $course->faculty?->name,
+                'department_name' => $course->department?->name,
+                'programme_name' => $course->programme?->name,
+            ]);
     }
 
     private function statuses(): array

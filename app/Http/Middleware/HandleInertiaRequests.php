@@ -161,8 +161,8 @@ class HandleInertiaRequests extends Middleware
                     ['label' => 'Courses', 'href' => $institutionBase.'/courses', 'permission' => 'manageSchools'],
                 ]],
                 ['label' => 'Assessment', 'children' => [
-                    ['label' => 'Question Bank', 'href' => $institutionBase.'/question-banks', 'permission' => 'manageQuestionBank'],
-                    ['label' => 'Questions', 'href' => $institutionBase.'/questions', 'permission' => 'manageQuestionBank'],
+                    ['label' => 'Question Bank', 'href' => '/question-bank', 'permission' => 'manageQuestionBank'],
+                    ['label' => 'Questions', 'href' => '/questions', 'permission' => 'manageQuestionBank'],
                     ['label' => 'Exams', 'href' => '/exams', 'permission' => 'manageExams'],
                 ]],
                 ['label' => 'Candidates', 'children' => $departmentItems],
@@ -328,8 +328,8 @@ class HandleInertiaRequests extends Middleware
                     ['label' => 'Courses', 'href' => $institutionBase.'/courses', 'permission' => 'manageSchools'],
                 ]],
                 ['label' => 'Assessment', 'children' => [
-                    ['label' => 'Question Bank', 'href' => $institutionBase.'/question-banks', 'permission' => 'manageQuestionBank'],
-                    ['label' => 'Questions', 'href' => $institutionBase.'/questions', 'permission' => 'manageQuestionBank'],
+                    ['label' => 'Question Bank', 'href' => '/question-bank', 'permission' => 'manageQuestionBank'],
+                    ['label' => 'Questions', 'href' => '/questions', 'permission' => 'manageQuestionBank'],
                     ['label' => 'Exams', 'href' => '/exams', 'permission' => 'manageExams'],
                 ]],
                 ['label' => 'Candidates', 'children' => $departmentItems],

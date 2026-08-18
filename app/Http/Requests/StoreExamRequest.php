@@ -3,8 +3,10 @@
 namespace App\Http\Requests;
 
 use App\Models\Exam;
+use App\Models\Course;
 use App\Models\StudentGroup;
 use App\Models\TrainingBatch;
+use App\Services\CurrentContextService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 use Illuminate\Validation\Rule;
@@ -26,6 +28,7 @@ class StoreExamRequest extends FormRequest
 
         return [
             'organization_id' => ['nullable', 'integer', 'exists:organizations,id'],
+            'institution_id' => ['nullable', 'integer', 'exists:institutions,id'],
             'center_id' => ['nullable', 'integer', 'exists:centers,id'],
             'school_id' => ['nullable', 'integer', 'exists:schools,id'],
             'secondary_school_id' => ['nullable', 'integer', 'exists:secondary_schools,id'],
@@ -52,7 +55,8 @@ class StoreExamRequest extends FormRequest
                 Exam::STATUS_CANCELLED,
             ])],
             'subjects' => ['required', 'array', 'min:1'],
-            'subjects.*.subject_id' => ['required', 'string', 'exists:subjects,id', 'distinct'],
+            'subjects.*.subject_id' => [Rule::requiredIf(! $this->isInstitutionExamRequest()), 'nullable', 'string', 'exists:subjects,id'],
+            'subjects.*.course_id' => [Rule::requiredIf($this->isInstitutionExamRequest()), 'nullable', 'integer', 'exists:courses,id'],
             'subjects.*.question_bank_id' => ['nullable', 'exists:question_banks,id'],
             'subjects.*.question_bank_ids' => ['nullable', 'array'],
             'subjects.*.question_bank_ids.*' => ['nullable', 'exists:question_banks,id'],
@@ -61,11 +65,11 @@ class StoreExamRequest extends FormRequest
             'subjects.*.duration_minutes' => ['nullable', 'integer', 'min:1', 'max:10080'],
             'subjects.*.difficulty_distribution' => ['nullable', 'array'],
             'question_bank_id' => ['nullable', 'exists:question_banks,id'],
-            'candidate_ids' => [Rule::excludeIf($this->isSecondaryExamRequest() || $this->isProfessionalExamRequest()), 'nullable', 'array'],
-            'candidate_ids.*' => [Rule::excludeIf($this->isSecondaryExamRequest() || $this->isProfessionalExamRequest()), 'string', 'exists:candidates,id', 'distinct'],
-            'candidate_group_id' => [Rule::excludeIf($this->isSecondaryExamRequest() || $this->isProfessionalExamRequest()), 'nullable', 'string', 'max:100', 'exists:candidate_groups,id'],
-            'candidate_group_ids' => [Rule::excludeIf($this->isSecondaryExamRequest() || $this->isProfessionalExamRequest()), 'nullable', 'array'],
-            'candidate_group_ids.*' => [Rule::excludeIf($this->isSecondaryExamRequest() || $this->isProfessionalExamRequest()), 'string', 'exists:candidate_groups,id', 'distinct'],
+            'candidate_ids' => [Rule::excludeIf($this->isSecondaryExamRequest() || $this->isProfessionalExamRequest() || $this->isInstitutionExamRequest()), 'nullable', 'array'],
+            'candidate_ids.*' => [Rule::excludeIf($this->isSecondaryExamRequest() || $this->isProfessionalExamRequest() || $this->isInstitutionExamRequest()), 'string', 'exists:candidates,id', 'distinct'],
+            'candidate_group_id' => [Rule::excludeIf($this->isSecondaryExamRequest() || $this->isProfessionalExamRequest() || $this->isInstitutionExamRequest()), 'nullable', 'string', 'max:100', 'exists:candidate_groups,id'],
+            'candidate_group_ids' => [Rule::excludeIf($this->isSecondaryExamRequest() || $this->isProfessionalExamRequest() || $this->isInstitutionExamRequest()), 'nullable', 'array'],
+            'candidate_group_ids.*' => [Rule::excludeIf($this->isSecondaryExamRequest() || $this->isProfessionalExamRequest() || $this->isInstitutionExamRequest()), 'string', 'exists:candidate_groups,id', 'distinct'],
             'settings.shuffle_questions' => ['required', 'boolean'],
             'settings.shuffle_options' => ['required', 'boolean'],
             'settings.show_result_immediately' => ['required', 'boolean'],
@@ -148,6 +152,7 @@ class StoreExamRequest extends FormRequest
             foreach ($this->input('subjects', []) as $index => $subject) {
                 $bankIds = collect($subject['question_bank_ids'] ?? [])
                     ->merge([$subject['question_bank_id'] ?? null])
+                    ->merge([$this->input('question_bank_id')])
                     ->filter()
                     ->unique()
                     ->values();
@@ -181,6 +186,34 @@ class StoreExamRequest extends FormRequest
 
                     if (! $belongsToSchool) {
                         $validator->errors()->add('training_batch_id', 'Choose a batch that belongs to this professional school.');
+                    }
+                }
+            }
+
+            if ($this->isInstitutionExamRequest()) {
+                if ($this->input('exam_category') !== Exam::CATEGORY_ASSESSMENT) {
+                    $validator->errors()->add('exam_category', 'Institution exams must use assessment category.');
+                }
+
+                foreach (['academic_session_id', 'term_id', 'academic_term_id', 'school_class_id', 'student_group_id', 'subject_id', 'module_id', 'training_batch_id'] as $field) {
+                    if ($this->filled($field)) {
+                        $validator->errors()->add($field, 'This field is not allowed for institution assessments.');
+                    }
+                }
+
+                $institutionId = $this->institutionId();
+                foreach ($this->input('subjects', []) as $index => $subject) {
+                    if (! filled($subject['course_id'] ?? null)) {
+                        continue;
+                    }
+
+                    $belongsToInstitution = Course::query()
+                        ->whereKey($subject['course_id'])
+                        ->where('institution_id', $institutionId)
+                        ->exists();
+
+                    if (! $belongsToInstitution) {
+                        $validator->errors()->add("subjects.{$index}.course_id", 'Choose a course within this institution.');
                     }
                 }
             }
@@ -219,7 +252,7 @@ class StoreExamRequest extends FormRequest
 
     private function isOrganizationExamRequest(): bool
     {
-        if ($this->isSecondaryExamRequest() || $this->isProfessionalExamRequest() || $this->isCbtCenterExamRequest()) {
+        if ($this->isInstitutionExamRequest() || $this->isSecondaryExamRequest() || $this->isProfessionalExamRequest() || $this->isCbtCenterExamRequest()) {
             return false;
         }
 
@@ -242,6 +275,25 @@ class StoreExamRequest extends FormRequest
             || $this->input('exam_owner_type') === Exam::OWNER_SECONDARY_SCHOOL
             || filled($this->input('school_id'))
             || filled($this->input('secondary_school_id'));
+    }
+
+    private function isInstitutionExamRequest(): bool
+    {
+        $context = app(CurrentContextService::class)->current($this->user());
+
+        return ($context['type'] ?? null) === 'institution'
+            || $this->user()?->institution_id !== null
+            || $this->input('exam_owner_type') === Exam::OWNER_INSTITUTION
+            || filled($this->input('institution_id'));
+    }
+
+    private function institutionId(): int|string|null
+    {
+        $context = app(CurrentContextService::class)->current($this->user());
+
+        return $this->input('institution_id')
+            ?: ((($context['type'] ?? null) === 'institution') ? $context['id'] : null)
+            ?: $this->user()?->institution_id;
     }
 
     private function isProfessionalExamRequest(): bool

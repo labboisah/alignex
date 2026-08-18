@@ -26,9 +26,10 @@ const labelClass = 'text-sm font-semibold text-slateDark';
 export function QuestionForm({ question, questionBanks, subjects, topics, difficulties, statuses, submitLabel }: { question?: Question; questionBanks: { data: QuestionBankOption[] }; subjects: { data: SubjectOption[] }; topics: { data: TopicOption[] }; difficulties: SelectOption[]; statuses: SelectOption[]; submitLabel: string }) {
     const currentContext = usePage().props.current_context as { type?: string } | undefined;
     const isSecondary = currentContext?.type === 'secondary_school';
+    const isInstitution = currentContext?.type === 'institution' || questionBanks.data.some((bank) => bank.institution_id);
     const isProfessional = currentContext?.type === 'professional_school' || questionBanks.data.some((bank) => bank.professional_school_id);
     const isCbt = currentContext?.type === 'cbt_center';
-    const showTopic = !isSecondary && !isProfessional && !isCbt;
+    const showTopic = !isSecondary && !isProfessional && !isCbt && !isInstitution;
     const initialOptions = labels.map((label) => {
         const option = question?.options?.find((choice) => choice.label === label);
         return {
@@ -116,10 +117,10 @@ export function QuestionForm({ question, questionBanks, subjects, topics, diffic
                             {questionBanks.data.map((bank) => <option key={bank.id} value={bank.id}>{bank.name} ({bank.code})</option>)}
                         </select>
                     </Field>
-                    {isProfessional ? (
-                        <Field label="Course / Module" error={errors.subject_id}>
+                    {isProfessional || isInstitution ? (
+                        <Field label={isInstitution ? 'Course' : 'Course / Module'} error={errors.subject_id}>
                             <div className="mt-1 rounded-md border border-border bg-slate-50 px-3 py-2 text-sm font-semibold text-slateDark">
-                                {selectedQuestionBank ? [selectedQuestionBank.course_name, selectedQuestionBank.module_name].filter(Boolean).join(' / ') || selectedQuestionBank.subject_name || 'Selected bank mapping' : 'Choose a question bank'}
+                                {selectedQuestionBank ? [selectedQuestionBank.course_name, isInstitution ? null : selectedQuestionBank.module_name].filter(Boolean).join(' / ') || selectedQuestionBank.subject_name || 'Selected bank mapping' : 'Choose a question bank'}
                             </div>
                         </Field>
                     ) : (

@@ -312,6 +312,24 @@ class User extends Authenticatable
             || ($organizationId !== null && (string) $this->organization_id === (string) $organizationId);
     }
 
+    public function canAccessInstitution(int|string|null $institutionId): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        if ($institutionId !== null && (string) $this->institution_id === (string) $institutionId) {
+            return true;
+        }
+
+        return $institutionId !== null
+            && $this->organization_id !== null
+            && Institution::query()
+                ->whereKey($institutionId)
+                ->where('organization_id', $this->organization_id)
+                ->exists();
+    }
+
     public function canAccessSecondarySchool(int|string|null $secondarySchoolId): bool
     {
         if ($this->isSuperAdmin()) {

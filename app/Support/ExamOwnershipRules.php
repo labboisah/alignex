@@ -13,6 +13,7 @@ class ExamOwnershipRules
     {
         return match ($ownerType) {
             Exam::OWNER_SECONDARY_SCHOOL => [Exam::CATEGORY_TERMINAL, Exam::CATEGORY_ASSESSMENT],
+            Exam::OWNER_INSTITUTION => [Exam::CATEGORY_ASSESSMENT],
             Exam::OWNER_PROFESSIONAL_SCHOOL => [Exam::CATEGORY_PROFESSIONAL, Exam::CATEGORY_CERTIFICATION, Exam::CATEGORY_PRACTICE, Exam::CATEGORY_ASSESSMENT],
             Exam::OWNER_CBT_CENTER,
             Exam::OWNER_ORGANIZATION => [
@@ -34,6 +35,7 @@ class ExamOwnershipRules
     {
         return match ($ownerType) {
             Exam::OWNER_SECONDARY_SCHOOL => [Exam::MODE_TRADITIONAL],
+            Exam::OWNER_INSTITUTION,
             Exam::OWNER_PROFESSIONAL_SCHOOL,
             Exam::OWNER_CBT_CENTER,
             Exam::OWNER_ORGANIZATION => [Exam::MODE_TRADITIONAL, Exam::MODE_ADAPTIVE],

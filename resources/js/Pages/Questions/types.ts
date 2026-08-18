@@ -12,6 +12,7 @@ export type Question = Record<string, unknown> & {
     question_bank_name?: string | null;
     question_bank_course_name?: string | null;
     question_bank_module_name?: string | null;
+    institution_id?: number | string | null;
     professional_school_id?: number | string | null;
     subject_id: string | null;
     subject_name?: string | null;
@@ -44,8 +45,10 @@ export type QuestionBankOption = {
     code: string;
     subject_id: string | null;
     subject_name?: string | null;
+    course_id?: string | number | null;
     course_name?: string | null;
     module_name?: string | null;
+    institution_id?: number | string | null;
     professional_school_id?: number | string | null;
 };
 

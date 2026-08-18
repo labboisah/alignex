@@ -8,6 +8,7 @@ import { CurrentContext, Exam, ExamSettings, ExamSubject, SelectOption, SubjectO
 type ExamFormData = {
     exam_owner_type: string;
     organization_id: string;
+    institution_id: string;
     center_id: string;
     school_id: string;
     secondary_school_id: string;
@@ -67,10 +68,11 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
     const auth = usePage().props.auth as { user?: { role?: string } };
     const isAssessmentRole = auth.user?.role === 'teacher' || auth.user?.role === 'facilitator';
     const currentContext = (usePage().props.current_context ?? null) as CurrentContext | null;
-    const inferredContext = contextFrom(exam, currentContext, { organizations, secondarySchools, professionalSchools, cbtCenters, academicSessions, programmes, cbtCandidates, questionBanks });
+    const inferredContext = contextFrom(exam, currentContext, { organizations, secondarySchools, professionalSchools, cbtCenters, academicSessions, programmes, courses, cbtCandidates, questionBanks });
     const { data, setData, post, patch, processing, errors } = useForm<ExamFormData>({
         exam_owner_type: inferredContext.type,
         organization_id: exam?.organization_id ? String(exam.organization_id) : inferredContext.organization_id,
+        institution_id: exam?.institution_id ? String(exam.institution_id) : inferredContext.institution_id,
         center_id: exam?.center_id ? String(exam.center_id) : '',
         school_id: exam?.school_id ? String(exam.school_id) : inferredContext.school_id,
         secondary_school_id: exam?.secondary_school_id ? String(exam.secondary_school_id) : inferredContext.secondary_school_id,
@@ -113,8 +115,9 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
     const errorKeys = Object.keys(errors);
     const hasErrors = errorKeys.length > 0;
     const errorSummary = errorKeys.map((key) => errorMessageFor(key, errors[key as keyof typeof errors] ?? 'Please review this field.'));
-    const ownerContext = data.exam_owner_type || inferredContext.type || (data.secondary_school_id ? 'secondary_school' : data.professional_school_id ? 'professional_school' : data.cbt_center_id ? 'cbt_center' : data.organization_id ? 'organization' : '');
+    const ownerContext = data.exam_owner_type || inferredContext.type || (data.institution_id ? 'institution' : data.secondary_school_id ? 'secondary_school' : data.professional_school_id ? 'professional_school' : data.cbt_center_id ? 'cbt_center' : data.organization_id ? 'organization' : '');
     const isSecondaryExam = ownerContext === 'secondary_school';
+    const isInstitutionExam = ownerContext === 'institution';
     const isProfessionalExam = ownerContext === 'professional_school';
     const isCbtExam = ownerContext === 'cbt_center';
     const isOrganizationExam = ownerContext === 'organization';
@@ -123,13 +126,15 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
         ? examCategories.filter((category) => category.value === 'assessment')
         : isSecondaryExam
         ? examCategories.filter((category) => ['terminal', 'assessment'].includes(category.value))
+        : isInstitutionExam
+            ? examCategories.filter((category) => category.value === 'assessment')
         : isProfessionalExam
             ? examCategories.filter((category) => ['professional', 'certification', 'practice'].includes(category.value))
             : examCategories.filter((category) => category.value !== 'terminal');
     const allowedModes = isSecondaryExam ? modes.filter((mode) => mode.value === 'traditional') : modes;
-    const paperLabel = isProfessionalExam ? 'Module' : 'Subject';
-    const paperLabelPlural = isProfessionalExam ? 'Modules' : 'Subjects';
-    const paperStepLabel = isProfessionalExam ? 'Course / Module Paper' : 'Subjects';
+    const paperLabel = isInstitutionExam ? 'Course' : isProfessionalExam ? 'Module' : 'Subject';
+    const paperLabelPlural = isInstitutionExam ? 'Courses' : isProfessionalExam ? 'Modules' : 'Subjects';
+    const paperStepLabel = isInstitutionExam ? 'Course Paper' : isProfessionalExam ? 'Course / Module Paper' : 'Subjects';
 
     const submit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -175,6 +180,7 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
                 <FormSection title="Basic Information" description={`This ${isAssessmentRole ? 'assessment' : 'exam'} will be created under ${inferredContext.name}.`}>
                     <input type="hidden" name="exam_owner_type" value={data.exam_owner_type} />
                     <input type="hidden" name="organization_id" value={data.organization_id} />
+                    <input type="hidden" name="institution_id" value={data.institution_id} />
                     <input type="hidden" name="school_id" value={data.school_id} />
                     <input type="hidden" name="secondary_school_id" value={data.secondary_school_id} />
                     <input type="hidden" name="professional_school_id" value={data.professional_school_id} />
@@ -221,7 +227,7 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
             )}
 
             {step === 2 && (
-                <FormSection title={paperStepLabel} description={isProfessionalExam ? 'Add one or more course/module rows and configure question counts and marks.' : 'Add one or more subjects and configure question counts and marks.'}>
+                <FormSection title={paperStepLabel} description={isInstitutionExam ? 'Add one or more course rows and configure question counts and marks.' : isProfessionalExam ? 'Add one or more course/module rows and configure question counts and marks.' : 'Add one or more subjects and configure question counts and marks.'}>
                     {(isCbtExam || isOrganizationExam) && (
                         <div className="mb-4 grid gap-4 rounded-md border border-border bg-white p-4 md:grid-cols-2">
                             <Field label="Candidate Groups" error={errors.candidate_group_ids ?? errors.candidate_group_id}>
@@ -293,6 +299,13 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
                                             </select>
                                         </Field>
                                     </>
+                                ) : isInstitutionExam ? (
+                                    <Field label="Course" error={fieldError(errors, `subjects.${index}.course_id`)}>
+                                        <select className={inputClass} value={String(row.course_id ?? '')} onChange={(event) => setSubject(index, { course_id: event.target.value, question_bank_id: '', question_bank_ids: [], subject_id: '' })} required>
+                                            <option value="">Choose course</option>
+                                            {courses.map((course) => <option key={course.id} value={course.id}>{course.name}</option>)}
+                                        </select>
+                                    </Field>
                                 ) : (
                                     <Field label={paperLabel} error={fieldError(errors, `subjects.${index}.subject_id`)}>
                                         <select className={inputClass} value={row.subject_id} onChange={(event) => setSubject(index, { subject_id: event.target.value, question_bank_id: '', question_bank_ids: [] })} required>
@@ -317,7 +330,7 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
                                         }}
                                         required
                                     >
-                                        {questionBanksForPaperRow(questionBanks, row, isProfessionalExam).map((bank) => <option key={bank.id} value={bank.id}>{bank.name} ({bank.code})</option>)}
+                                        {questionBanksForPaperRow(questionBanks, row, isProfessionalExam, isInstitutionExam).map((bank) => <option key={bank.id} value={bank.id}>{bank.name} ({bank.code})</option>)}
                                     </select>
                                     {isProfessionalExam && fieldError(errors, `subjects.${index}.subject_id`) && <span className="mt-1 block text-sm text-danger">{fieldError(errors, `subjects.${index}.subject_id`)}</span>}
                                 </Field>
@@ -378,7 +391,7 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
             )}
 
             {step === 4 && (
-                <FormSection title="Review" description={`Confirm the ${isAssessmentRole ? 'assessment' : 'exam'} summary, ${isProfessionalExam ? 'course/module' : 'subject'} configuration, and settings before saving.`}>
+                <FormSection title="Review" description={`Confirm the ${isAssessmentRole ? 'assessment' : 'exam'} summary, ${isInstitutionExam ? 'course' : isProfessionalExam ? 'course/module' : 'subject'} configuration, and settings before saving.`}>
                     <div className="grid gap-4 md:grid-cols-3">
                         <Summary label="Title" value={data.title || 'Untitled'} />
                         <Summary label={isAssessmentRole ? 'Assessment Code' : 'Exam Code'} value={data.exam_code || 'N/A'} />
@@ -453,11 +466,11 @@ function batchesForProgramme(trainingBatches: TenantOption[], programmeId: strin
     return trainingBatches.filter((batch) => !batch.programme_id || String(batch.programme_id) === String(programmeId));
 }
 
-function questionBanksForPaperRow(questionBanks: TenantOption[], row: ExamSubject, isProfessionalExam: boolean) {
-    if (isProfessionalExam) {
+function questionBanksForPaperRow(questionBanks: TenantOption[], row: ExamSubject, isProfessionalExam: boolean, isInstitutionExam: boolean) {
+    if (isProfessionalExam || isInstitutionExam) {
         return questionBanks.filter((bank) => {
             const courseMatches = !row.course_id || !bank.course_id || String(bank.course_id) === String(row.course_id);
-            const moduleMatches = !row.module_id || !bank.module_id || String(bank.module_id) === String(row.module_id);
+            const moduleMatches = isInstitutionExam || !row.module_id || !bank.module_id || String(bank.module_id) === String(row.module_id);
 
             return courseMatches && moduleMatches;
         });
@@ -480,6 +493,7 @@ function contextFrom(
         cbtCenters: TenantOption[];
         academicSessions: TenantOption[];
         programmes: TenantOption[];
+        courses: TenantOption[];
         cbtCandidates: TenantOption[];
         questionBanks: TenantOption[];
     },
@@ -496,6 +510,7 @@ function contextFrom(
         type,
         name,
         organization_id: type === 'organization' ? id : '',
+        institution_id: type === 'institution' ? id : '',
         school_id: isLegacySchool ? id : '',
         secondary_school_id: type === 'secondary_school' && !isLegacySchool ? id : '',
         professional_school_id: type === 'professional_school' ? id : '',
@@ -510,11 +525,13 @@ function fallbackContextType(options: {
     cbtCenters: TenantOption[];
     academicSessions: TenantOption[];
     programmes: TenantOption[];
+    courses: TenantOption[];
     cbtCandidates: TenantOption[];
     questionBanks: TenantOption[];
 }): CurrentContext['type'] {
     if (options.secondarySchools.length > 0 || options.academicSessions.length > 0) return 'secondary_school';
     if (options.professionalSchools.length > 0 || options.programmes.length > 0) return 'professional_school';
+    if (options.courses.some((course) => !course.programme_id) || options.questionBanks.some((bank) => !bank.subject_id && bank.course_id)) return 'institution';
     if (options.cbtCenters.length > 0 || options.cbtCandidates.length > 0) return 'cbt_center';
     return 'organization';
 }
@@ -522,6 +539,7 @@ function fallbackContextType(options: {
 function fallbackContextId(type: CurrentContext['type'], options: { organizations: TenantOption[]; secondarySchools: TenantOption[]; professionalSchools: TenantOption[]; cbtCenters: TenantOption[] }) {
     const rows = {
         organization: options.organizations,
+        institution: [],
         secondary_school: options.secondarySchools,
         professional_school: options.professionalSchools,
         cbt_center: options.cbtCenters,
@@ -531,16 +549,17 @@ function fallbackContextId(type: CurrentContext['type'], options: { organization
 }
 
 function defaultExamType(type: CurrentContext['type']) {
-    return type === 'secondary_school' ? 'secondary' : type === 'professional_school' ? 'professional' : 'general';
+    return type === 'secondary_school' ? 'secondary' : type === 'professional_school' ? 'professional' : type === 'institution' ? 'assessment' : 'general';
 }
 
 function defaultExamCategory(type: CurrentContext['type']) {
-    return type === 'secondary_school' ? 'terminal' : type === 'professional_school' ? 'professional' : 'general';
+    return type === 'secondary_school' ? 'terminal' : type === 'professional_school' ? 'professional' : type === 'institution' ? 'assessment' : 'general';
 }
 
 function contextLabel(type: CurrentContext['type']) {
     return {
         organization: 'the selected organization',
+        institution: 'the selected institution',
         secondary_school: 'the selected secondary school',
         professional_school: 'the selected professional school',
         cbt_center: 'the selected CBT center',
