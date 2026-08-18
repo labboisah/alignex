@@ -127,6 +127,53 @@ class CandidateExamApiTest extends TestCase
         $this->assertDatabaseHas('exam_audit_logs', ['event_type' => 'login_failed']);
     }
 
+    public function test_candidate_can_login_before_start_time_but_cannot_start_until_scheduled_time(): void
+    {
+        [$exam, $candidate] = $this->activeExamWithPaper();
+        $exam->update(['starts_at' => now()->addMinutes(10), 'ends_at' => now()->addHours(2)]);
+
+        $login = $this->postJson('/api/candidate/login', [
+            'exam_code' => $exam->code,
+            'registration_number' => $candidate->candidate_number,
+            'device_fingerprint' => 'device-one',
+        ])
+            ->assertOk()
+            ->assertJsonPath('can_start', false)
+            ->assertJsonPath('attempt.status', CandidateExamAttempt::STATUS_NOT_STARTED);
+
+        $token = $login->json('exam_token');
+
+        $this->postJson('/api/candidate/start', [
+            'device_fingerprint' => 'device-one',
+        ], ['Authorization' => "Bearer {$token}"])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('exam');
+
+        $this->postJson('/api/candidate/answer', [
+            'question_id' => $login->json('questions.0.question_id'),
+            'selected_option_ids' => [$login->json('questions.0.options.0.id')],
+        ], ['Authorization' => "Bearer {$token}"])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('exam');
+
+        $this->travel(11)->minutes();
+
+        $this->postJson('/api/candidate/start', [
+            'device_fingerprint' => 'device-one',
+        ], ['Authorization' => "Bearer {$token}"])
+            ->assertOk()
+            ->assertJsonPath('can_start', true)
+            ->assertJsonPath('attempt.status', CandidateExamAttempt::STATUS_IN_PROGRESS);
+
+        $this->assertDatabaseHas('candidate_exam_attempts', [
+            'id' => $login->json('attempt.id'),
+            'status' => CandidateExamAttempt::STATUS_IN_PROGRESS,
+        ]);
+        $this->assertDatabaseHas('exam_audit_logs', ['event_type' => 'login_waiting']);
+        $this->assertDatabaseHas('exam_audit_logs', ['event_type' => 'start_waiting']);
+        $this->assertDatabaseHas('exam_audit_logs', ['event_type' => 'login_success']);
+    }
+
     public function test_device_binding_blocks_different_device(): void
     {
         [$exam, $candidate] = $this->activeExamWithPaper(['bind_device' => true]);
@@ -347,6 +394,7 @@ class CandidateExamApiTest extends TestCase
         }
 
         app(ExamPaperGeneratorService::class)->generate($exam);
+        $exam->update(['starts_at' => now()->subMinute()]);
 
         return [$exam->refresh(), $candidate];
     }

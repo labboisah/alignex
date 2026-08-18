@@ -23,6 +23,9 @@ class CandidateExamPayloadResource extends JsonResource
         /** @var CandidateExamAttempt $attempt */
         $attempt = $this->resource;
         $session = app(CandidateExamSessionService::class);
+        $startsInSeconds = $attempt->exam?->starts_at
+            ? max(0, now()->diffInSeconds($attempt->exam->starts_at, false))
+            : 0;
         $answers = $attempt->answers()
             ->get()
             ->keyBy('question_id');
@@ -40,6 +43,8 @@ class CandidateExamPayloadResource extends JsonResource
                 'title' => $attempt->exam?->title,
                 'exam_code' => $attempt->exam?->code,
                 'duration_minutes' => $attempt->exam?->duration_minutes,
+                'starts_at' => $attempt->exam?->starts_at?->toISOString(),
+                'ends_at' => $attempt->exam?->ends_at?->toISOString(),
                 'settings' => [
                     'allow_back_navigation' => (bool) data_get($attempt->exam?->settings ?? [], 'allow_back_navigation', true),
                     'require_fullscreen' => (bool) data_get($attempt->exam?->settings ?? [], 'require_fullscreen', false),
@@ -55,6 +60,9 @@ class CandidateExamPayloadResource extends JsonResource
                 'submitted_at' => $attempt->submitted_at?->toISOString(),
             ],
             'remaining_time' => $session->remainingSeconds($attempt),
+            'server_now' => now()->toISOString(),
+            'can_start' => $startsInSeconds <= 0,
+            'starts_in_seconds' => $startsInSeconds,
             'exam_token' => $this->token,
             'questions' => CandidatePaperResource::collection(
                 $attempt->papers

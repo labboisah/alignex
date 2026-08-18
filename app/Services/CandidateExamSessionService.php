@@ -52,6 +52,10 @@ class CandidateExamSessionService
         ], true)) {
             throw ValidationException::withMessages(['exam' => 'This exam attempt is already closed.']);
         }
+
+        if ($attempt->status !== CandidateExamAttempt::STATUS_IN_PROGRESS) {
+            throw ValidationException::withMessages(['exam' => 'This exam attempt has not started.']);
+        }
     }
 
     public function remainingSeconds(CandidateExamAttempt $attempt): int

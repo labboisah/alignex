@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('candidate')->group(function (): void {
     Route::post('/login', [CandidateExamController::class, 'login']);
+    Route::post('/start', [CandidateExamController::class, 'start']);
     Route::get('/exam', [CandidateExamController::class, 'exam']);
     Route::post('/answer', [CandidateExamController::class, 'answer']);
     Route::post('/submit', [CandidateExamController::class, 'submit']);

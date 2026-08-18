@@ -15,6 +15,8 @@ type ExamDetails = {
     title: string;
     exam_code: string;
     duration_minutes: number;
+    starts_at?: string | null;
+    ends_at?: string | null;
     settings: {
         allow_back_navigation: boolean;
         require_fullscreen: boolean;
@@ -62,7 +64,17 @@ type SubjectSection = {
 type ExamPayload = {
     candidate: CandidateProfile;
     exam: ExamDetails;
+    attempt?: {
+        id: string;
+        status: string;
+        started_at?: string | null;
+        server_due_at?: string | null;
+        submitted_at?: string | null;
+    };
     remaining_time: number;
+    starts_in_seconds?: number;
+    can_start?: boolean;
+    server_now?: string;
     exam_token?: string | null;
     questions: { data: ExamQuestion[] } | ExamQuestion[];
     answers: SavedAnswer[];
@@ -151,17 +163,39 @@ function CandidateLoginPage() {
 
 function ExamInstructionsPage() {
     const navigate = useNavigate();
-    const payload = storedPayload();
+    const [payload, setPayload] = useState<ExamPayload | null>(storedPayload());
     const [webcamReady, setWebcamReady] = useState(sessionStorage.getItem('alignex_webcam_ready') === 'yes');
     const [fullscreenReady, setFullscreenReady] = useState(Boolean(document.fullscreenElement));
     const [setupError, setSetupError] = useState('');
     const [checkingSetup, setCheckingSetup] = useState(false);
+    const [startsIn, setStartsIn] = useState(payload?.starts_in_seconds ?? 0);
+    const canStart = !payload || (payload.can_start ?? true) || startsIn <= 0 || payload.attempt?.status === 'in_progress';
+
+    useEffect(() => {
+        setStartsIn(payload?.starts_in_seconds ?? 0);
+    }, [payload?.starts_in_seconds]);
+
+    useEffect(() => {
+        if (canStart) {
+            return;
+        }
+
+        const interval = window.setInterval(() => {
+            setStartsIn((value) => Math.max(0, value - 1));
+        }, 1000);
+
+        return () => window.clearInterval(interval);
+    }, [canStart]);
 
     if (!payload) {
         return <Navigate to="/exam/login" replace />;
     }
 
     const prepareAndStart = async () => {
+        if (!canStart) {
+            return;
+        }
+
         const requirements = [
             payload.exam.settings.require_webcam ? 'webcam access' : null,
             payload.exam.settings.require_fullscreen ? 'fullscreen mode' : null,
@@ -195,6 +229,15 @@ function ExamInstructionsPage() {
                 setFullscreenReady(true);
             }
 
+            if (payload.attempt?.status !== 'in_progress') {
+                const next = await api<ExamPayload>('/api/candidate/start', {
+                    method: 'POST',
+                    body: JSON.stringify({ device_fingerprint: deviceFingerprint() }),
+                });
+                localStorage.setItem(payloadKey, JSON.stringify(next));
+                setPayload(next);
+            }
+
             navigate('/exam/write');
         } catch (exception) {
             setSetupError(exception instanceof Error ? exception.message : 'Required exam controls could not be enabled. Please allow permissions and try again.');
@@ -215,7 +258,19 @@ function ExamInstructionsPage() {
                         <Info label="Registration Number" value={payload.candidate.registration_number} />
                         <Info label="Duration" value={`${payload.exam.duration_minutes} minutes`} />
                         <Info label="Questions" value={String(questionList(payload).length)} />
+                        {payload.exam.starts_at && <Info label="Start Time" value={new Date(payload.exam.starts_at).toLocaleString()} />}
                     </div>
+                    {!canStart && (
+                        <div className="mt-6 rounded-md border border-blue-200 bg-blue-50 p-4 text-info">
+                            <div className="flex items-center gap-2 text-sm font-bold">
+                                <Clock className="h-5 w-5" />
+                                Exam starts in {formatTime(startsIn)}
+                            </div>
+                            <p className="mt-2 text-sm leading-6 text-slate-700">
+                                You are logged in, but the exam cannot be started until the scheduled start time.
+                            </p>
+                        </div>
+                    )}
                     <div className="mt-6 space-y-2 text-sm leading-6 text-slate-600">
                         <p>Read each question carefully before selecting an answer.</p>
                         <p>Your answers save automatically. Keep your network connected and wait for pending saves before submitting.</p>
@@ -233,10 +288,12 @@ function ExamInstructionsPage() {
                         </div>
                     )}
                     {setupError && <div className="mt-4"><Alert tone="danger" message={setupError} /></div>}
-                    <Button className="mt-6" type="button" disabled={checkingSetup} onClick={prepareAndStart}>
-                        {checkingSetup && <Loader2 className="h-4 w-4 animate-spin" />}
-                        Start Exam
-                    </Button>
+                    {canStart && (
+                        <Button className="mt-6" type="button" disabled={checkingSetup} onClick={prepareAndStart}>
+                            {checkingSetup && <Loader2 className="h-4 w-4 animate-spin" />}
+                            Start Exam
+                        </Button>
+                    )}
                 </div>
             </div>
         </CandidateShell>

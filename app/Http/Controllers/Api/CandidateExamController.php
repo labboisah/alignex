@@ -91,6 +91,16 @@ class CandidateExamController extends Controller
             $this->session->log($request, 'login_failed', $attempt, [], 'Device binding failed.');
             throw $exception;
         }
+        if (! $this->examCanStart($exam) && $attempt->status === CandidateExamAttempt::STATUS_NOT_STARTED) {
+            $token = $this->session->makeToken($attempt->refresh()->load(['candidate', 'exam', 'papers.question.subject', 'papers.question.options']));
+            $this->session->log($request, 'login_waiting', $attempt, [
+                'starts_at' => $exam->starts_at?->toISOString(),
+                'starts_in_seconds' => $this->secondsUntilStart($exam),
+            ], 'Candidate logged in before exam start time.');
+
+            return response()->json((new CandidateExamPayloadResource($attempt, $token))->resolve($request));
+        }
+
         $this->startAttempt($exam, $attempt, $request, $data['device_fingerprint']);
 
         $token = $this->session->makeToken($attempt->refresh()->load(['candidate', 'exam', 'papers.question.subject', 'papers.question.options']));
@@ -100,11 +110,49 @@ class CandidateExamController extends Controller
         return response()->json((new CandidateExamPayloadResource($attempt, $token))->resolve($request));
     }
 
+    public function start(Request $request): JsonResponse
+    {
+        $attempt = $this->session->attemptFromRequest($request);
+        $data = $request->validate([
+            'device_fingerprint' => ['required', 'string', 'max:255'],
+        ]);
+        $exam = $attempt->exam;
+
+        if (! $exam || $exam->status !== Exam::STATUS_ACTIVE) {
+            throw ValidationException::withMessages(['exam' => 'Exam not found or not active.']);
+        }
+
+        if ($this->examOverdue($exam)) {
+            app(ExamStatusService::class)->sync($exam);
+            $this->session->log($request, 'start_failed', $attempt, [], 'Exam time has ended.');
+            throw ValidationException::withMessages(['exam' => 'This exam time has ended.']);
+        }
+
+        if (! $this->examCanStart($exam)) {
+            $this->session->log($request, 'start_waiting', $attempt, [
+                'starts_at' => $exam->starts_at?->toISOString(),
+                'starts_in_seconds' => $this->secondsUntilStart($exam),
+            ], 'Candidate attempted to start before exam start time.');
+            throw ValidationException::withMessages(['exam' => 'This exam has not started yet.']);
+        }
+
+        $this->bindDeviceIfRequired($exam, $attempt, $data['device_fingerprint']);
+
+        if ($attempt->status === CandidateExamAttempt::STATUS_NOT_STARTED) {
+            $this->startAttempt($exam, $attempt, $request, $data['device_fingerprint']);
+            $attempt = $attempt->refresh()->load(['candidate', 'exam', 'papers.question.subject', 'papers.question.options']);
+            $this->session->log($request, 'login_success', $attempt, ['device_binding' => (bool) data_get($exam->settings ?? [], 'bind_device', false)]);
+            app(ExamMonitorService::class)->broadcast($exam, 'login', $attempt);
+        }
+
+        return response()->json((new CandidateExamPayloadResource($attempt))->resolve($request));
+    }
+
     public function exam(Request $request): JsonResponse
     {
         $attempt = $this->session->attemptFromRequest($request);
 
-        if ($this->session->remainingSeconds($attempt) <= 0 && $this->isOpenAttempt($attempt)) {
+        if ($attempt->status === CandidateExamAttempt::STATUS_IN_PROGRESS && $this->session->remainingSeconds($attempt) <= 0 && $this->isOpenAttempt($attempt)) {
             $attempt = $this->finalizeAttempt($request, $attempt, CandidateExamAttempt::STATUS_AUTO_SUBMITTED);
         }
 
@@ -384,6 +432,20 @@ class CandidateExamController extends Controller
     private function examOverdue(Exam $exam): bool
     {
         return $exam->ends_at !== null && $exam->ends_at->isPast();
+    }
+
+    private function examCanStart(Exam $exam): bool
+    {
+        return ! $exam->starts_at || $exam->starts_at->lessThanOrEqualTo(now());
+    }
+
+    private function secondsUntilStart(Exam $exam): int
+    {
+        if (! $exam->starts_at) {
+            return 0;
+        }
+
+        return max(0, now()->diffInSeconds($exam->starts_at, false));
     }
 
     private function finalizeAttempt(Request $request, CandidateExamAttempt $attempt, string $status): CandidateExamAttempt
