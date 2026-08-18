@@ -137,6 +137,8 @@ class ExamParticipantAssignmentService
         $count = Candidate::query()
             ->whereIn('id', $candidateIds)
             ->when($exam->organization_id, fn ($query) => $query->where('organization_id', $exam->organization_id))
+            ->when($exam->institution_id, fn ($query) => $query->where('institution_id', $exam->institution_id))
+            ->when($exam->department_id, fn ($query) => $query->where('department_id', $exam->department_id))
             ->when($exam->professional_school_id, fn ($query) => $query->where('professional_school_id', $exam->professional_school_id))
             ->when($exam->cbt_center_id, fn ($query) => $query->where('cbt_center_id', $exam->cbt_center_id))
             ->count();

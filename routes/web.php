@@ -157,6 +157,10 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
         Route::post('/institutions/{institution}/departments', [InstitutionStructureController::class, 'storeDepartment'])->name('institutions.departments.store');
         Route::patch('/institutions/{institution}/departments/{department}', [InstitutionStructureController::class, 'updateDepartment'])->name('institutions.departments.update');
         Route::delete('/institutions/{institution}/departments/{department}', [InstitutionStructureController::class, 'destroyDepartment'])->name('institutions.departments.destroy');
+        Route::get('/institutions/{institution}/departments/{department}/lecturers', [InstitutionStructureController::class, 'lecturers'])->name('institutions.departments.lecturers.index');
+        Route::post('/institutions/{institution}/departments/{department}/lecturers', [InstitutionStructureController::class, 'storeLecturer'])->name('institutions.departments.lecturers.store');
+        Route::patch('/institutions/{institution}/departments/{department}/lecturers/{lecturer}', [InstitutionStructureController::class, 'updateLecturer'])->name('institutions.departments.lecturers.update');
+        Route::delete('/institutions/{institution}/departments/{department}/lecturers/{lecturer}', [InstitutionStructureController::class, 'destroyLecturer'])->name('institutions.departments.lecturers.destroy');
         Route::get('/institutions/{institution}/programmes', [InstitutionStructureController::class, 'programmes'])->name('institutions.programmes.index');
         Route::post('/institutions/{institution}/programmes', [InstitutionStructureController::class, 'storeProgramme'])->name('institutions.programmes.store');
         Route::patch('/institutions/{institution}/programmes/{programme}', [InstitutionStructureController::class, 'updateProgramme'])->name('institutions.programmes.update');

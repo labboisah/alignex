@@ -4,7 +4,10 @@ namespace Tests\Feature;
 
 use App\Models\AdminRegistrationRequest;
 use App\Models\Center;
+use App\Models\Institution;
 use App\Models\Organization;
+use App\Models\PricingPlan;
+use App\Models\ProfessionalSchool;
 use App\Models\School;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -22,13 +25,15 @@ class AdminRegistrationTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('AdminRegistrations/Create')
-                ->has('entityTypes', 4)
-                ->where('entityTypes.1.value', AdminRegistrationRequest::TYPE_SECONDARY_SCHOOL)
-                ->where('entityTypes.2.value', AdminRegistrationRequest::TYPE_PROFESSIONAL_SCHOOL)
+                ->has('entityTypes', 5)
+                ->where('entityTypes.1.value', AdminRegistrationRequest::TYPE_INSTITUTION)
+                ->where('entityTypes.2.value', AdminRegistrationRequest::TYPE_SECONDARY_SCHOOL)
+                ->where('entityTypes.3.value', AdminRegistrationRequest::TYPE_PROFESSIONAL_SCHOOL)
             );
 
         $this->post('/register-admin', [
             'entity_type' => AdminRegistrationRequest::TYPE_ORGANIZATION,
+            'pricing_plan_id' => $this->pricingPlan()->id,
             'admin_name' => 'Org Admin',
             'admin_email' => 'org-admin@example.test',
             'password' => 'password',
@@ -66,6 +71,7 @@ class AdminRegistrationTest extends TestCase
     {
         $this->post('/register-admin', [
             'entity_type' => AdminRegistrationRequest::TYPE_INSTITUTION,
+            'pricing_plan_id' => $this->pricingPlan()->id,
             'admin_name' => 'Institution Admin',
             'admin_email' => 'institution-admin@example.test',
             'password' => 'password',
@@ -230,6 +236,7 @@ class AdminRegistrationTest extends TestCase
         $this->actingAs($superAdmin)
             ->patch("/admin-registrations/{$registration->id}", [
                 'entity_type' => AdminRegistrationRequest::TYPE_CENTER,
+                'pricing_plan_id' => $this->pricingPlan()->id,
                 'admin_name' => $registration->admin_name,
                 'admin_email' => 'new-center-admin@example.test',
                 'entity_name' => 'Updated CBT',
@@ -258,6 +265,278 @@ class AdminRegistrationTest extends TestCase
             'entity_name' => 'Updated CBT',
             'entity_code' => 'UPDATED-CBT',
             'facility_summary' => 'Updated labs and backup power.',
+        ]);
+    }
+
+    public function test_super_admin_can_change_approved_account_type(): void
+    {
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $plan = $this->pricingPlan();
+        $professionalSchool = ProfessionalSchool::create([
+            'pricing_plan_id' => $plan->id,
+            'name' => 'Wrong Professional School',
+            'code' => 'WRONG-PRO',
+            'contact_person' => 'Registrar',
+            'email' => 'wrong-pro@example.test',
+            'phone' => '08030000009',
+            'address' => 'Old address',
+            'status' => ProfessionalSchool::STATUS_ACTIVE,
+        ]);
+        $registration = AdminRegistrationRequest::factory()->create([
+            'entity_type' => AdminRegistrationRequest::TYPE_PROFESSIONAL_SCHOOL,
+            'entity_id' => $professionalSchool->id,
+            'pricing_plan_id' => $plan->id,
+            'status' => AdminRegistrationRequest::STATUS_APPROVED,
+            'admin_name' => 'Account Admin',
+            'admin_email' => 'account-admin@example.test',
+            'entity_name' => 'Wrong Professional School',
+            'entity_code' => 'WRONG-PRO',
+            'entity_email' => 'wrong-pro@example.test',
+        ]);
+        $admin = User::factory()->create([
+            'name' => 'Account Admin',
+            'email' => 'account-admin@example.test',
+            'role' => User::ROLE_PROFESSIONAL_SCHOOL_ADMIN,
+            'professional_school_id' => $professionalSchool->id,
+        ]);
+
+        $this->actingAs($superAdmin)
+            ->patch("/admin-registrations/{$registration->id}", [
+                'entity_type' => AdminRegistrationRequest::TYPE_INSTITUTION,
+                'pricing_plan_id' => $plan->id,
+                'admin_name' => 'Institution Account Admin',
+                'admin_email' => 'institution-account-admin@example.test',
+                'entity_name' => 'Correct Institution',
+                'entity_code' => 'CORRECT-INST',
+                'location' => 'Institution location',
+                'capacity' => 1000,
+                'contact_person' => 'Registrar',
+                'phone' => '08030000010',
+                'entity_email' => 'correct-inst@example.test',
+                'address' => 'Institution address',
+                'legal_registration_number' => 'INST-001',
+                'website' => 'https://correct-inst.test',
+                'years_in_operation' => 10,
+                'operating_scope' => 'National',
+                'accreditation_body' => 'NUC',
+                'accreditation_number' => 'NUC-001',
+                'facility_summary' => 'Institution facilities.',
+                'exam_experience' => 'Semester examinations.',
+                'expected_candidates' => 1000,
+            ])
+            ->assertRedirect(route('admin-registrations.show', $registration, absolute: false));
+
+        $institution = Institution::query()->where('code', 'CORRECT-INST')->firstOrFail();
+        $admin->refresh();
+
+        $this->assertSame(User::ROLE_INSTITUTION_ADMIN, $admin->role);
+        $this->assertSame($institution->id, $admin->institution_id);
+        $this->assertNull($admin->professional_school_id);
+        $this->assertDatabaseHas('professional_schools', [
+            'id' => $professionalSchool->id,
+            'status' => ProfessionalSchool::STATUS_INACTIVE,
+        ]);
+        $this->assertDatabaseHas('admin_registration_requests', [
+            'id' => $registration->id,
+            'entity_type' => AdminRegistrationRequest::TYPE_INSTITUTION,
+            'entity_id' => $institution->id,
+            'admin_email' => 'institution-account-admin@example.test',
+        ]);
+    }
+
+    public function test_changing_institution_account_to_organization_deactivates_old_lecturers(): void
+    {
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $plan = $this->pricingPlan();
+        $institution = Institution::create([
+            'name' => 'Old Institution',
+            'code' => 'OLD-INST',
+            'institution_type' => 'university',
+            'email' => 'old-institution@example.test',
+            'phone' => '08030000018',
+            'address' => 'Old institution address',
+            'status' => Institution::STATUS_ACTIVE,
+        ]);
+        $registration = AdminRegistrationRequest::factory()->create([
+            'entity_type' => AdminRegistrationRequest::TYPE_INSTITUTION,
+            'entity_id' => $institution->id,
+            'pricing_plan_id' => $plan->id,
+            'status' => AdminRegistrationRequest::STATUS_APPROVED,
+            'admin_name' => 'Institution Admin',
+            'admin_email' => 'institution-owner@example.test',
+            'entity_name' => 'Old Institution',
+            'entity_code' => 'OLD-INST',
+            'entity_email' => 'old-institution@example.test',
+        ]);
+        $admin = User::factory()->create([
+            'name' => 'Institution Admin',
+            'email' => 'institution-owner@example.test',
+            'role' => User::ROLE_INSTITUTION_ADMIN,
+            'status' => User::STATUS_ACTIVE,
+            'institution_id' => $institution->id,
+            'active_context_type' => 'institution',
+            'active_context_id' => $institution->id,
+        ]);
+        $lecturer = User::factory()->create([
+            'role' => User::ROLE_FACILITATOR,
+            'status' => User::STATUS_ACTIVE,
+            'institution_id' => $institution->id,
+            'active_context_type' => 'institution',
+            'active_context_id' => $institution->id,
+        ]);
+
+        $this->actingAs($superAdmin)
+            ->patch("/admin-registrations/{$registration->id}", [
+                'entity_type' => AdminRegistrationRequest::TYPE_ORGANIZATION,
+                'pricing_plan_id' => $plan->id,
+                'admin_name' => 'Organization Account Admin',
+                'admin_email' => 'organization-owner@example.test',
+                'entity_name' => 'Correct Organization',
+                'entity_code' => 'CORRECT-ORG',
+                'location' => 'Organization location',
+                'capacity' => 1000,
+                'contact_person' => 'Director',
+                'phone' => '08030000019',
+                'entity_email' => 'correct-org@example.test',
+                'address' => 'Organization address',
+                'legal_registration_number' => 'ORG-001',
+                'website' => 'https://correct-org.test',
+                'years_in_operation' => 10,
+                'operating_scope' => 'National',
+                'accreditation_body' => 'CAC',
+                'accreditation_number' => 'CAC-001',
+                'facility_summary' => 'Organization facilities.',
+                'exam_experience' => 'Organization examinations.',
+                'expected_candidates' => 1000,
+            ])
+            ->assertRedirect(route('admin-registrations.show', $registration, absolute: false));
+
+        $organization = Organization::query()->where('code', 'CORRECT-ORG')->firstOrFail();
+        $admin->refresh();
+        $lecturer->refresh();
+
+        $this->assertSame(User::ROLE_ORGANIZATION_ADMIN, $admin->role);
+        $this->assertSame($organization->id, $admin->organization_id);
+        $this->assertNull($admin->institution_id);
+        $this->assertSame(User::STATUS_ACTIVE, $admin->status);
+        $this->assertSame(User::STATUS_INACTIVE, $lecturer->status);
+        $this->assertNull($lecturer->active_context_type);
+        $this->assertNull($lecturer->active_context_id);
+        $this->assertDatabaseHas('institutions', [
+            'id' => $institution->id,
+            'status' => Institution::STATUS_INACTIVE,
+        ]);
+
+        $this->actingAs($lecturer)
+            ->get('/dashboard')
+            ->assertRedirect(route('login', absolute: false))
+            ->assertSessionHasErrors('email');
+    }
+
+    public function test_changing_organization_account_to_institution_deactivates_old_scoped_users(): void
+    {
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $plan = $this->pricingPlan();
+        $organization = Organization::create([
+            'pricing_plan_id' => $plan->id,
+            'name' => 'Old Organization',
+            'code' => 'OLD-ORG',
+            'contact_person' => 'Director',
+            'email' => 'old-org@example.test',
+            'phone' => '08030000020',
+            'address' => 'Old organization address',
+            'status' => Organization::STATUS_ACTIVE,
+        ]);
+        $childInstitution = Institution::create([
+            'organization_id' => $organization->id,
+            'name' => 'Child Institution',
+            'code' => 'CHILD-INST',
+            'institution_type' => 'university',
+            'email' => 'child-institution@example.test',
+            'phone' => '08030000021',
+            'address' => 'Child institution address',
+            'status' => Institution::STATUS_ACTIVE,
+        ]);
+        $registration = AdminRegistrationRequest::factory()->create([
+            'entity_type' => AdminRegistrationRequest::TYPE_ORGANIZATION,
+            'entity_id' => $organization->id,
+            'pricing_plan_id' => $plan->id,
+            'status' => AdminRegistrationRequest::STATUS_APPROVED,
+            'admin_name' => 'Organization Admin',
+            'admin_email' => 'old-organization-owner@example.test',
+            'entity_name' => 'Old Organization',
+            'entity_code' => 'OLD-ORG',
+            'entity_email' => 'old-org@example.test',
+        ]);
+        $admin = User::factory()->create([
+            'name' => 'Organization Admin',
+            'email' => 'old-organization-owner@example.test',
+            'role' => User::ROLE_ORGANIZATION_ADMIN,
+            'status' => User::STATUS_ACTIVE,
+            'organization_id' => $organization->id,
+            'active_context_type' => 'organization',
+            'active_context_id' => $organization->id,
+        ]);
+        $examiner = User::factory()->create([
+            'role' => User::ROLE_EXAMINER,
+            'status' => User::STATUS_ACTIVE,
+            'organization_id' => $organization->id,
+            'active_context_type' => 'organization',
+            'active_context_id' => $organization->id,
+        ]);
+        $lecturer = User::factory()->create([
+            'role' => User::ROLE_FACILITATOR,
+            'status' => User::STATUS_ACTIVE,
+            'organization_id' => $organization->id,
+            'institution_id' => $childInstitution->id,
+            'active_context_type' => 'institution',
+            'active_context_id' => $childInstitution->id,
+        ]);
+
+        $this->actingAs($superAdmin)
+            ->patch("/admin-registrations/{$registration->id}", [
+                'entity_type' => AdminRegistrationRequest::TYPE_INSTITUTION,
+                'pricing_plan_id' => $plan->id,
+                'admin_name' => 'Institution Account Admin',
+                'admin_email' => 'new-institution-owner@example.test',
+                'entity_name' => 'New Institution',
+                'entity_code' => 'NEW-INST',
+                'location' => 'Institution location',
+                'capacity' => 1000,
+                'contact_person' => 'Registrar',
+                'phone' => '08030000022',
+                'entity_email' => 'new-inst@example.test',
+                'address' => 'Institution address',
+                'legal_registration_number' => 'INST-002',
+                'website' => 'https://new-inst.test',
+                'years_in_operation' => 10,
+                'operating_scope' => 'National',
+                'accreditation_body' => 'NUC',
+                'accreditation_number' => 'NUC-002',
+                'facility_summary' => 'Institution facilities.',
+                'exam_experience' => 'Semester examinations.',
+                'expected_candidates' => 1000,
+            ])
+            ->assertRedirect(route('admin-registrations.show', $registration, absolute: false));
+
+        $newInstitution = Institution::query()->where('code', 'NEW-INST')->firstOrFail();
+        $admin->refresh();
+        $examiner->refresh();
+        $lecturer->refresh();
+
+        $this->assertSame(User::ROLE_INSTITUTION_ADMIN, $admin->role);
+        $this->assertSame($newInstitution->id, $admin->institution_id);
+        $this->assertNull($admin->organization_id);
+        $this->assertSame(User::STATUS_ACTIVE, $admin->status);
+        $this->assertSame(User::STATUS_INACTIVE, $examiner->status);
+        $this->assertSame(User::STATUS_INACTIVE, $lecturer->status);
+        $this->assertDatabaseHas('organizations', [
+            'id' => $organization->id,
+            'status' => Organization::STATUS_INACTIVE,
+        ]);
+        $this->assertDatabaseHas('institutions', [
+            'id' => $childInstitution->id,
+            'status' => Institution::STATUS_INACTIVE,
         ]);
     }
 
@@ -318,5 +597,10 @@ class AdminRegistrationTest extends TestCase
 
         $this->actingAs($schoolAdmin)->get('/admin-registrations')->assertForbidden();
         $this->actingAs($schoolAdmin)->patch("/admin-registrations/{$registration->id}/approve")->assertForbidden();
+    }
+
+    private function pricingPlan(): PricingPlan
+    {
+        return PricingPlan::query()->firstOrFail();
     }
 }

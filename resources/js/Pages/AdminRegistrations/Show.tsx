@@ -29,7 +29,7 @@ export default function ShowAdminRegistration({ registration }: Props) {
                     eyebrow="Application"
                     title={record.entity_name}
                     description={`Review submitted ${label.toLowerCase()} and administrator details before approving login access.`}
-                    actions={pending && (
+                    actions={(pending || approved) && (
                         <Button asChild type="button" variant="secondary">
                             <Link href={`/admin-registrations/${record.id}/edit`}>
                                 <Edit className="h-4 w-4" />

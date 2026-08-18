@@ -55,6 +55,8 @@ const iconByLabel = {
     'Student Groups': Users,
     Students: Users,
     Teachers: Users,
+    Lecturers: Users,
+    'Assigned Courses': BookOpen,
     Faculties: GraduationCap,
     Departments: Building2,
     Programmes: GraduationCap,
@@ -71,6 +73,7 @@ const iconByLabel = {
     Exams: ClipboardList,
     'Recruitment Exams': ClipboardList,
     Assessments: ClipboardCheck,
+    'Create Assessment': ClipboardCheck,
     'Assessment Exams': ClipboardCheck,
     'Certification Exams': ClipboardList,
     'Adaptive Exams': ClipboardList,
@@ -189,7 +192,13 @@ function resolveNavItem(item: SharedNavItem, fallbackIcon = LayoutDashboard): Po
     const matchedIcon = Object.prototype.hasOwnProperty.call(iconByLabel, item.label)
         ? iconByLabel[item.label as keyof typeof iconByLabel]
         : null;
-    const Icon = isRenderableComponent(matchedIcon) ? matchedIcon : fallbackIcon;
+    const Icon = isRenderableComponent(matchedIcon)
+        ? matchedIcon
+        : isDepartmentNavItem(item)
+            ? Building2
+            : isCourseNavItem(item)
+                ? BookOpen
+            : fallbackIcon;
 
     return {
         ...item,
@@ -197,4 +206,15 @@ function resolveNavItem(item: SharedNavItem, fallbackIcon = LayoutDashboard): Po
         icon: Icon,
         children: item.children?.map((child) => resolveNavItem(child, Icon)),
     };
+}
+
+function isDepartmentNavItem(item: SharedNavItem) {
+    return item.label.endsWith(' Dept')
+        && item.children?.some((child) => child.label === 'Candidates') === true
+        && item.children?.some((child) => child.label === 'Candidate Groups') === true;
+}
+
+function isCourseNavItem(item: SharedNavItem) {
+    return item.children?.some((child) => child.label === 'Question Bank') === true
+        && item.children?.some((child) => child.label === 'Assessments') === true;
 }

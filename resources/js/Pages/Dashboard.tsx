@@ -50,7 +50,7 @@ type NamedValue = {
 };
 
 type TeacherPanel = {
-    kind?: 'teacher' | 'facilitator';
+    kind?: 'teacher' | 'facilitator' | 'lecturer';
     metrics: Metric[];
     subjects: { id: string; name: string; code?: string | null; class_name?: string | null }[];
     classes: { id: string; name: string; level?: string | null; students_count: number; groups_count: number }[];
@@ -112,6 +112,13 @@ export default function Dashboard({
     const currentContext = (usePage().props.current_context ?? null) as { type: string; name: string } | null;
     const terms = getContextTerminology(currentContext?.type);
     const isTeacherDashboard = Boolean(teacher_panel);
+    const dashboardDescription = teacher_panel
+        ? teacher_panel.kind === 'lecturer'
+            ? 'Overview of your assigned courses, candidates, question banks, assessments, and results.'
+            : teacher_panel.kind === 'facilitator'
+                ? 'Overview of your assigned courses, modules, candidates, assessments, and results.'
+                : 'Overview of your assigned subjects, classes, student groups, students, assessments, and results.'
+        : `${role.scope} overview for ${terms.examLabel.toLowerCase()}s, ${terms.learnerPlural.toLowerCase()}, ${terms.questionStructure.toLowerCase()}, and ${terms.resultDocument.toLowerCase()}s.`;
     const passFail = [
         { name: 'Passed', value: result_summary.passed },
         { name: 'Failed', value: result_summary.failed },
@@ -124,9 +131,7 @@ export default function Dashboard({
                 <PageHeader
                     eyebrow={role.label}
                     title={currentContext?.name ?? 'Dashboard'}
-                    description={isTeacherDashboard
-                        ? 'Overview of your assigned subjects, classes, student groups, students, assessments, and results.'
-                        : `${role.scope} overview for ${terms.examLabel.toLowerCase()}s, ${terms.learnerPlural.toLowerCase()}, ${terms.questionStructure.toLowerCase()}, and ${terms.resultDocument.toLowerCase()}s.`}
+                    description={dashboardDescription}
                     actions={quick_actions.slice(0, 2).map((action) => (
                         <Button key={action.href} asChild variant="secondary">
                             <Link href={action.href}>{action.label}</Link>
@@ -298,7 +303,9 @@ export default function Dashboard({
 }
 
 function TeacherDashboardPanel({ panel }: { panel: TeacherPanel }) {
-    if (panel.kind === 'facilitator') {
+    if (panel.kind === 'facilitator' || panel.kind === 'lecturer') {
+        const isLecturer = panel.kind === 'lecturer';
+
         return (
             <section className="mt-6 space-y-6">
                 <div className="grid gap-6 xl:grid-cols-2">
@@ -308,13 +315,15 @@ function TeacherDashboardPanel({ panel }: { panel: TeacherPanel }) {
                         ))}
                     </SimplePanel>
 
-                    <SimplePanel title="Assigned Modules" empty="No assigned modules found.">
-                        {(panel.modules ?? []).map((module) => (
-                            <InfoRow key={module.id} title={module.name} meta={[module.code, module.course_name].filter(Boolean).join(' / ')} />
-                        ))}
-                    </SimplePanel>
+                    {!isLecturer && (
+                        <SimplePanel title="Assigned Modules" empty="No assigned modules found.">
+                            {(panel.modules ?? []).map((module) => (
+                                <InfoRow key={module.id} title={module.name} meta={[module.code, module.course_name].filter(Boolean).join(' / ')} />
+                            ))}
+                        </SimplePanel>
+                    )}
 
-                    <SimplePanel title="Candidates / Trainees" empty="No candidates found for assigned courses.">
+                    <SimplePanel title={isLecturer ? 'Candidates' : 'Candidates / Trainees'} empty="No candidates found for assigned courses.">
                         {(panel.candidates ?? []).map((candidate) => (
                             <InfoRow key={candidate.id} title={candidate.name} meta={[candidate.registration_number, candidate.status].filter(Boolean).join(' / ')} />
                         ))}

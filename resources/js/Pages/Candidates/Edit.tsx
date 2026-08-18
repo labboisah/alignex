@@ -3,7 +3,7 @@ import { PageHeader, PortalAppShell } from '@/Components/Platform';
 import { CandidateForm } from './Form';
 import { Candidate, ScopeOption, StatusOption } from './types';
 
-export default function EditCandidate({ candidate, ...props }: { candidate: { data: Candidate }; organizations: ScopeOption[]; schools: ScopeOption[]; centers: ScopeOption[]; statuses: StatusOption[] }) {
+export default function EditCandidate({ candidate, ...props }: { candidate: { data: Candidate }; organizations: ScopeOption[]; schools: ScopeOption[]; centers: ScopeOption[]; departments?: ScopeOption[]; statuses: StatusOption[] }) {
     return (
         <PortalAppShell title="Edit Candidate">
             <Head title="Edit Candidate" />

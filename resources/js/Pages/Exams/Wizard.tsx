@@ -135,6 +135,12 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
     const paperLabel = isInstitutionExam ? 'Course' : isProfessionalExam ? 'Module' : 'Subject';
     const paperLabelPlural = isInstitutionExam ? 'Courses' : isProfessionalExam ? 'Modules' : 'Subjects';
     const paperStepLabel = isInstitutionExam ? 'Course Paper' : isProfessionalExam ? 'Course / Module Paper' : 'Subjects';
+    const selectedInstitutionDepartmentId = isInstitutionExam
+        ? courses.find((course) => String(course.id) === String(data.subjects.find((row) => row.course_id)?.course_id))?.department_id
+        : null;
+    const availableCandidateGroups = selectedInstitutionDepartmentId
+        ? candidateGroups.filter((group) => !group.department_id || String(group.department_id) === String(selectedInstitutionDepartmentId))
+        : candidateGroups;
 
     const submit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -228,7 +234,7 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
 
             {step === 2 && (
                 <FormSection title={paperStepLabel} description={isInstitutionExam ? 'Add one or more course rows and configure question counts and marks.' : isProfessionalExam ? 'Add one or more course/module rows and configure question counts and marks.' : 'Add one or more subjects and configure question counts and marks.'}>
-                    {(isCbtExam || isOrganizationExam) && (
+                    {(isCbtExam || isOrganizationExam || isInstitutionExam) && (
                         <div className="mb-4 grid gap-4 rounded-md border border-border bg-white p-4 md:grid-cols-2">
                             <Field label="Candidate Groups" error={errors.candidate_group_ids ?? errors.candidate_group_id}>
                                 <select
@@ -241,14 +247,14 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
                                             ...data,
                                             candidate_group_ids: groupIds,
                                             candidate_group_id: groupIds[0] ?? '',
-                                            candidate_ids: isCbtExam || groupIds.length > 0 ? [] : data.candidate_ids,
+                                            candidate_ids: isCbtExam || isInstitutionExam || groupIds.length > 0 ? [] : data.candidate_ids,
                                         });
                                     }}
                                 >
-                                    {candidateGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+                                    {availableCandidateGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
                                 </select>
                             </Field>
-                            {isCbtExam || data.candidate_group_ids.length > 0 ? (
+                            {isCbtExam || isInstitutionExam || data.candidate_group_ids.length > 0 ? (
                                 <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm font-semibold text-primary">
                                     Candidates will be fetched automatically from the selected group(s).
                                 </div>

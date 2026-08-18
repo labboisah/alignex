@@ -41,6 +41,7 @@ const inputClass = 'mt-1 block w-full rounded-md border-border shadow-sm focus:b
 
 export default function EditApplication({ registration, entityTypes, plans }: Props) {
     const record = registration.data;
+    const isApproved = record.status === 'approved';
     const { data, setData, patch, processing, errors } = useForm<FormData>({
         entity_type: record.entity_type,
         pricing_plan_id: record.pricing_plan_id ? String(record.pricing_plan_id) : (plans[0] ? String(plans[0].id) : ''),
@@ -79,8 +80,10 @@ export default function EditApplication({ registration, entityTypes, plans }: Pr
             <section className="mx-auto max-w-5xl">
                 <PageHeader
                     eyebrow="Applications"
-                    title={`Edit ${record.entity_name}`}
-                    description="Update application details before approval creates the admin login and record."
+                    title={`Edit ${isApproved ? 'Account' : 'Application'}: ${record.entity_name}`}
+                    description={isApproved
+                        ? 'Update the approved account, including account type, tenant details, pricing plan, and administrator login scope.'
+                        : 'Update application details before approval creates the admin login and record.'}
                     actions={(
                         <Button asChild type="button" variant="secondary">
                             <Link href={`/admin-registrations/${record.id}`}>Cancel</Link>
@@ -91,6 +94,11 @@ export default function EditApplication({ registration, entityTypes, plans }: Pr
                 <form onSubmit={submit} className="grid gap-5">
                     <section className="rounded-md border border-border bg-white p-5 shadow-sm">
                         <h2 className="font-semibold text-slateDark">Application Type</h2>
+                        {isApproved && (
+                            <p className="mt-2 text-sm leading-6 text-slate-600">
+                                Changing this type creates a new matching account record, deactivates the old one, and moves the administrator login to the new scope.
+                            </p>
+                        )}
                         <div className="mt-4 grid gap-3 md:grid-cols-3">
                             {entityTypes.map((type) => (
                                 <label key={type.value} className="cursor-pointer rounded-md border border-border p-4 hover:bg-slate-50">
@@ -213,7 +221,7 @@ export default function EditApplication({ registration, entityTypes, plans }: Pr
                     <div className="flex justify-end">
                         <Button type="submit" disabled={processing}>
                             <Save className="h-4 w-4" />
-                            Save Application
+                            Save {isApproved ? 'Account' : 'Application'}
                         </Button>
                     </div>
                 </form>
@@ -237,6 +245,10 @@ function ErrorText({ message }: { message?: string }) {
 }
 
 function typeLabel(type: FormData['entity_type']) {
+    if (type === 'institution') {
+        return 'Institution';
+    }
+
     if (type === 'school') {
         return 'School';
     }

@@ -23,6 +23,7 @@ class UpdateCandidateRequest extends FormRequest
 
         return [
             'full_name' => ['required_without:first_name', 'string', 'max:255'],
+            'department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'first_name' => ['nullable', 'string', 'max:255'],
             'last_name' => ['nullable', 'string', 'max:255'],
             'registration_number' => [
@@ -33,6 +34,7 @@ class UpdateCandidateRequest extends FormRequest
                     ->ignore($candidate)
                     ->where(fn ($query) => $query
                         ->when($candidate->organization_id, fn ($query) => $query->where('organization_id', $candidate->organization_id))
+                        ->when($candidate->department_id, fn ($query) => $query->where('department_id', $candidate->department_id))
                         ->when($candidate->school_id, fn ($query) => $query->where('school_id', $candidate->school_id))
                         ->when($candidate->center_id, fn ($query) => $query->where('center_id', $candidate->center_id))),
             ],

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Candidate;
+use App\Models\CandidateGroup;
 use App\Models\Exam;
 use App\Models\Organization;
 use App\Models\User;
@@ -101,10 +102,10 @@ class CandidateModuleTest extends TestCase
             'role' => User::ROLE_ORGANIZATION_ADMIN,
             'organization_id' => $organization->id,
         ]);
-        $exam = Exam::factory()->create([
+        $group = CandidateGroup::factory()->create([
             'organization_id' => $organization->id,
-            'school_id' => null,
-            'center_id' => null,
+            'name' => 'Recruitment Batch A',
+            'code' => 'REC-A',
         ]);
 
         Candidate::factory()->create([
@@ -123,7 +124,7 @@ class CandidateModuleTest extends TestCase
         ]));
 
         $this->actingAs($admin)
-            ->post('/candidates/import', ['exam_id' => $exam->id, 'file' => $file])
+            ->post('/candidates/import', ['candidate_group_id' => $group->id, 'file' => $file])
             ->assertRedirect()
             ->assertSessionHas('candidate_import_report');
 
@@ -136,9 +137,10 @@ class CandidateModuleTest extends TestCase
             'organization_id' => $organization->id,
             'candidate_number' => 'REG-NEW',
         ]);
-        $this->assertDatabaseHas('exam_candidates', [
-            'exam_id' => $exam->id,
-            'status' => 'assigned',
+        $candidate = Candidate::query()->where('candidate_number', 'REG-NEW')->firstOrFail();
+        $this->assertDatabaseHas('candidate_group_candidate', [
+            'candidate_group_id' => $group->id,
+            'candidate_id' => $candidate->id,
         ]);
     }
 

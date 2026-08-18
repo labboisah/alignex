@@ -12,6 +12,7 @@ use App\Models\PricingPlan;
 use App\Services\AdminRegistrationApprovalService;
 use App\Services\Notifications\NotificationDispatcher;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -30,7 +31,7 @@ class AdminRegistrationController extends Controller
     public function store(StoreAdminRegistrationRequest $request): RedirectResponse
     {
         $registration = AdminRegistrationRequest::create([
-            ...$request->safe()->except(['password', 'password_confirmation']),
+            ...Arr::except($request->validated(), ['password', 'password_confirmation']),
             'password' => Hash::make($request->validated('password')),
             'status' => AdminRegistrationRequest::STATUS_PENDING,
         ]);
@@ -68,7 +69,10 @@ class AdminRegistrationController extends Controller
 
     public function edit(AdminRegistrationRequest $adminRegistration): Response
     {
-        abort_if($adminRegistration->status !== AdminRegistrationRequest::STATUS_PENDING, 403);
+        abort_unless(in_array($adminRegistration->status, [
+            AdminRegistrationRequest::STATUS_PENDING,
+            AdminRegistrationRequest::STATUS_APPROVED,
+        ], true), 403);
 
         return Inertia::render('AdminRegistrations/Edit', [
             'registration' => AdminRegistrationRequestResource::make($adminRegistration->load('pricingPlan')),
@@ -77,15 +81,26 @@ class AdminRegistrationController extends Controller
         ]);
     }
 
-    public function update(UpdateAdminRegistrationRequest $request, AdminRegistrationRequest $adminRegistration): RedirectResponse
+    public function update(
+        UpdateAdminRegistrationRequest $request,
+        AdminRegistrationRequest $adminRegistration,
+        AdminRegistrationApprovalService $approvalService
+    ): RedirectResponse
     {
-        abort_if($adminRegistration->status !== AdminRegistrationRequest::STATUS_PENDING, 403);
+        abort_unless(in_array($adminRegistration->status, [
+            AdminRegistrationRequest::STATUS_PENDING,
+            AdminRegistrationRequest::STATUS_APPROVED,
+        ], true), 403);
 
-        $adminRegistration->update($request->safe()->all());
+        if ($adminRegistration->status === AdminRegistrationRequest::STATUS_APPROVED) {
+            $approvalService->updateApprovedAccount($adminRegistration, $request->user(), $request->validated());
+        } else {
+            $adminRegistration->update($request->validated());
+        }
 
         return redirect()
             ->route('admin-registrations.show', $adminRegistration)
-            ->with('success', 'Application updated.');
+            ->with('success', $adminRegistration->status === AdminRegistrationRequest::STATUS_APPROVED ? 'Account updated.' : 'Application updated.');
     }
 
     public function approve(

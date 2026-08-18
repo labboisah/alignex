@@ -2,6 +2,10 @@ export type Candidate = {
     id: string;
     organization_id?: number | null;
     organization_name?: string | null;
+    institution_id?: number | null;
+    institution_name?: string | null;
+    department_id?: number | string | null;
+    department_name?: string | null;
     school_id?: number | null;
     school_name?: string | null;
     center_id?: number | null;
@@ -40,6 +44,8 @@ export type CandidateGroupOption = {
     id: string;
     name: string;
     code?: string | null;
+    department_id?: number | string | null;
+    department_name?: string | null;
 };
 
 export type ScopeOption = {

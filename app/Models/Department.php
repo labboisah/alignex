@@ -35,4 +35,14 @@ class Department extends Model
     {
         return $this->hasMany(Course::class);
     }
+
+    public function candidates(): HasMany
+    {
+        return $this->hasMany(Candidate::class);
+    }
+
+    public function candidateGroups(): HasMany
+    {
+        return $this->hasMany(CandidateGroup::class);
+    }
 }

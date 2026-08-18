@@ -3,8 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\Course;
+use App\Models\Candidate;
+use App\Models\CandidateGroup;
 use App\Models\Department;
 use App\Models\Exam;
+use App\Models\ExamParticipant;
 use App\Models\Faculty;
 use App\Models\Institution;
 use App\Models\Organization;
@@ -47,7 +50,7 @@ class InstitutionAssessmentFeatureTest extends TestCase
             'department_id' => $department->id,
             'name' => 'BSc Computer Science',
             'code' => 'BSC-CS',
-            'duration_months' => 48,
+            'duration' => 48,
             'status' => 'active',
         ]);
         $course = Course::query()->create([
@@ -66,6 +69,22 @@ class InstitutionAssessmentFeatureTest extends TestCase
             'active_context_type' => 'institution',
             'active_context_id' => $institution->id,
         ]);
+        $group = CandidateGroup::factory()->create([
+            'organization_id' => $organization->id,
+            'institution_id' => $institution->id,
+            'faculty_id' => $faculty->id,
+            'department_id' => $department->id,
+            'name' => 'CSC 201 Batch A',
+            'code' => 'CSC201-A',
+        ]);
+        $candidate = Candidate::factory()->create([
+            'organization_id' => $organization->id,
+            'institution_id' => $institution->id,
+            'faculty_id' => $faculty->id,
+            'department_id' => $department->id,
+            'candidate_number' => 'CSC201-001',
+        ]);
+        $group->candidates()->attach($candidate->id);
 
         $this->actingAs($admin)
             ->post('/question-bank', [
@@ -125,7 +144,7 @@ class InstitutionAssessmentFeatureTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->post('/exams', $this->examPayload($institution->id, $course->id, $bank->id))
+            ->post('/exams', $this->examPayload($institution->id, $course->id, $bank->id, $group->id))
             ->assertRedirect();
 
         $exam = Exam::query()->where('code', 'CSC201-CA1')->firstOrFail();
@@ -138,9 +157,41 @@ class InstitutionAssessmentFeatureTest extends TestCase
             'question_bank_id' => $bank->id,
             'question_count' => 10,
         ]);
+        $this->assertDatabaseHas('exam_candidates', [
+            'exam_id' => $exam->id,
+            'candidate_id' => $candidate->id,
+        ]);
+        $this->assertDatabaseHas('exam_participants', [
+            'exam_id' => $exam->id,
+            'participant_type' => ExamParticipant::TYPE_CANDIDATE,
+            'participant_id' => $candidate->id,
+        ]);
+
+        $newCandidate = Candidate::factory()->create([
+            'organization_id' => $organization->id,
+            'institution_id' => $institution->id,
+            'faculty_id' => $faculty->id,
+            'department_id' => $department->id,
+            'candidate_number' => 'CSC201-002',
+        ]);
+        $group->candidates()->attach($newCandidate->id);
+
+        $this->actingAs($admin)
+            ->post(route('exams.participants.refresh', $exam, absolute: false))
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('exam_candidates', [
+            'exam_id' => $exam->id,
+            'candidate_id' => $newCandidate->id,
+        ]);
+        $this->assertDatabaseHas('exam_participants', [
+            'exam_id' => $exam->id,
+            'participant_type' => ExamParticipant::TYPE_CANDIDATE,
+            'participant_id' => $newCandidate->id,
+        ]);
     }
 
-    private function examPayload(int $institutionId, int $courseId, string $bankId): array
+    private function examPayload(int $institutionId, int $courseId, string $bankId, int|string $candidateGroupId): array
     {
         return [
             'institution_id' => $institutionId,
@@ -156,6 +207,8 @@ class InstitutionAssessmentFeatureTest extends TestCase
             'duration_minutes' => 60,
             'pass_mark' => 5,
             'status' => Exam::STATUS_SCHEDULED,
+            'candidate_group_id' => $candidateGroupId,
+            'candidate_group_ids' => [$candidateGroupId],
             'subjects' => [
                 [
                     'course_id' => $courseId,

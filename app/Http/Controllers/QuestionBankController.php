@@ -227,6 +227,14 @@ class QuestionBankController extends Controller
 
     private function scopeFacilitatorQuestionBanks($query, $user): void
     {
+        if ($user->institution_id) {
+            $query
+                ->where('institution_id', $user->institution_id)
+                ->whereIn('course_id', $user->assignedCourses()->select('courses.id'));
+
+            return;
+        }
+
         $query
             ->where('professional_school_id', $user->professional_school_id)
             ->where(function ($scope) use ($user): void {
@@ -387,6 +395,7 @@ class QuestionBankController extends Controller
         $course = Course::query()
             ->whereKey($courseId)
             ->where('institution_id', $this->institutionId($request))
+            ->when($request->user()->isFacilitator(), fn ($query) => $query->whereIn('id', $request->user()->assignedCourses()->select('courses.id')))
             ->first();
 
         if (! $course) {
@@ -448,6 +457,7 @@ class QuestionBankController extends Controller
 
         return Course::query()
             ->where('institution_id', $institutionId)
+            ->when($request->user()->isFacilitator(), fn ($query) => $query->whereIn('id', $request->user()->assignedCourses()->select('courses.id')))
             ->with(['faculty:id,name', 'department:id,name', 'programme:id,name'])
             ->orderBy('name')
             ->get(['id', 'institution_id', 'faculty_id', 'department_id', 'programme_id', 'name', 'code'])

@@ -49,7 +49,7 @@ class DashboardSummaryService
         return [
             'role' => [
                 'name' => $user->role,
-                'label' => AccessControl::roleLabel($user->role),
+                'label' => $user->isInstitutionLecturer() ? 'Lecturer' : AccessControl::roleLabel($user->role),
                 'scope' => match ($context['type'] ?? null) {
                     'organization' => 'Organization scope',
                     'institution' => 'Institution scope',
@@ -181,6 +181,18 @@ class DashboardSummaryService
 
     private function facilitatorExamScope(User $user, Builder $examScope): Builder
     {
+        if ($user->isInstitutionLecturer()) {
+            return $examScope
+                ->where('exam_category', Exam::CATEGORY_ASSESSMENT)
+                ->where('institution_id', $user->institution_id)
+                ->where(function (Builder $query) use ($user): void {
+                    $query
+                        ->whereIn('course_id', $user->assignedCourses()->select('courses.id'))
+                        ->orWhereHas('examSubjects.questionBank', fn (Builder $bankQuery) => $bankQuery
+                            ->whereIn('course_id', $user->assignedCourses()->select('courses.id')));
+                });
+        }
+
         return $examScope
             ->where('exam_category', Exam::CATEGORY_ASSESSMENT)
             ->where('professional_school_id', $user->professional_school_id)
@@ -253,24 +265,39 @@ class DashboardSummaryService
             ->values();
         $moduleIds = $modules->pluck('id')->unique()->values();
 
-        $candidates = Candidate::query()
-            ->where('professional_school_id', $user->professional_school_id)
-            ->where(function (Builder $query) use ($courseIds): void {
-                $query
-                    ->whereIn('course_id', $courseIds)
-                    ->orWhereHas('trainingBatch.programme.courses', fn (Builder $courseQuery) => $courseQuery->whereIn('courses.id', $courseIds));
-            })
-            ->latest()
-            ->limit(8)
-            ->get();
+        $candidates = $user->institution_id
+            ? Candidate::query()
+                ->where('institution_id', $user->institution_id)
+                ->when($user->department_id, fn (Builder $query) => $query->where('department_id', $user->department_id))
+                ->latest()
+                ->limit(8)
+                ->get()
+            : Candidate::query()
+                ->where('professional_school_id', $user->professional_school_id)
+                ->where(function (Builder $query) use ($courseIds): void {
+                    $query
+                        ->whereIn('course_id', $courseIds)
+                        ->orWhereHas('trainingBatch.programme.courses', fn (Builder $courseQuery) => $courseQuery->whereIn('courses.id', $courseIds));
+                })
+                ->latest()
+                ->limit(8)
+                ->get();
+
+        $questionBankCount = QuestionBank::query()
+            ->when($user->institution_id, fn (Builder $query) => $query->where('institution_id', $user->institution_id))
+            ->when(! $user->institution_id, fn (Builder $query) => $query->where('professional_school_id', $user->professional_school_id))
+            ->whereIn('course_id', $courseIds)
+            ->count();
 
         return [
-            'kind' => 'facilitator',
+            'kind' => $user->isInstitutionLecturer() ? 'lecturer' : 'facilitator',
             'metrics' => [
-                $this->metric('Assigned Courses', $courseIds->count(), 'Courses this facilitator can manage.', 'BookOpen'),
-                $this->metric('Assigned Modules', $moduleIds->count(), 'Modules linked to assigned courses.', 'Library'),
-                $this->metric('Candidates / Trainees', $candidates->count(), 'Recent trainees linked to assigned courses.', 'Users'),
-                $this->metric('Question Banks', QuestionBank::query()->where('professional_school_id', $user->professional_school_id)->whereIn('course_id', $courseIds)->count(), 'Question banks in assigned courses.', 'FileQuestion'),
+                $this->metric('Assigned Courses', $courseIds->count(), 'Courses this '.($user->institution_id ? 'lecturer' : 'facilitator').' can manage.', 'BookOpen'),
+                ...($user->isInstitutionLecturer() ? [] : [
+                    $this->metric('Assigned Modules', $moduleIds->count(), 'Modules linked to assigned courses.', 'Library'),
+                ]),
+                $this->metric($user->institution_id ? 'Candidates' : 'Candidates / Trainees', $candidates->count(), 'Recent candidates linked to assigned courses.', 'Users'),
+                $this->metric('Question Banks', $questionBankCount, 'Question banks in assigned courses.', 'FileQuestion'),
                 $this->metric('Assessments', (clone $examScope)->count(), 'Assessments using assigned courses or modules.', 'ClipboardList'),
                 $this->metric('Submitted Results', (clone $submittedScope)->count(), 'Submitted attempts for assigned-course assessments.', 'CheckCircle2'),
             ],

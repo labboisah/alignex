@@ -9,11 +9,13 @@ use App\Http\Resources\ExamResource;
 use App\Models\Candidate;
 use App\Models\CandidateGroup;
 use App\Models\Center;
+use App\Models\Department;
 use App\Models\Exam;
 use App\Models\Organization;
 use App\Models\School;
 use App\Models\Student;
 use App\Models\StudentGroup;
+use App\Services\CurrentContextService;
 use App\Services\ExamParticipantAssignmentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -36,12 +38,14 @@ class CandidateController extends Controller
             'candidates' => CandidateResource::collection(
                 $this->scopedCandidates($request)
                     ->with(['organization', 'school', 'center'])
+                    ->with(['institution', 'department'])
                     ->withCount('assignedExams')
                     ->latest()
                     ->get()
             ),
             'exams' => ExamResource::collection($this->scopedExams($request)->with('examType')->latest()->get()),
             'candidateGroups' => $this->candidateGroupOptions($request),
+            'departments' => $this->departmentOptions($request),
             'importReport' => $request->session()->get('candidate_import_report'),
             'can' => ['create' => $request->user()->can('create', Candidate::class)],
         ]);
@@ -136,7 +140,7 @@ class CandidateController extends Controller
                     throw ValidationException::withMessages(['registration_number' => 'Registration number is required.']);
                 }
 
-                $duplicateKey = implode(':', [$tenant['organization_id'] ?? '', $tenant['school_id'] ?? '', $tenant['center_id'] ?? '', $tenant['cbt_center_id'] ?? '', $registrationNumber]);
+                $duplicateKey = implode(':', [$tenant['organization_id'] ?? '', $tenant['institution_id'] ?? '', $tenant['department_id'] ?? '', $tenant['school_id'] ?? '', $tenant['center_id'] ?? '', $tenant['cbt_center_id'] ?? '', $registrationNumber]);
 
                 if (isset($seen[$duplicateKey])) {
                     $duplicates[] = ['row' => $line, 'registration_number' => $registrationNumber, 'reason' => 'Duplicate in uploaded file.'];
@@ -286,7 +290,16 @@ class CandidateController extends Controller
     private function persistCandidate(StoreCandidateRequest|UpdateCandidateRequest $request, ?Candidate $candidate = null): Candidate
     {
         $data = $request->validated();
-        $tenant = $candidate ? ['organization_id' => $candidate->organization_id, 'school_id' => $candidate->school_id, 'center_id' => $candidate->center_id] : $this->tenantFor($request, $data);
+        $tenant = $candidate
+            ? [
+                'organization_id' => $candidate->organization_id,
+                'institution_id' => $candidate->institution_id,
+                'faculty_id' => $candidate->faculty_id,
+                'department_id' => $candidate->department_id,
+                'school_id' => $candidate->school_id,
+                'center_id' => $candidate->center_id,
+            ]
+            : $this->tenantFor($request, $data);
         $metadata = $candidate?->metadata ?? [];
         [$firstName, $lastName] = $this->splitFullName($data['full_name'] ?? trim(($data['first_name'] ?? '').' '.($data['last_name'] ?? '')));
 
@@ -328,9 +341,15 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         $organization = $request->route('organization');
+        $institutionId = $this->institutionId($request);
+        $departmentId = $request->query('department_id');
 
         return Candidate::query()
             ->when($organization, fn ($query) => $query->where('organization_id', $organization->id))
+            ->when($institutionId, fn ($query) => $query->where('institution_id', $institutionId))
+            ->when(! $institutionId, fn ($query) => $query->whereNull('institution_id'))
+            ->when($departmentId && $institutionId, fn ($query) => $query->where('department_id', $departmentId))
+            ->when($user->isInstitutionLecturer(), fn ($query) => $query->where('department_id', $user->department_id))
             ->when(! $user->isSuperAdmin() && $user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
             ->when(! $user->isSuperAdmin() && $user->school_id, fn ($query) => $query->where('school_id', $user->school_id))
             ->when(! $user->isSuperAdmin() && $user->center_id, fn ($query) => $query->where('center_id', $user->center_id))
@@ -343,9 +362,12 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         $organization = $request->route('organization');
+        $institutionId = $this->institutionId($request);
 
         return Exam::query()
             ->when($organization, fn ($query) => $query->where('organization_id', $organization->id))
+            ->when($institutionId, fn ($query) => $query->where('institution_id', $institutionId))
+            ->when(! $institutionId, fn ($query) => $query->whereNull('institution_id'))
             ->when(! $user->isSuperAdmin() && $user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
             ->when(! $user->isSuperAdmin() && $user->school_id, fn ($query) => $query->where('school_id', $user->school_id))
             ->when(! $user->isSuperAdmin() && $user->center_id, fn ($query) => $query->where('center_id', $user->center_id))
@@ -418,6 +440,26 @@ class CandidateController extends Controller
             return ['organization_id' => $user->organization_id, 'school_id' => null, 'center_id' => null];
         }
 
+        if ($this->institutionId($request)) {
+            $department = Department::query()
+                ->whereKey($data['department_id'] ?? null)
+                ->where('institution_id', $this->institutionId($request))
+                ->first();
+
+            if (! $department) {
+                throw ValidationException::withMessages(['department_id' => 'Choose a department within this institution.']);
+            }
+
+            return [
+                'organization_id' => $department->institution?->organization_id,
+                'institution_id' => $department->institution_id,
+                'faculty_id' => $department->faculty_id,
+                'department_id' => $department->id,
+                'school_id' => null,
+                'center_id' => null,
+            ];
+        }
+
         if ($request->route('organization') && $user->isSuperAdmin()) {
             return ['organization_id' => $request->route('organization')->id, 'school_id' => null, 'center_id' => null];
         }
@@ -443,6 +485,8 @@ class CandidateController extends Controller
     {
         return [
             'organization_id' => $exam->organization_id,
+            'institution_id' => $exam->institution_id,
+            'department_id' => $exam->department_id,
             'school_id' => $exam->school_id,
             'center_id' => $exam->center_id,
         ];
@@ -461,6 +505,19 @@ class CandidateController extends Controller
             ];
         }
 
+        if ($candidateGroup->institution_id) {
+            return [
+                'owner_type' => Exam::OWNER_INSTITUTION,
+                'owner_id' => $candidateGroup->institution_id,
+                'organization_id' => $candidateGroup->organization_id,
+                'institution_id' => $candidateGroup->institution_id,
+                'faculty_id' => $candidateGroup->faculty_id,
+                'department_id' => $candidateGroup->department_id,
+                'school_id' => null,
+                'center_id' => null,
+            ];
+        }
+
         return [
             'organization_id' => $candidateGroup->organization_id,
             'school_id' => null,
@@ -473,6 +530,8 @@ class CandidateController extends Controller
         return Candidate::query()
             ->where('candidate_number', $registrationNumber)
             ->when($tenant['organization_id'] ?? null, fn ($query, $organizationId) => $query->where('organization_id', $organizationId))
+            ->when($tenant['institution_id'] ?? null, fn ($query, $institutionId) => $query->where('institution_id', $institutionId))
+            ->when($tenant['department_id'] ?? null, fn ($query, $departmentId) => $query->where('department_id', $departmentId))
             ->when($tenant['school_id'] ?? null, fn ($query, $schoolId) => $query->where('school_id', $schoolId))
             ->when($tenant['center_id'] ?? null, fn ($query, $centerId) => $query->where('center_id', $centerId))
             ->when($tenant['cbt_center_id'] ?? null, fn ($query, $centerId) => $query->where('cbt_center_id', $centerId))
@@ -482,8 +541,13 @@ class CandidateController extends Controller
     private function scopedCandidateGroups(Request $request)
     {
         $user = $request->user();
+        $institutionId = $this->institutionId($request);
 
         return CandidateGroup::query()
+            ->when($institutionId, fn ($query) => $query->where('institution_id', $institutionId))
+            ->when(! $institutionId, fn ($query) => $query->whereNull('institution_id'))
+            ->when($request->query('department_id') && $institutionId, fn ($query) => $query->where('department_id', $request->query('department_id')))
+            ->when($user->isInstitutionLecturer(), fn ($query) => $query->where('department_id', $user->department_id))
             ->when(! $user->isSuperAdmin() && $user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
             ->when(! $user->isSuperAdmin() && $user->cbt_center_id, fn ($query) => $query->where('cbt_center_id', $user->cbt_center_id))
             ->when(! $user->isSuperAdmin() && ! $user->cbt_center_id, fn ($query) => $query->whereNull('cbt_center_id'));
@@ -494,7 +558,14 @@ class CandidateController extends Controller
         return $this->scopedCandidateGroups($request)
             ->where('status', CandidateGroup::STATUS_ACTIVE)
             ->orderBy('name')
-            ->get(['id', 'name', 'code']);
+            ->get(['id', 'department_id', 'name', 'code'])
+            ->map(fn (CandidateGroup $group) => [
+                'id' => $group->id,
+                'department_id' => $group->department_id,
+                'department_name' => $group->department?->name,
+                'name' => $group->name,
+                'code' => $group->code,
+            ]);
     }
 
     private function formOptions(Request $request): array
@@ -503,12 +574,43 @@ class CandidateController extends Controller
             'organizations' => $request->user()->isSuperAdmin() ? Organization::query()->orderBy('name')->get(['id', 'name', 'code']) : [],
             'schools' => $request->user()->isSuperAdmin() ? School::query()->orderBy('name')->get(['id', 'name', 'code']) : [],
             'centers' => $request->user()->isSuperAdmin() ? Center::query()->orderBy('name')->get(['id', 'name', 'code']) : [],
+            'departments' => $this->departmentOptions($request),
             'statuses' => [
                 ['value' => Candidate::STATUS_ACTIVE, 'label' => 'Active'],
                 ['value' => Candidate::STATUS_INACTIVE, 'label' => 'Inactive'],
                 ['value' => Candidate::STATUS_SUSPENDED, 'label' => 'Suspended'],
             ],
         ];
+    }
+
+    private function institutionId(Request $request): ?int
+    {
+        $user = $request->user();
+        $context = app(CurrentContextService::class)->current($user);
+
+        return (($context['type'] ?? null) === 'institution' ? (int) $context['id'] : null)
+            ?? ($user->institution_id ? (int) $user->institution_id : null);
+    }
+
+    private function departmentOptions(Request $request): array
+    {
+        $institutionId = $this->institutionId($request);
+
+        if (! $institutionId) {
+            return [];
+        }
+
+        return Department::query()
+            ->where('institution_id', $institutionId)
+            ->when($request->user()->isInstitutionLecturer(), fn ($query) => $query->whereKey($request->user()->department_id))
+            ->orderBy('name')
+            ->get(['id', 'name', 'code'])
+            ->map(fn (Department $department) => [
+                'id' => $department->id,
+                'name' => $department->name,
+                'code' => $department->code,
+            ])
+            ->all();
     }
 
     /**

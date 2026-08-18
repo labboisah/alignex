@@ -49,7 +49,7 @@ class HandleInertiaRequests extends Middleware
                     'name' => $user->name,
                     'email' => $user->email,
                     'role' => $user->role,
-                    'role_label' => AccessControl::roleLabel($user->role),
+                    'role_label' => $this->roleLabelFor($user),
                     'organization_id' => $user->organization_id,
                     'institution_id' => $user->institution_id,
                     'center_id' => $user->center_id,
@@ -60,7 +60,7 @@ class HandleInertiaRequests extends Middleware
                 ] : null,
                 'role' => $user ? [
                     'name' => $user->role,
-                    'label' => AccessControl::roleLabel($user->role),
+                    'label' => $this->roleLabelFor($user),
                 ] : null,
                 'permissions' => $user ? $this->permissionsFor($user) : [],
                 'plan' => $user ? $planFeatures->planSummaryForUser($user) : null,
@@ -165,7 +165,7 @@ class HandleInertiaRequests extends Middleware
                     ['label' => 'Questions', 'href' => '/questions', 'permission' => 'manageQuestionBank'],
                     ['label' => 'Exams', 'href' => '/exams', 'permission' => 'manageExams'],
                 ]],
-                ['label' => 'Candidates', 'children' => $departmentItems],
+                ...$departmentItems,
                 ['label' => 'Reports', 'children' => [
                     ['label' => 'Results', 'href' => '/results', 'permission' => 'viewReports'],
                     ['label' => 'Academic Reports', 'href' => '/reports', 'permission' => 'viewReports'],
@@ -187,6 +187,9 @@ class HandleInertiaRequests extends Middleware
                 ['label' => 'Documentation', 'href' => '/documentation'],
             ]);
         } elseif ($user->isFacilitator()) {
+            if ($user->isInstitutionLecturer()) {
+                $navigation = collect($this->institutionLecturerNavigation($user));
+            } else {
             $base = $user->professional_school_id ? '/professional-schools/'.$user->professional_school_id : '/professional-schools';
             $navigation = collect([
                 ['label' => 'Dashboard', 'href' => '/dashboard'],
@@ -201,6 +204,7 @@ class HandleInertiaRequests extends Middleware
                 ['label' => 'Activation Codes', 'href' => '/offline-activation-codes', 'permission' => 'downloadOfflineServer', 'feature' => 'offline_activation'],
                 ['label' => 'Documentation', 'href' => '/documentation'],
             ]);
+            }
         } else {
             $navigation = collect(match ($contextType) {
                 'secondary_school' => [
@@ -316,7 +320,7 @@ class HandleInertiaRequests extends Middleware
             });
         }
 
-        if ($contextType === 'institution' && $user->institution_id) {
+        if ($contextType === 'institution' && $user->institution_id && ! $user->isInstitutionLecturer()) {
             $institutionBase = '/institutions/'.$user->institution_id;
             $departmentItems = $this->institutionDepartmentNavigation($user, $institutionBase);
             $navigation = collect([
@@ -332,7 +336,7 @@ class HandleInertiaRequests extends Middleware
                     ['label' => 'Questions', 'href' => '/questions', 'permission' => 'manageQuestionBank'],
                     ['label' => 'Exams', 'href' => '/exams', 'permission' => 'manageExams'],
                 ]],
-                ['label' => 'Candidates', 'children' => $departmentItems],
+                ...$departmentItems,
                 ['label' => 'Reports', 'children' => [
                     ['label' => 'Results', 'href' => '/results', 'permission' => 'viewReports'],
                     ['label' => 'Academic Reports', 'href' => '/reports', 'permission' => 'viewReports'],
@@ -375,13 +379,16 @@ class HandleInertiaRequests extends Middleware
     }
 
     /**
-     * @return array<int, array{label: string, href: string, permission: string}>
+     * @return array<int, array<string, mixed>>
      */
     private function institutionDepartmentNavigation(User $user, string $institutionBase): array
     {
         if (! $user->institution_id) {
             return [
-                ['label' => 'All Candidates', 'href' => '/candidates', 'permission' => 'manageExams'],
+                ['label' => 'Candidates', 'children' => [
+                    ['label' => 'Candidates', 'href' => '/candidates', 'permission' => 'manageExams'],
+                    ['label' => 'Candidate Groups', 'href' => '/candidate-groups', 'permission' => 'manageExams'],
+                ]],
             ];
         }
 
@@ -391,14 +398,68 @@ class HandleInertiaRequests extends Middleware
             ->limit(30)
             ->get(['id', 'name', 'code']);
 
+        return $departments->map(fn (Department $department): array => [
+                'label' => $this->departmentNavigationLabel($department),
+                'children' => [
+                    ['label' => 'Lecturers', 'href' => '/institutions/'.$user->institution_id.'/departments/'.$department->id.'/lecturers', 'permission' => 'manageSchools'],
+                    ['label' => 'Candidates', 'href' => '/candidates?department_id='.$department->id, 'permission' => 'manageExams'],
+                    ['label' => 'Candidate Groups', 'href' => '/candidate-groups?department_id='.$department->id, 'permission' => 'manageExams'],
+                ],
+            ])->all();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function institutionLecturerNavigation(User $user): array
+    {
+        $courses = $user->assignedCourses()
+            ->where('courses.institution_id', $user->institution_id)
+            ->orderByRaw('COALESCE(courses.code, courses.name)')
+            ->get(['courses.id', 'courses.name', 'courses.code']);
+
+        $courseItems = $courses->map(fn ($course): array => [
+            'label' => $this->courseNavigationLabel($course),
+            'children' => [
+                ['label' => 'Question Bank', 'href' => '/question-bank?course_id='.$course->id, 'permission' => 'manageQuestionBank'],
+                ['label' => 'Questions', 'href' => '/questions?course_id='.$course->id, 'permission' => 'manageQuestionBank'],
+                ['label' => 'Assessments', 'href' => '/exams?category=assessment&course_id='.$course->id, 'permission' => 'manageExams'],
+                ['label' => 'Create Assessment', 'href' => '/exams/create?category=assessment&course_id='.$course->id, 'permission' => 'manageExams'],
+            ],
+        ])->values()->all();
+
         return [
-            ['label' => 'All Candidates', 'href' => '/candidates', 'permission' => 'manageExams'],
-            ...$departments->map(fn (Department $department): array => [
-                'label' => $department->code ? $department->name.' ('.$department->code.')' : $department->name,
-                'href' => '/candidates?department_id='.$department->id,
-                'permission' => 'manageExams',
-            ])->all(),
+            ['label' => 'Dashboard', 'href' => '/dashboard'],
+            ...$courseItems,
+            ['label' => 'Candidates', 'href' => '/candidates?department_id='.$user->department_id, 'permission' => 'manageExams'],
+            ['label' => 'Candidate Groups', 'href' => '/candidate-groups?department_id='.$user->department_id, 'permission' => 'manageExams'],
+            ['label' => 'Results', 'href' => '/results', 'permission' => 'viewReports'],
+            ['label' => 'Offline Server', 'href' => '/offline-server/download', 'feature' => 'offline_activation'],
+            ['label' => 'Documentation', 'href' => '/documentation'],
         ];
+    }
+
+    private function roleLabelFor(User $user): string
+    {
+        return $user->isInstitutionLecturer() ? 'Lecturer' : AccessControl::roleLabel($user->role);
+    }
+
+    private function courseNavigationLabel($course): string
+    {
+        $code = str((string) ($course->code ?? ''))->squish()->upper()->toString();
+
+        if ($code !== '') {
+            return $code;
+        }
+
+        return str($course->name)->squish()->limit(16, '')->toString() ?: 'Course';
+    }
+
+    private function departmentNavigationLabel(Department $department): string
+    {
+        $firstWord = str($department->name)->squish()->before(' ')->toString();
+
+        return ($firstWord !== '' ? $firstWord : 'Department').' Dept';
     }
 
     /**

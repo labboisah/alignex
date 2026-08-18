@@ -31,9 +31,7 @@ class StoreAdminRegistrationRequest extends FormRequest
                 AdminRegistrationRequest::TYPE_INSTITUTION,
                 AdminRegistrationRequest::TYPE_SECONDARY_SCHOOL,
                 AdminRegistrationRequest::TYPE_PROFESSIONAL_SCHOOL,
-                AdminRegistrationRequest::TYPE_INSTITUTION,
                 AdminRegistrationRequest::TYPE_CBT_CENTER,
-
             ])],
             'pricing_plan_id' => ['required', Rule::exists(PricingPlan::class, 'id')->where('is_active', true)],
             'admin_name' => ['required', 'string', 'max:255'],

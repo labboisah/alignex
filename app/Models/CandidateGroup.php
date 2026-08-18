@@ -17,7 +17,11 @@ class CandidateGroup extends Model
 
     protected $fillable = [
         'organization_id',
+        'institution_id',
+        'faculty_id',
+        'department_id',
         'cbt_center_id',
+        'created_by',
         'name',
         'code',
         'description',
@@ -29,9 +33,29 @@ class CandidateGroup extends Model
         return $this->belongsTo(Organization::class);
     }
 
+    public function institution(): BelongsTo
+    {
+        return $this->belongsTo(Institution::class);
+    }
+
+    public function faculty(): BelongsTo
+    {
+        return $this->belongsTo(Faculty::class);
+    }
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class);
+    }
+
     public function cbtCenter(): BelongsTo
     {
         return $this->belongsTo(CbtCenter::class);
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function candidates(): BelongsToMany

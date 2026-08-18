@@ -182,7 +182,7 @@ class ExamController extends Controller
             return count($candidateIds).' candidates refreshed from the selected batch.';
         }
 
-        if (in_array($ownerType, [Exam::OWNER_CBT_CENTER, Exam::OWNER_ORGANIZATION], true)) {
+        if (in_array($ownerType, [Exam::OWNER_CBT_CENTER, Exam::OWNER_ORGANIZATION, Exam::OWNER_INSTITUTION], true)) {
             $groupIds = collect(
                 data_get($settings, $ownerType === Exam::OWNER_CBT_CENTER ? 'cbt_candidate_group_ids' : 'participant_candidate_group_ids', [])
             )
@@ -227,7 +227,7 @@ class ExamController extends Controller
         $data = $request->validated();
         $tenant = $this->tenantFor($request, $data, $exam);
         if (($tenant['exam_owner_type'] ?? null) === Exam::OWNER_INSTITUTION) {
-            $tenant = $this->tenantForInstitutionCourse($tenant, $data);
+            $tenant = $this->tenantForInstitutionCourse($request, $tenant, $data);
         }
         $examType = $this->examTypeFor($data['exam_type']);
         $examCategory = $data['exam_category'] ?? $this->categoryForLegacyType($data['exam_type'], $tenant['exam_owner_type']);
@@ -312,6 +312,16 @@ class ExamController extends Controller
             ];
         }
 
+        if ($tenant['exam_owner_type'] === Exam::OWNER_INSTITUTION) {
+            $candidateIds = $this->resolveCandidateIds($tenant, $data);
+            $payload['settings'] = [
+                ...($payload['settings'] ?? []),
+                'participant_candidate_ids' => $candidateIds,
+                'participant_candidate_group_id' => $this->candidateGroupIds($data)[0] ?? null,
+                'participant_candidate_group_ids' => $this->candidateGroupIds($data),
+            ];
+        }
+
         if ($tenant['exam_owner_type'] === Exam::OWNER_ORGANIZATION && array_key_exists('candidate_ids', $data)) {
             $candidateIds = $this->resolveCandidateIds($tenant, $data);
             $payload['settings'] = [
@@ -352,6 +362,10 @@ class ExamController extends Controller
             app(ExamParticipantAssignmentService::class)->syncCandidates($exam, data_get($exam->settings ?? [], 'participant_candidate_ids', []));
         }
 
+        if ($tenant['exam_owner_type'] === Exam::OWNER_INSTITUTION) {
+            app(ExamParticipantAssignmentService::class)->syncCandidates($exam, data_get($exam->settings ?? [], 'participant_candidate_ids', []));
+        }
+
         if ($tenant['exam_owner_type'] === Exam::OWNER_ORGANIZATION && array_key_exists('candidate_ids', $data)) {
             app(ExamParticipantAssignmentService::class)->syncCandidates($exam, $this->resolveCandidateIds($tenant, $data));
         }
@@ -382,7 +396,7 @@ class ExamController extends Controller
         return [];
     }
 
-    private function tenantForInstitutionCourse(array $tenant, array $data): array
+    private function tenantForInstitutionCourse(Request $request, array $tenant, array $data): array
     {
         $courseId = collect($data['subjects'] ?? [])
             ->pluck('course_id')
@@ -392,6 +406,7 @@ class ExamController extends Controller
         $course = Course::query()
             ->whereKey($courseId)
             ->where('institution_id', $tenant['institution_id'] ?? null)
+            ->when($request->user()?->isFacilitator(), fn ($query) => $query->whereIn('id', $request->user()->assignedCourses()->select('courses.id')))
             ->first();
 
         if (! $course) {
@@ -747,8 +762,9 @@ class ExamController extends Controller
 
         return Course::query()
             ->where('institution_id', $institutionId)
+            ->when($request->user()->isFacilitator(), fn ($query) => $query->whereIn('id', $request->user()->assignedCourses()->select('courses.id')))
             ->orderBy('name')
-            ->get(['id', 'programme_id', 'name', 'code']);
+            ->get(['id', 'programme_id', 'department_id', 'name', 'code']);
     }
 
     private function institutionIdForRequest(Request $request, array $data): ?int
@@ -891,6 +907,7 @@ class ExamController extends Controller
     {
         $user = $request->user();
         $context = app(CurrentContextService::class)->current($user);
+        $institutionId = (($context['type'] ?? null) === 'institution' ? $context['id'] : null) ?? $user->institution_id;
         $centerId = $request->route('cbtCenter')?->id
             ?? (($context['type'] ?? null) === 'cbt_center' ? $context['id'] : null)
             ?? $user->cbt_center_id
@@ -903,6 +920,7 @@ class ExamController extends Controller
                         ->when($user->organization_id, fn ($scope) => $scope->orWhere('organization_id', $user->organization_id));
                 });
             })
+            ->when($institutionId, fn ($query) => $query->where('institution_id', $institutionId))
             ->when(Schema::hasColumn('candidate_groups', 'cbt_center_id'), function ($query) use ($centerId): void {
                 $centerId
                     ? $query->where('cbt_center_id', $centerId)
@@ -910,7 +928,7 @@ class ExamController extends Controller
             })
             ->where('status', CandidateGroup::STATUS_ACTIVE)
             ->orderBy('name')
-            ->get(['id', 'name', 'code']);
+            ->get(['id', 'department_id', 'name', 'code']);
     }
 
     private function questionBankOptions(Request $request)
@@ -942,6 +960,14 @@ class ExamController extends Controller
 
     private function scopeFacilitatorQuestionBanks($query, User $user): void
     {
+        if ($user->institution_id) {
+            $query
+                ->where('institution_id', $user->institution_id)
+                ->whereIn('course_id', $user->assignedCourses()->select('courses.id'));
+
+            return;
+        }
+
         $query
             ->where('professional_school_id', $user->professional_school_id)
             ->where(function (Builder $scope) use ($user): void {
@@ -1063,6 +1089,8 @@ class ExamController extends Controller
             $groups = CandidateGroup::query()
                 ->whereIn('id', $groupIds)
                 ->when($tenant['organization_id'] ?? null, fn ($query) => $query->where('organization_id', $tenant['organization_id']))
+                ->when($tenant['institution_id'] ?? null, fn ($query) => $query->where('institution_id', $tenant['institution_id']))
+                ->when($tenant['department_id'] ?? null, fn ($query) => $query->where('department_id', $tenant['department_id']))
                 ->when(Schema::hasColumn('candidate_groups', 'cbt_center_id') && ($tenant['cbt_center_id'] ?? null), fn ($query) => $query->where('cbt_center_id', $tenant['cbt_center_id']))
                 ->with('candidates:id')
                 ->get();

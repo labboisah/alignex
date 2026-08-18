@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\Candidate;
+use App\Services\CurrentContextService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -31,6 +32,7 @@ class StoreCandidateRequest extends FormRequest
 
         return [
             'organization_id' => $organizationRules,
+            'department_id' => [$this->isInstitutionContext() ? 'required' : 'nullable', 'integer', 'exists:departments,id'],
             'school_id' => $schoolRules,
             'center_id' => $centerRules,
             'full_name' => ['required_without:first_name', 'string', 'max:255'],
@@ -43,6 +45,7 @@ class StoreCandidateRequest extends FormRequest
                 Rule::unique('candidates', 'candidate_number')
                     ->where(fn ($query) => $query
                         ->when($user?->isOrganizationAdmin() || $user?->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
+                        ->when($this->isInstitutionContext(), fn ($query) => $query->where('department_id', $this->input('department_id')))
                         ->when($user?->isSchoolAdmin() || $user?->school_id, fn ($query) => $query->where('school_id', $user->school_id))
                         ->when($user?->isCenterAdmin() || $user?->center_id, fn ($query) => $query->where('center_id', $user->center_id))
                         ->when($user?->isSuperAdmin() && $this->organization_id, fn ($query) => $query->where('organization_id', $this->organization_id))
@@ -55,5 +58,13 @@ class StoreCandidateRequest extends FormRequest
             'photo' => ['nullable', 'image', 'max:2048'],
             'status' => ['required', Rule::in([Candidate::STATUS_ACTIVE, Candidate::STATUS_INACTIVE, Candidate::STATUS_SUSPENDED])],
         ];
+    }
+
+    private function isInstitutionContext(): bool
+    {
+        $context = app(CurrentContextService::class)->current($this->user());
+
+        return ($context['type'] ?? null) === 'institution'
+            || $this->user()?->institution_id !== null;
     }
 }

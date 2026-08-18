@@ -314,6 +314,10 @@ class QuestionController extends Controller
         if (($context['type'] ?? null) === 'institution') {
             $query->where('institution_id', $context['id']);
 
+            if ($user->isFacilitator()) {
+                $this->scopeFacilitatorQuestionBanks($query, $user);
+            }
+
             return;
         }
 
@@ -331,6 +335,12 @@ class QuestionController extends Controller
 
     private function scopeFacilitatorQuestionBanks($query, $user): void
     {
+        if ($user->institution_id) {
+            $query->whereIn('course_id', $user->assignedCourses()->select('courses.id'));
+
+            return;
+        }
+
         $query->where(function ($scope) use ($user): void {
             $scope
                 ->whereIn('course_id', $user->assignedCourses()->select('courses.id'))

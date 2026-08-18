@@ -32,7 +32,7 @@ export function PortalSidebar({ items, className, mode = 'desktop' }: { items: P
             <nav className="max-h-[calc(100vh-4rem)] space-y-1 overflow-y-auto p-3">
                 {items.map((item) => {
                     const Icon = isRenderableComponent(item.icon) ? item.icon : null;
-                    const childActive = item.children?.some((child) => isActive(url, child.href)) ?? false;
+                    const childActive = item.children?.some((child) => navItemIsActive(url, child)) ?? false;
                     const active = isActive(url, item.href) || childActive;
 
                     if (item.children?.length) {
@@ -50,55 +50,7 @@ export function PortalSidebar({ items, className, mode = 'desktop' }: { items: P
                                     <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
                                 </summary>
                                 <div className="mt-1 space-y-1 pl-4">
-                                    {item.children.map((child) => {
-                                        const ChildIcon = isRenderableComponent(child.icon) ? child.icon : null;
-                                        const childIsActive = isActive(url, child.href);
-                                        const childClassName = cn(
-                                            'flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium text-slate-600 hover:bg-slate-100',
-                                            childIsActive && 'bg-green-50 text-primary',
-                                        );
-
-                                        if (isDownloadLink(child.href)) {
-                                            return (
-                                                <a
-                                                    key={`${item.label}:${child.label}:${child.href}`}
-                                                    href={child.href}
-                                                    className={childClassName}
-                                                    download
-                                                    title={`${child.label} | ${terms.examLabel}`}
-                                                >
-                                                    {ChildIcon && <ChildIcon className="h-4 w-4" />}
-                                                    <span className="min-w-0 truncate">{child.label}</span>
-                                                </a>
-                                            );
-                                        }
-
-                                        if (isHardNavigationLink(child.href)) {
-                                            return (
-                                                <a
-                                                    key={`${item.label}:${child.label}:${child.href}`}
-                                                    href={child.href}
-                                                    className={childClassName}
-                                                    title={`${child.label} | ${terms.examLabel}`}
-                                                >
-                                                    {ChildIcon && <ChildIcon className="h-4 w-4" />}
-                                                    <span className="min-w-0 truncate">{child.label}</span>
-                                                </a>
-                                            );
-                                        }
-
-                                        return (
-                                            <Link
-                                                key={`${item.label}:${child.label}:${child.href}`}
-                                                href={child.href}
-                                                className={childClassName}
-                                                title={`${child.label} | ${terms.examLabel}`}
-                                            >
-                                                {ChildIcon && <ChildIcon className="h-4 w-4" />}
-                                                <span className="min-w-0 truncate">{child.label}</span>
-                                            </Link>
-                                        );
-                                    })}
+                                    {item.children.map((child) => <NestedNavItem key={`${item.label}:${child.label}:${child.href}`} item={child} parentKey={item.label} terms={terms} url={url} />)}
                                 </div>
                             </details>
                         );
@@ -157,6 +109,66 @@ export function PortalSidebar({ items, className, mode = 'desktop' }: { items: P
             </nav>
         </aside>
     );
+}
+
+function NestedNavItem({ item, parentKey, terms, url }: { item: PortalNavItem; parentKey: string; terms: ReturnType<typeof getContextTerminology>; url: string }) {
+    const Icon = isRenderableComponent(item.icon) ? item.icon : null;
+    const active = navItemIsActive(url, item);
+
+    if (item.children?.length) {
+        return (
+            <details className="group/nested" open={active}>
+                <summary
+                    className={cn(
+                        'flex h-9 cursor-pointer list-none items-center gap-2 rounded-md px-3 text-sm font-medium text-slate-600 hover:bg-slate-100',
+                        active && 'bg-green-50 text-primary',
+                    )}
+                    title={`${item.label} | ${terms.examLabel}`}
+                >
+                    {Icon && <Icon className="h-4 w-4" />}
+                    <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                    <ChevronDown className="h-4 w-4 transition group-open/nested:rotate-180" />
+                </summary>
+                <div className="mt-1 space-y-1 pl-4">
+                    {item.children.map((child) => <NestedNavItem key={`${parentKey}:${item.label}:${child.label}:${child.href}`} item={child} parentKey={`${parentKey}:${item.label}`} terms={terms} url={url} />)}
+                </div>
+            </details>
+        );
+    }
+
+    const className = cn(
+        'flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium text-slate-600 hover:bg-slate-100',
+        active && 'bg-green-50 text-primary',
+    );
+
+    if (isDownloadLink(item.href)) {
+        return (
+            <a href={item.href} className={className} download title={`${item.label} | ${terms.examLabel}`}>
+                {Icon && <Icon className="h-4 w-4" />}
+                <span className="min-w-0 truncate">{item.label}</span>
+            </a>
+        );
+    }
+
+    if (isHardNavigationLink(item.href)) {
+        return (
+            <a href={item.href} className={className} title={`${item.label} | ${terms.examLabel}`}>
+                {Icon && <Icon className="h-4 w-4" />}
+                <span className="min-w-0 truncate">{item.label}</span>
+            </a>
+        );
+    }
+
+    return (
+        <Link href={item.href} className={className} title={`${item.label} | ${terms.examLabel}`}>
+            {Icon && <Icon className="h-4 w-4" />}
+            <span className="min-w-0 truncate">{item.label}</span>
+        </Link>
+    );
+}
+
+function navItemIsActive(url: string, item: PortalNavItem): boolean {
+    return isActive(url, item.href) || (item.children?.some((child) => navItemIsActive(url, child)) ?? false);
 }
 
 function isActive(url: string, href: string) {

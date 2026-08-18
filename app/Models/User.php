@@ -149,7 +149,7 @@ class User extends Authenticatable
     public function assignedCourses(): BelongsToMany
     {
         return $this->belongsToMany(Course::class, 'course_facilitator', 'user_id', 'course_id')
-            ->withPivot('professional_school_id', 'module_id')
+            ->withPivot('professional_school_id', 'institution_id', 'faculty_id', 'department_id', 'module_id')
             ->distinct()
             ->withTimestamps();
     }
@@ -240,6 +240,11 @@ class User extends Authenticatable
     public function isFacilitator(): bool
     {
         return $this->role === self::ROLE_FACILITATOR;
+    }
+
+    public function isInstitutionLecturer(): bool
+    {
+        return $this->isFacilitator() && $this->institution_id !== null;
     }
 
     public function isCandidate(): bool

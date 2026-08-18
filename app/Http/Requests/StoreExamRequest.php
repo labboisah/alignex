@@ -67,9 +67,9 @@ class StoreExamRequest extends FormRequest
             'question_bank_id' => ['nullable', 'exists:question_banks,id'],
             'candidate_ids' => [Rule::excludeIf($this->isSecondaryExamRequest() || $this->isProfessionalExamRequest() || $this->isInstitutionExamRequest()), 'nullable', 'array'],
             'candidate_ids.*' => [Rule::excludeIf($this->isSecondaryExamRequest() || $this->isProfessionalExamRequest() || $this->isInstitutionExamRequest()), 'string', 'exists:candidates,id', 'distinct'],
-            'candidate_group_id' => [Rule::excludeIf($this->isSecondaryExamRequest() || $this->isProfessionalExamRequest() || $this->isInstitutionExamRequest()), 'nullable', 'string', 'max:100', 'exists:candidate_groups,id'],
-            'candidate_group_ids' => [Rule::excludeIf($this->isSecondaryExamRequest() || $this->isProfessionalExamRequest() || $this->isInstitutionExamRequest()), 'nullable', 'array'],
-            'candidate_group_ids.*' => [Rule::excludeIf($this->isSecondaryExamRequest() || $this->isProfessionalExamRequest() || $this->isInstitutionExamRequest()), 'string', 'exists:candidate_groups,id', 'distinct'],
+            'candidate_group_id' => [Rule::excludeIf($this->isSecondaryExamRequest() || $this->isProfessionalExamRequest()), 'nullable', 'string', 'max:100', 'exists:candidate_groups,id'],
+            'candidate_group_ids' => [Rule::excludeIf($this->isSecondaryExamRequest() || $this->isProfessionalExamRequest()), 'nullable', 'array'],
+            'candidate_group_ids.*' => [Rule::excludeIf($this->isSecondaryExamRequest() || $this->isProfessionalExamRequest()), 'string', 'exists:candidate_groups,id', 'distinct'],
             'settings.shuffle_questions' => ['required', 'boolean'],
             'settings.shuffle_options' => ['required', 'boolean'],
             'settings.show_result_immediately' => ['required', 'boolean'],
@@ -195,6 +195,10 @@ class StoreExamRequest extends FormRequest
                     $validator->errors()->add('exam_category', 'Institution exams must use assessment category.');
                 }
 
+                if (! $this->hasCandidateGroups()) {
+                    $validator->errors()->add('candidate_group_ids', 'Choose candidate groups for this institution assessment.');
+                }
+
                 foreach (['academic_session_id', 'term_id', 'academic_term_id', 'school_class_id', 'student_group_id', 'subject_id', 'module_id', 'training_batch_id'] as $field) {
                     if ($this->filled($field)) {
                         $validator->errors()->add($field, 'This field is not allowed for institution assessments.');
@@ -210,10 +214,11 @@ class StoreExamRequest extends FormRequest
                     $belongsToInstitution = Course::query()
                         ->whereKey($subject['course_id'])
                         ->where('institution_id', $institutionId)
+                        ->when($this->user()?->isFacilitator(), fn ($query) => $query->whereIn('id', $this->user()->assignedCourses()->select('courses.id')))
                         ->exists();
 
                     if (! $belongsToInstitution) {
-                        $validator->errors()->add("subjects.{$index}.course_id", 'Choose a course within this institution.');
+                        $validator->errors()->add("subjects.{$index}.course_id", 'Choose an assigned course within this institution.');
                     }
                 }
             }

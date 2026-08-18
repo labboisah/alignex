@@ -25,6 +25,7 @@ class UpdateAdminRegistrationRequest extends FormRequest
     public function rules(): array
     {
         $registration = $this->route('adminRegistration');
+        $adminUser = $this->adminUserFor($registration);
 
         return [
             'entity_type' => ['required', Rule::in([
@@ -42,7 +43,7 @@ class UpdateAdminRegistrationRequest extends FormRequest
                 'required',
                 'email',
                 'max:255',
-                Rule::unique(User::class, 'email'),
+                Rule::unique(User::class, 'email')->ignore($adminUser),
                 Rule::unique(AdminRegistrationRequest::class, 'admin_email')->ignore($registration),
             ],
             'entity_name' => ['required', 'string', 'max:255'],
@@ -82,29 +83,55 @@ class UpdateAdminRegistrationRequest extends FormRequest
 
     private function entityCodeRule(): mixed
     {
+        $ignoreId = $this->tenantIdToIgnore();
+
         return match ($this->input('entity_type')) {
-            AdminRegistrationRequest::TYPE_ORGANIZATION => Rule::unique(Organization::class, 'code'),
-            AdminRegistrationRequest::TYPE_INSTITUTION => Rule::unique(Institution::class, 'code'),
-            AdminRegistrationRequest::TYPE_SCHOOL => Rule::unique(School::class, 'code'),
-            AdminRegistrationRequest::TYPE_SECONDARY_SCHOOL => Rule::unique(SecondarySchool::class, 'code'),
-            AdminRegistrationRequest::TYPE_PROFESSIONAL_SCHOOL => Rule::unique(ProfessionalSchool::class, 'code'),
-            AdminRegistrationRequest::TYPE_CENTER => Rule::unique(Center::class, 'code'),
-            AdminRegistrationRequest::TYPE_CBT_CENTER => Rule::unique(CbtCenter::class, 'code'),
+            AdminRegistrationRequest::TYPE_ORGANIZATION => Rule::unique(Organization::class, 'code')->ignore($ignoreId),
+            AdminRegistrationRequest::TYPE_INSTITUTION => Rule::unique(Institution::class, 'code')->ignore($ignoreId),
+            AdminRegistrationRequest::TYPE_SCHOOL => Rule::unique(School::class, 'code')->ignore($ignoreId),
+            AdminRegistrationRequest::TYPE_SECONDARY_SCHOOL => Rule::unique(SecondarySchool::class, 'code')->ignore($ignoreId),
+            AdminRegistrationRequest::TYPE_PROFESSIONAL_SCHOOL => Rule::unique(ProfessionalSchool::class, 'code')->ignore($ignoreId),
+            AdminRegistrationRequest::TYPE_CENTER => Rule::unique(Center::class, 'code')->ignore($ignoreId),
+            AdminRegistrationRequest::TYPE_CBT_CENTER => Rule::unique(CbtCenter::class, 'code')->ignore($ignoreId),
             default => Rule::unique(AdminRegistrationRequest::class, 'entity_code'),
         };
     }
 
     private function entityEmailRule(): mixed
     {
+        $ignoreId = $this->tenantIdToIgnore();
+
         return match ($this->input('entity_type')) {
-            AdminRegistrationRequest::TYPE_ORGANIZATION => Rule::unique(Organization::class, 'email'),
-            AdminRegistrationRequest::TYPE_INSTITUTION => Rule::unique(Institution::class, 'email'),
-            AdminRegistrationRequest::TYPE_SCHOOL => Rule::unique(School::class, 'email'),
-            AdminRegistrationRequest::TYPE_SECONDARY_SCHOOL => Rule::unique(SecondarySchool::class, 'email'),
-            AdminRegistrationRequest::TYPE_PROFESSIONAL_SCHOOL => Rule::unique(ProfessionalSchool::class, 'email'),
-            AdminRegistrationRequest::TYPE_CENTER => Rule::unique(Center::class, 'email'),
-            AdminRegistrationRequest::TYPE_CBT_CENTER => Rule::unique(CbtCenter::class, 'email'),
+            AdminRegistrationRequest::TYPE_ORGANIZATION => Rule::unique(Organization::class, 'email')->ignore($ignoreId),
+            AdminRegistrationRequest::TYPE_INSTITUTION => Rule::unique(Institution::class, 'email')->ignore($ignoreId),
+            AdminRegistrationRequest::TYPE_SCHOOL => Rule::unique(School::class, 'email')->ignore($ignoreId),
+            AdminRegistrationRequest::TYPE_SECONDARY_SCHOOL => Rule::unique(SecondarySchool::class, 'email')->ignore($ignoreId),
+            AdminRegistrationRequest::TYPE_PROFESSIONAL_SCHOOL => Rule::unique(ProfessionalSchool::class, 'email')->ignore($ignoreId),
+            AdminRegistrationRequest::TYPE_CENTER => Rule::unique(Center::class, 'email')->ignore($ignoreId),
+            AdminRegistrationRequest::TYPE_CBT_CENTER => Rule::unique(CbtCenter::class, 'email')->ignore($ignoreId),
             default => Rule::unique(AdminRegistrationRequest::class, 'entity_email'),
         };
+    }
+
+    private function tenantIdToIgnore(): int|string|null
+    {
+        $registration = $this->route('adminRegistration');
+
+        if (! $registration instanceof AdminRegistrationRequest) {
+            return null;
+        }
+
+        return $registration->entity_type === $this->input('entity_type') ? $registration->entity_id : null;
+    }
+
+    private function adminUserFor(?AdminRegistrationRequest $registration): ?User
+    {
+        if (! $registration || ! $registration->entity_id) {
+            return null;
+        }
+
+        return User::query()
+            ->where('email', $registration->admin_email)
+            ->first();
     }
 }

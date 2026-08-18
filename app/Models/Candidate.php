@@ -15,6 +15,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'owner_type',
     'owner_id',
     'organization_id',
+    'institution_id',
+    'faculty_id',
+    'department_id',
     'school_id',
     'center_id',
     'secondary_school_id',
@@ -55,6 +58,21 @@ class Candidate extends Model
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    public function institution(): BelongsTo
+    {
+        return $this->belongsTo(Institution::class);
+    }
+
+    public function faculty(): BelongsTo
+    {
+        return $this->belongsTo(Faculty::class);
+    }
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class);
     }
 
     public function school(): BelongsTo
@@ -122,5 +140,10 @@ class Candidate extends Model
         return $this->belongsToMany(Exam::class, 'exam_candidates')
             ->withPivot('status')
             ->withTimestamps();
+    }
+
+    public function candidateGroups(): BelongsToMany
+    {
+        return $this->belongsToMany(CandidateGroup::class, 'candidate_group_candidate')->withTimestamps();
     }
 }

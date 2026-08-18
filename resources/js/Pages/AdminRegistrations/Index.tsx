@@ -51,7 +51,7 @@ export default function AdminRegistrationsIndex({ registrations }: Props) {
                                         View
                                     </Link>
                                 </Button>
-                                {registration.status === 'pending' ? (
+                                {registration.status === 'pending' || registration.status === 'approved' ? (
                                     <Button asChild type="button" variant="secondary" className="h-9 px-3">
                                         <Link href={`/admin-registrations/${registration.id}/edit`}>
                                             <Edit className="h-4 w-4" />

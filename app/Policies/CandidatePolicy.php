@@ -19,11 +19,21 @@ class CandidatePolicy
 
     public function view(User $user, Candidate $candidate): bool
     {
+        if ($user->isInstitutionLecturer()) {
+            return $this->viewAny($user)
+                && (string) $candidate->institution_id === (string) $user->institution_id
+                && (string) $candidate->department_id === (string) $user->department_id;
+        }
+
         return $this->viewAny($user) && $this->canAccessOrganization($user, $candidate);
     }
 
     public function create(User $user): bool
     {
+        if ($user->isInstitutionLecturer()) {
+            return false;
+        }
+
         return $user->hasPermission('manageExams');
     }
 
@@ -34,6 +44,10 @@ class CandidatePolicy
 
     public function delete(User $user, Candidate $candidate): bool
     {
+        if ($user->isInstitutionLecturer()) {
+            return false;
+        }
+
         return $user->hasPermission('manageExams')
             && $this->canAccessOrganization($user, $candidate);
     }

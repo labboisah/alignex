@@ -7,6 +7,7 @@ import { Candidate, ScopeOption, StatusOption } from './types';
 
 type CandidateFormData = {
     organization_id: string;
+    department_id: string;
     school_id: string;
     center_id: string;
     full_name: string;
@@ -21,9 +22,11 @@ type CandidateFormData = {
 const inputClass = 'mt-1 block w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm';
 const labelClass = 'text-sm font-semibold text-slateDark';
 
-export function CandidateForm({ candidate, organizations = [], schools = [], centers = [], statuses, submitLabel }: { candidate?: Candidate; organizations?: ScopeOption[]; schools?: ScopeOption[]; centers?: ScopeOption[]; statuses: StatusOption[]; submitLabel: string }) {
+export function CandidateForm({ candidate, organizations = [], schools = [], centers = [], departments = [], statuses, submitLabel }: { candidate?: Candidate; organizations?: ScopeOption[]; schools?: ScopeOption[]; centers?: ScopeOption[]; departments?: ScopeOption[]; statuses: StatusOption[]; submitLabel: string }) {
+    const isInstitution = departments.length > 0 || Boolean(candidate?.department_id);
     const { data, setData, post, processing, errors, transform } = useForm<CandidateFormData>({
         organization_id: candidate?.organization_id ? String(candidate.organization_id) : '',
+        department_id: candidate?.department_id ? String(candidate.department_id) : '',
         school_id: candidate?.school_id ? String(candidate.school_id) : '',
         center_id: candidate?.center_id ? String(candidate.center_id) : '',
         full_name: candidate?.full_name ?? '',
@@ -70,6 +73,17 @@ export function CandidateForm({ candidate, organizations = [], schools = [], cen
                             <select className={inputClass} value={data.center_id} onChange={(event) => setData({ ...data, center_id: event.target.value, organization_id: '', school_id: '' })}>
                                 <option value="">None</option>
                                 {centers.map((center) => <option key={center.id} value={center.id}>{center.name}</option>)}
+                            </select>
+                        </Field>
+                    </div>
+                )}
+
+                {isInstitution && (
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <Field label="Department" error={errors.department_id}>
+                            <select className={inputClass} value={data.department_id} onChange={(event) => setData('department_id', event.target.value)} required={!candidate}>
+                                <option value="">Choose department</option>
+                                {departments.map((department) => <option key={department.id} value={department.id}>{department.name}{department.code ? ` (${department.code})` : ''}</option>)}
                             </select>
                         </Field>
                     </div>

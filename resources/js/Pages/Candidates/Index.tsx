@@ -23,7 +23,7 @@ export default function CandidatesIndex({ candidates, exams, candidateGroups, ca
                 }
             />
 
-            <BulkTools candidateGroups={candidateGroups} />
+            {can.create && <BulkTools candidateGroups={candidateGroups} />}
             {importReport && <ImportReportPanel report={importReport} />}
 
             <DataTable<Candidate>
@@ -35,7 +35,7 @@ export default function CandidatesIndex({ candidates, exams, candidateGroups, ca
                     { key: 'registration_number', header: 'Registration Number' },
                     { key: 'email', header: 'Email', render: (candidate) => candidate.email ?? 'N/A' },
                     { key: 'phone', header: 'Phone', render: (candidate) => candidate.phone ?? 'N/A' },
-                    { key: 'organization_name', header: 'Organization', render: (candidate) => candidate.organization_name ?? candidate.school_name ?? candidate.center_name ?? 'N/A' },
+                    { key: 'organization_name', header: 'Scope', render: (candidate) => candidate.department_name ?? candidate.institution_name ?? candidate.organization_name ?? candidate.school_name ?? candidate.center_name ?? 'N/A' },
                     { key: 'status', header: 'Status', render: (candidate) => <StatusBadge label={candidate.status_label} tone={candidate.status === 'active' ? 'success' : candidate.status === 'suspended' ? 'danger' : 'neutral'} /> },
                     { key: 'assigned_exams_count', header: 'Assigned Exams Count', render: (candidate) => String(candidate.assigned_exams_count ?? 0) },
                     {
@@ -45,8 +45,10 @@ export default function CandidatesIndex({ candidates, exams, candidateGroups, ca
                             <ActionDropdown
                                 items={[
                                     { label: 'View', icon: Eye, onSelect: () => router.visit(`/candidates/${candidate.id}`) },
-                                    { label: 'Edit', icon: Pencil, onSelect: () => router.visit(`/candidates/${candidate.id}/edit`) },
-                                    { label: 'Delete', icon: Trash2, destructive: true, onSelect: () => window.confirm('Delete this candidate?') && router.delete(`/candidates/${candidate.id}`, { preserveScroll: true }) },
+                                    ...(can.create ? [
+                                        { label: 'Edit', icon: Pencil, onSelect: () => router.visit(`/candidates/${candidate.id}/edit`) },
+                                        { label: 'Delete', icon: Trash2, destructive: true, onSelect: () => window.confirm('Delete this candidate?') && router.delete(`/candidates/${candidate.id}`, { preserveScroll: true }) },
+                                    ] : []),
                                 ]}
                             />
                         ),
