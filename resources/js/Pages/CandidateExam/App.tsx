@@ -259,16 +259,12 @@ function ExamInstructionsPage() {
                         <Info label="Registration Number" value={payload.candidate.registration_number} />
                         <Info label="Duration" value={`${payload.exam.duration_minutes} minutes`} />
                         <Info label="Questions" value={String(questionList(payload).length)} />
-                        {payload.exam.starts_at && <Info label="Start Time" value={new Date(payload.exam.starts_at).toLocaleString()} />}
                     </div>
                     {!canStart && (
                         <div className="mt-6 rounded-md border-2 border-blue-300 bg-blue-50 p-5 text-info">
-                            <div className="flex flex-wrap items-center gap-3">
+                            <div className="flex flex-wrap items-center gap-3" aria-label={`Exam starts in ${formatTime(startsIn)}`}>
                                 <Clock className="h-8 w-8" />
-                                <div>
-                                    <div className="text-sm font-black uppercase tracking-wide text-blue-700">Exam starts in</div>
-                                    <div className="mt-1 font-mono text-4xl font-black leading-none text-blue-900 md:text-5xl">{formatTime(startsIn)}</div>
-                                </div>
+                                <div className="font-mono text-4xl font-black leading-none text-blue-900 md:text-5xl">{formatTime(startsIn)}</div>
                             </div>
                             <p className="mt-3 text-sm font-semibold leading-6 text-slate-700">
                                 You are logged in, but the exam cannot be started until the scheduled start time.
