@@ -16,6 +16,7 @@ use App\Models\QuestionBank;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class InstitutionAssessmentFeatureTest extends TestCase
@@ -188,6 +189,134 @@ class InstitutionAssessmentFeatureTest extends TestCase
             'exam_id' => $exam->id,
             'participant_type' => ExamParticipant::TYPE_CANDIDATE,
             'participant_id' => $newCandidate->id,
+        ]);
+    }
+
+    public function test_institution_lecturer_can_select_department_candidate_group_when_creating_assessment(): void
+    {
+        $organization = Organization::factory()->create();
+        $institution = Institution::query()->create([
+            'organization_id' => $organization->id,
+            'name' => 'AlignEx University',
+            'code' => 'AXU',
+            'status' => 'active',
+        ]);
+        $faculty = Faculty::query()->create([
+            'institution_id' => $institution->id,
+            'name' => 'Science',
+            'code' => 'SCI',
+            'status' => 'active',
+        ]);
+        $department = Department::query()->create([
+            'institution_id' => $institution->id,
+            'faculty_id' => $faculty->id,
+            'name' => 'Computer Science',
+            'code' => 'CSC',
+            'status' => 'active',
+        ]);
+        $otherDepartment = Department::query()->create([
+            'institution_id' => $institution->id,
+            'faculty_id' => $faculty->id,
+            'name' => 'Mathematics',
+            'code' => 'MTH',
+            'status' => 'active',
+        ]);
+        $programme = Programme::query()->create([
+            'institution_id' => $institution->id,
+            'faculty_id' => $faculty->id,
+            'department_id' => $department->id,
+            'name' => 'BSc Computer Science',
+            'code' => 'BSC-CS',
+            'duration' => 48,
+            'status' => 'active',
+        ]);
+        $course = Course::query()->create([
+            'institution_id' => $institution->id,
+            'faculty_id' => $faculty->id,
+            'department_id' => $department->id,
+            'programme_id' => $programme->id,
+            'name' => 'Data Structures',
+            'code' => 'CSC201',
+            'status' => 'active',
+        ]);
+        $bank = QuestionBank::query()->create([
+            'owner_type' => Exam::OWNER_INSTITUTION,
+            'owner_id' => $institution->id,
+            'organization_id' => $organization->id,
+            'institution_id' => $institution->id,
+            'course_id' => $course->id,
+            'name' => 'Data Structures Main Bank',
+            'code' => 'DS-MAIN',
+            'status' => QuestionBank::STATUS_ACTIVE,
+        ]);
+        $group = CandidateGroup::factory()->create([
+            'organization_id' => $organization->id,
+            'institution_id' => $institution->id,
+            'faculty_id' => $faculty->id,
+            'department_id' => $department->id,
+            'name' => 'CSC 201 Batch A',
+            'code' => 'CSC201-A',
+        ]);
+        $otherGroup = CandidateGroup::factory()->create([
+            'organization_id' => $organization->id,
+            'institution_id' => $institution->id,
+            'faculty_id' => $faculty->id,
+            'department_id' => $otherDepartment->id,
+            'name' => 'MTH Batch A',
+            'code' => 'MTH-A',
+        ]);
+        $candidate = Candidate::factory()->create([
+            'organization_id' => $organization->id,
+            'institution_id' => $institution->id,
+            'faculty_id' => $faculty->id,
+            'department_id' => $department->id,
+            'candidate_number' => 'CSC201-001',
+        ]);
+        $group->candidates()->attach($candidate->id);
+
+        $lecturer = User::factory()->create([
+            'role' => User::ROLE_FACILITATOR,
+            'organization_id' => $organization->id,
+            'institution_id' => $institution->id,
+            'faculty_id' => $faculty->id,
+            'department_id' => $department->id,
+            'active_context_type' => 'institution',
+            'active_context_id' => $institution->id,
+        ]);
+        $lecturer->assignedCourses()->attach($course->id, [
+            'professional_school_id' => null,
+            'institution_id' => $institution->id,
+            'faculty_id' => $faculty->id,
+            'department_id' => $department->id,
+            'module_id' => null,
+        ]);
+
+        $this->actingAs($lecturer)
+            ->get('/exams/create?category=assessment&course_id='.$course->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Exams/Create')
+                ->where('candidateGroups.0.id', $group->id)
+                ->where('candidateGroups.0.department_id', $department->id)
+                ->missing('candidateGroups.1')
+            );
+
+        $payload = $this->examPayload($institution->id, $course->id, $bank->id, $group->id);
+
+        $this->actingAs($lecturer)
+            ->post('/exams', $payload)
+            ->assertRedirect();
+
+        $exam = Exam::query()->where('code', 'CSC201-CA1')->firstOrFail();
+        $this->assertSame($department->id, $exam->department_id);
+        $this->assertDatabaseHas('exam_participants', [
+            'exam_id' => $exam->id,
+            'participant_type' => ExamParticipant::TYPE_CANDIDATE,
+            'participant_id' => $candidate->id,
+        ]);
+        $this->assertDatabaseMissing('exam_candidates', [
+            'exam_id' => $exam->id,
+            'candidate_id' => $otherGroup->id,
         ]);
     }
 

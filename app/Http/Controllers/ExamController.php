@@ -551,7 +551,10 @@ class ExamController extends Controller
 
         $institutionId = $this->institutionIdForRequest($request, $data);
         if ($institutionId) {
-            return $this->tenantPayload(Exam::OWNER_INSTITUTION, $institutionId);
+            return $this->tenantPayload(Exam::OWNER_INSTITUTION, $institutionId, [
+                'faculty_id' => $user->isInstitutionLecturer() ? $user->faculty_id : null,
+                'department_id' => $user->isInstitutionLecturer() ? $user->department_id : null,
+            ]);
         }
 
         if (filled($data['secondary_school_id'] ?? null) && ($user->isSuperAdmin() || SecondarySchool::query()
@@ -914,13 +917,14 @@ class ExamController extends Controller
             ?? $user->center_id;
 
         return CandidateGroup::query()
-            ->when(! $user->isSuperAdmin() && ! $centerId, function ($query) use ($user): void {
+            ->when(! $user->isSuperAdmin() && ! $centerId && ! $institutionId, function ($query) use ($user): void {
                 $query->where(function ($inner) use ($user): void {
                     $inner->whereRaw('1 = 0')
                         ->when($user->organization_id, fn ($scope) => $scope->orWhere('organization_id', $user->organization_id));
                 });
             })
             ->when($institutionId, fn ($query) => $query->where('institution_id', $institutionId))
+            ->when($user->isInstitutionLecturer() && $user->department_id, fn ($query) => $query->where('department_id', $user->department_id))
             ->when(Schema::hasColumn('candidate_groups', 'cbt_center_id'), function ($query) use ($centerId): void {
                 $centerId
                     ? $query->where('cbt_center_id', $centerId)
