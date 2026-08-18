@@ -1,16 +1,50 @@
-import { Head, useForm } from '@inertiajs/react';
-import { FormEvent, ReactNode } from 'react';
-import { DataTable, FormSection, PageHeader, PortalAppShell, StatusBadge } from '@/Components/Platform';
+import { Head, router, useForm } from '@inertiajs/react';
+import { FormEvent, ReactNode, useState } from 'react';
+import { Pencil, Trash2, X } from 'lucide-react';
+import { ActionDropdown, DataTable, FormSection, PageHeader, PortalAppShell, StatusBadge } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
 
 const inputClass = 'mt-1 block w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm';
 
 export default function InstitutionCourses({ institution, faculties, departments, programmes, courses }: { institution: any; faculties: any[]; departments: any[]; programmes: any[]; courses: any[] }) {
-    const { data, setData, post, processing, errors, reset } = useForm({ faculty_id: '', department_id: '', programme_id: '', name: '', code: '', description: '', status: 'active' });
+    const [editing, setEditing] = useState<any | null>(null);
+    const { data, setData, post, patch, processing, errors, reset, clearErrors } = useForm({ faculty_id: '', department_id: '', programme_id: '', name: '', code: '', status: 'active' });
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        post(`/institutions/${institution.id}/courses`, { onSuccess: () => reset() });
+        const options = { onSuccess: () => cancelEdit() };
+
+        if (editing) {
+            patch(`/institutions/${institution.id}/courses/${editing.id}`, options);
+            return;
+        }
+
+        post(`/institutions/${institution.id}/courses`, options);
+    };
+
+    const editCourse = (course: any) => {
+        setEditing(course);
+        clearErrors();
+        setData({
+            faculty_id: course.faculty_id ? String(course.faculty_id) : '',
+            department_id: course.department_id ? String(course.department_id) : '',
+            programme_id: course.programme_id ? String(course.programme_id) : '',
+            name: course.name ?? '',
+            code: course.code ?? '',
+            status: course.status ?? 'active',
+        });
+    };
+
+    const cancelEdit = () => {
+        setEditing(null);
+        clearErrors();
+        reset();
+    };
+
+    const deleteCourse = (course: any) => {
+        if (window.confirm(`Delete ${course.name}?`)) {
+            router.delete(`/institutions/${institution.id}/courses/${course.id}`, { preserveScroll: true });
+        }
     };
 
     return (
@@ -18,16 +52,25 @@ export default function InstitutionCourses({ institution, faculties, departments
             <Head title="Courses" />
             <PageHeader eyebrow={institution.name} title="Courses" description="Add courses to programmes for teaching and assessment." />
             <form onSubmit={submit} className="mb-6">
-                <FormSection title="New Course" description="Create a course and attach it to a programme." footer={<Button disabled={processing}>Save Course</Button>}>
+                <FormSection
+                    title={editing ? 'Edit Course' : 'New Course'}
+                    description="Create or update a course and attach it to a programme."
+                    footer={
+                        <div className="flex gap-2">
+                            {editing && <Button type="button" variant="secondary" onClick={cancelEdit}><X className="h-4 w-4" />Cancel</Button>}
+                            <Button disabled={processing}>{editing ? 'Update Course' : 'Save Course'}</Button>
+                        </div>
+                    }
+                >
                     <Grid>
                         <Field label="Faculty" error={errors.faculty_id}>
-                            <select className={inputClass} value={data.faculty_id} onChange={(event) => setData('faculty_id', event.target.value)}>
+                            <select required className={inputClass} value={data.faculty_id} onChange={(event) => setData('faculty_id', event.target.value)}>
                                 <option value="">Select faculty</option>
                                 {faculties.map((faculty) => <option key={faculty.id} value={faculty.id}>{faculty.name}</option>)}
                             </select>
                         </Field>
                         <Field label="Department" error={errors.department_id}>
-                            <select className={inputClass} value={data.department_id} onChange={(event) => setData('department_id', event.target.value)}>
+                            <select required className={inputClass} value={data.department_id} onChange={(event) => setData('department_id', event.target.value)}>
                                 <option value="">Select department</option>
                                 {departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
                             </select>
@@ -47,7 +90,6 @@ export default function InstitutionCourses({ institution, faculties, departments
                             </select>
                         </Field>
                     </Grid>
-                    <Field label="Description" error={errors.description}><textarea rows={3} className={inputClass} value={data.description} onChange={(event) => setData('description', event.target.value)} /></Field>
                 </FormSection>
             </form>
 
@@ -58,6 +100,18 @@ export default function InstitutionCourses({ institution, faculties, departments
                 { key: 'faculty', header: 'Faculty', render: (row: any) => row.faculty?.name ?? 'N/A' },
                 { key: 'department', header: 'Department', render: (row: any) => row.department?.name ?? 'N/A' },
                 { key: 'status', header: 'Status', render: (row: any) => <StatusBadge label={row.status} tone={row.status === 'active' ? 'success' : 'neutral'} /> },
+                {
+                    key: 'actions',
+                    header: 'Actions',
+                    render: (row: any) => (
+                        <ActionDropdown
+                            items={[
+                                { label: 'Edit', icon: Pencil, onSelect: () => editCourse(row) },
+                                { label: 'Delete', icon: Trash2, destructive: true, onSelect: () => deleteCourse(row) },
+                            ]}
+                        />
+                    ),
+                },
             ]} />
         </PortalAppShell>
     );

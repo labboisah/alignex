@@ -24,6 +24,7 @@ import { PortalTopbar } from './PortalTopbar';
 import { AlertBanner } from './AlertBanner';
 import { SetupGuide, SetupGuideIndicator } from './SetupGuideIndicator';
 import { Button } from '@/Components/ui/button';
+import { isRenderableComponent } from '@/lib/reactComponent';
 
 const iconByLabel = {
     Dashboard: LayoutDashboard,
@@ -53,6 +54,8 @@ const iconByLabel = {
     'Student Groups': Users,
     Students: Users,
     Teachers: Users,
+    Faculties: GraduationCap,
+    Departments: Building2,
     Programmes: GraduationCap,
     Courses: BookOpen,
     Modules: SlidersHorizontal,
@@ -76,6 +79,7 @@ const iconByLabel = {
     'Continuous Assessment': ClipboardList,
     'Assigned Exams': ClipboardList,
     Candidates: Users,
+    'All Candidates': Users,
     'Candidate Groups': Users,
     Results: BarChart3,
     Certificates: FileText,
@@ -95,7 +99,7 @@ const iconByLabel = {
 };
 
 type SharedNavItem = {
-    label: keyof typeof iconByLabel;
+    label: string;
     href?: string;
     permission?: string;
     feature?: string;
@@ -179,11 +183,16 @@ export function PortalAppShell({
     );
 }
 
-function resolveNavItem(item: SharedNavItem): PortalNavItem {
+function resolveNavItem(item: SharedNavItem, fallbackIcon = LayoutDashboard): PortalNavItem {
+    const matchedIcon = Object.prototype.hasOwnProperty.call(iconByLabel, item.label)
+        ? iconByLabel[item.label as keyof typeof iconByLabel]
+        : null;
+    const Icon = isRenderableComponent(matchedIcon) ? matchedIcon : fallbackIcon;
+
     return {
         ...item,
         href: item.href ?? '#',
-        icon: iconByLabel[item.label] ?? LayoutDashboard,
-        children: item.children?.map(resolveNavItem),
+        icon: Icon,
+        children: item.children?.map((child) => resolveNavItem(child, Icon)),
     };
 }

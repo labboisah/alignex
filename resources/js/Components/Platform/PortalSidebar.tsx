@@ -3,6 +3,7 @@ import { ChevronDown, LucideIcon } from 'lucide-react';
 import { AppLogo } from './AppLogo';
 import { cn } from '@/lib/cn';
 import { getContextTerminology } from '@/lib/terminology';
+import { isRenderableComponent } from '@/lib/reactComponent';
 
 export type PortalNavItem = {
     label: string;
@@ -30,7 +31,7 @@ export function PortalSidebar({ items, className, mode = 'desktop' }: { items: P
             </div>
             <nav className="max-h-[calc(100vh-4rem)] space-y-1 overflow-y-auto p-3">
                 {items.map((item) => {
-                    const Icon = item.icon;
+                    const Icon = isRenderableComponent(item.icon) ? item.icon : null;
                     const childActive = item.children?.some((child) => isActive(url, child.href)) ?? false;
                     const active = isActive(url, item.href) || childActive;
 
@@ -44,13 +45,13 @@ export function PortalSidebar({ items, className, mode = 'desktop' }: { items: P
                                     )}
                                     title={`${item.label} | ${terms.examLabel}`}
                                 >
-                                    <Icon className="h-4 w-4" />
+                                    {Icon && <Icon className="h-4 w-4" />}
                                     <span className="min-w-0 flex-1 truncate">{item.label}</span>
                                     <ChevronDown className="h-4 w-4 transition group-open:rotate-180" />
                                 </summary>
                                 <div className="mt-1 space-y-1 pl-4">
                                     {item.children.map((child) => {
-                                        const ChildIcon = child.icon;
+                                        const ChildIcon = isRenderableComponent(child.icon) ? child.icon : null;
                                         const childIsActive = isActive(url, child.href);
                                         const childClassName = cn(
                                             'flex h-9 items-center gap-2 rounded-md px-3 text-sm font-medium text-slate-600 hover:bg-slate-100',
@@ -66,7 +67,7 @@ export function PortalSidebar({ items, className, mode = 'desktop' }: { items: P
                                                     download
                                                     title={`${child.label} | ${terms.examLabel}`}
                                                 >
-                                                    <ChildIcon className="h-4 w-4" />
+                                                    {ChildIcon && <ChildIcon className="h-4 w-4" />}
                                                     <span className="min-w-0 truncate">{child.label}</span>
                                                 </a>
                                             );
@@ -80,7 +81,7 @@ export function PortalSidebar({ items, className, mode = 'desktop' }: { items: P
                                                     className={childClassName}
                                                     title={`${child.label} | ${terms.examLabel}`}
                                                 >
-                                                    <ChildIcon className="h-4 w-4" />
+                                                    {ChildIcon && <ChildIcon className="h-4 w-4" />}
                                                     <span className="min-w-0 truncate">{child.label}</span>
                                                 </a>
                                             );
@@ -93,7 +94,7 @@ export function PortalSidebar({ items, className, mode = 'desktop' }: { items: P
                                                 className={childClassName}
                                                 title={`${child.label} | ${terms.examLabel}`}
                                             >
-                                                <ChildIcon className="h-4 w-4" />
+                                                {ChildIcon && <ChildIcon className="h-4 w-4" />}
                                                 <span className="min-w-0 truncate">{child.label}</span>
                                             </Link>
                                         );
@@ -115,7 +116,7 @@ export function PortalSidebar({ items, className, mode = 'desktop' }: { items: P
                                 download
                                 title={`${item.label} | ${terms.examLabel}`}
                             >
-                                <Icon className="h-4 w-4" />
+                                {Icon && <Icon className="h-4 w-4" />}
                                 {item.label}
                             </a>
                         );
@@ -132,7 +133,7 @@ export function PortalSidebar({ items, className, mode = 'desktop' }: { items: P
                                 )}
                                 title={`${item.label} | ${terms.examLabel}`}
                             >
-                                <Icon className="h-4 w-4" />
+                                {Icon && <Icon className="h-4 w-4" />}
                                 {item.label}
                             </a>
                         );
@@ -148,7 +149,7 @@ export function PortalSidebar({ items, className, mode = 'desktop' }: { items: P
                             )}
                             title={`${item.label} | ${terms.examLabel}`}
                         >
-                            <Icon className="h-4 w-4" />
+                            {Icon && <Icon className="h-4 w-4" />}
                             {item.label}
                         </Link>
                     );
@@ -167,5 +168,6 @@ function isDownloadLink(href: string) {
 }
 
 function isHardNavigationLink(href: string) {
-    return href === '/admin/manage-activation';
+    return href === '/admin/manage-activation'
+        || /^\/institutions\/[^/]+\/(faculties|departments|programmes|courses)$/.test(href);
 }

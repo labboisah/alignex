@@ -138,7 +138,7 @@ return new class extends Migration
         if (! Schema::hasTable('programmes')) {
             Schema::create('programmes', function (Blueprint $table): void {
                 $table->id();
-                $table->foreignId('professional_school_id')->constrained()->cascadeOnDelete();
+                $table->foreignId('professional_school_id')->nullable()->constrained()->cascadeOnDelete();
                 $table->string('name');
                 $table->string('code');
                 $table->text('description')->nullable();
@@ -153,7 +153,7 @@ return new class extends Migration
         if (! Schema::hasTable('courses')) {
             Schema::create('courses', function (Blueprint $table): void {
                 $table->id();
-                $table->foreignId('professional_school_id')->constrained()->cascadeOnDelete();
+                $table->foreignId('professional_school_id')->nullable()->constrained()->cascadeOnDelete();
                 $table->foreignId('programme_id')->nullable()->constrained()->cascadeOnDelete();
                 $table->string('name');
                 $table->string('code');

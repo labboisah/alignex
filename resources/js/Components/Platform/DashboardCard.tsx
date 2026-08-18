@@ -1,8 +1,11 @@
 import { LucideIcon } from 'lucide-react';
 import { ReactNode } from 'react';
 import { cn } from '@/lib/cn';
+import { isRenderableComponent } from '@/lib/reactComponent';
 
 export function DashboardCard({ title, value, description, icon: Icon, footer, className }: { title: string; value: string | number; description?: string; icon?: LucideIcon; footer?: ReactNode; className?: string }) {
+    const SafeIcon = isRenderableComponent(Icon) ? Icon : null;
+
     return (
         <div className={cn('rounded-md border border-border bg-white p-5 shadow-sm', className)}>
             <div className="flex items-start justify-between gap-4">
@@ -10,9 +13,9 @@ export function DashboardCard({ title, value, description, icon: Icon, footer, c
                     <p className="text-sm font-medium text-slate-500">{title}</p>
                     <div className="mt-3 text-3xl font-bold text-slateDark">{value}</div>
                 </div>
-                {Icon && (
+                {SafeIcon && (
                     <div className="rounded-md bg-green-50 p-2 text-primary">
-                        <Icon className="h-5 w-5" />
+                        <SafeIcon className="h-5 w-5" />
                     </div>
                 )}
             </div>

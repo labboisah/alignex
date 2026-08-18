@@ -2,6 +2,7 @@ import { ChevronDown, LucideIcon } from 'lucide-react';
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Button } from '@/Components/ui/button';
 import { cn } from '@/lib/cn';
+import { isRenderableComponent } from '@/lib/reactComponent';
 
 export type ActionDropdownItem = {
     label: string;
@@ -74,7 +75,7 @@ export function ActionDropdown({ label = 'Actions', items, trigger }: { label?: 
                     role="menu"
                 >
                     {items.map((item) => {
-                        const Icon = item.icon;
+                        const Icon = isRenderableComponent(item.icon) ? item.icon : null;
 
                         return (
                             <button

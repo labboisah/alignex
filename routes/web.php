@@ -151,12 +151,20 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
         Route::patch('/institutions/{institution}/deactivate', [InstitutionController::class, 'deactivate'])->name('institutions.deactivate');
         Route::get('/institutions/{institution}/faculties', [InstitutionStructureController::class, 'faculties'])->name('institutions.faculties.index');
         Route::post('/institutions/{institution}/faculties', [InstitutionStructureController::class, 'storeFaculty'])->name('institutions.faculties.store');
+        Route::patch('/institutions/{institution}/faculties/{faculty}', [InstitutionStructureController::class, 'updateFaculty'])->name('institutions.faculties.update');
+        Route::delete('/institutions/{institution}/faculties/{faculty}', [InstitutionStructureController::class, 'destroyFaculty'])->name('institutions.faculties.destroy');
         Route::get('/institutions/{institution}/departments', [InstitutionStructureController::class, 'departments'])->name('institutions.departments.index');
         Route::post('/institutions/{institution}/departments', [InstitutionStructureController::class, 'storeDepartment'])->name('institutions.departments.store');
+        Route::patch('/institutions/{institution}/departments/{department}', [InstitutionStructureController::class, 'updateDepartment'])->name('institutions.departments.update');
+        Route::delete('/institutions/{institution}/departments/{department}', [InstitutionStructureController::class, 'destroyDepartment'])->name('institutions.departments.destroy');
         Route::get('/institutions/{institution}/programmes', [InstitutionStructureController::class, 'programmes'])->name('institutions.programmes.index');
         Route::post('/institutions/{institution}/programmes', [InstitutionStructureController::class, 'storeProgramme'])->name('institutions.programmes.store');
+        Route::patch('/institutions/{institution}/programmes/{programme}', [InstitutionStructureController::class, 'updateProgramme'])->name('institutions.programmes.update');
+        Route::delete('/institutions/{institution}/programmes/{programme}', [InstitutionStructureController::class, 'destroyProgramme'])->name('institutions.programmes.destroy');
         Route::get('/institutions/{institution}/courses', [InstitutionStructureController::class, 'courses'])->name('institutions.courses.index');
         Route::post('/institutions/{institution}/courses', [InstitutionStructureController::class, 'storeCourse'])->name('institutions.courses.store');
+        Route::patch('/institutions/{institution}/courses/{course}', [InstitutionStructureController::class, 'updateCourse'])->name('institutions.courses.update');
+        Route::delete('/institutions/{institution}/courses/{course}', [InstitutionStructureController::class, 'destroyCourse'])->name('institutions.courses.destroy');
     });
 
     Route::middleware(['role:super_admin,organization_admin,secondary_school_admin,school_admin,examiner', 'permission:manageSchools'])->group(function (): void {

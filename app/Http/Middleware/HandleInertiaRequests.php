@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Department;
 use App\Models\User;
 use App\Services\CurrentContextService;
 use App\Services\ExamSetupGuideService;
@@ -149,6 +150,7 @@ class HandleInertiaRequests extends Middleware
             ]);
         } elseif ($user->isInstitutionAdmin() && ! $contextType) {
             $institutionBase = $user->institution_id ? '/institutions/'.$user->institution_id : '/institutions';
+            $departmentItems = $this->institutionDepartmentNavigation($user, $institutionBase);
             $navigation = collect([
                 ['label' => 'Dashboard', 'href' => '/dashboard'],
                 ['label' => 'Administration', 'children' => [
@@ -163,6 +165,7 @@ class HandleInertiaRequests extends Middleware
                     ['label' => 'Questions', 'href' => $institutionBase.'/questions', 'permission' => 'manageQuestionBank'],
                     ['label' => 'Exams', 'href' => '/exams', 'permission' => 'manageExams'],
                 ]],
+                ['label' => 'Candidates', 'children' => $departmentItems],
                 ['label' => 'Reports', 'children' => [
                     ['label' => 'Results', 'href' => '/results', 'permission' => 'viewReports'],
                     ['label' => 'Academic Reports', 'href' => '/reports', 'permission' => 'viewReports'],
@@ -315,6 +318,7 @@ class HandleInertiaRequests extends Middleware
 
         if ($contextType === 'institution' && $user->institution_id) {
             $institutionBase = '/institutions/'.$user->institution_id;
+            $departmentItems = $this->institutionDepartmentNavigation($user, $institutionBase);
             $navigation = collect([
                 ['label' => 'Dashboard', 'href' => '/dashboard'],
                 ['label' => 'Administration', 'children' => [
@@ -328,6 +332,7 @@ class HandleInertiaRequests extends Middleware
                     ['label' => 'Questions', 'href' => $institutionBase.'/questions', 'permission' => 'manageQuestionBank'],
                     ['label' => 'Exams', 'href' => '/exams', 'permission' => 'manageExams'],
                 ]],
+                ['label' => 'Candidates', 'children' => $departmentItems],
                 ['label' => 'Reports', 'children' => [
                     ['label' => 'Results', 'href' => '/results', 'permission' => 'viewReports'],
                     ['label' => 'Academic Reports', 'href' => '/reports', 'permission' => 'viewReports'],
@@ -367,6 +372,33 @@ class HandleInertiaRequests extends Middleware
         }
 
         return $this->filterNavigation($navigation->all(), $user);
+    }
+
+    /**
+     * @return array<int, array{label: string, href: string, permission: string}>
+     */
+    private function institutionDepartmentNavigation(User $user, string $institutionBase): array
+    {
+        if (! $user->institution_id) {
+            return [
+                ['label' => 'All Candidates', 'href' => '/candidates', 'permission' => 'manageExams'],
+            ];
+        }
+
+        $departments = Department::query()
+            ->where('institution_id', $user->institution_id)
+            ->orderBy('name')
+            ->limit(30)
+            ->get(['id', 'name', 'code']);
+
+        return [
+            ['label' => 'All Candidates', 'href' => '/candidates', 'permission' => 'manageExams'],
+            ...$departments->map(fn (Department $department): array => [
+                'label' => $department->code ? $department->name.' ('.$department->code.')' : $department->name,
+                'href' => '/candidates?department_id='.$department->id,
+                'permission' => 'manageExams',
+            ])->all(),
+        ];
     }
 
     /**
