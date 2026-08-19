@@ -116,11 +116,59 @@ class ExamController extends Controller
     public function destroy(Exam $exam): RedirectResponse
     {
         Gate::authorize('delete', $exam);
-        abort_if($exam->attempts()->exists(), 422, 'Records with candidate attempts cannot be deleted.');
 
-        $exam->delete();
+        $hasAttempts = $exam->attempts()->withTrashed()->exists();
+        $canPurgeAttemptedAssessment = $hasAttempts && $this->canPurgeAttemptedAssessment(request()->user(), $exam);
+
+        abort_if($hasAttempts && ! $canPurgeAttemptedAssessment, 422, 'Records with candidate attempts cannot be deleted.');
+
+        if ($canPurgeAttemptedAssessment) {
+            DB::transaction(fn () => $this->purgeAssessmentWithAttempts($exam));
+        } else {
+            $exam->delete();
+        }
 
         return redirect()->route('exams.index')->with('success', request()->user()?->isTeacher() || request()->user()?->isFacilitator() ? 'Assessment deleted.' : 'Exam deleted.');
+    }
+
+    private function canPurgeAttemptedAssessment(?User $user, Exam $exam): bool
+    {
+        return $user !== null
+            && $exam->exam_category === Exam::CATEGORY_ASSESSMENT
+            && ($user->isTeacher() || $user->isFacilitator() || $user->isInstitutionLecturer());
+    }
+
+    private function purgeAssessmentWithAttempts(Exam $exam): void
+    {
+        $attemptIds = $exam->attempts()->withTrashed()->pluck('id');
+
+        if ($attemptIds->isNotEmpty()) {
+            DB::table('candidate_papers')->whereIn('attempt_id', $attemptIds)->delete();
+            DB::table('candidate_answers')->whereIn('candidate_exam_attempt_id', $attemptIds)->delete();
+            DB::table('proctoring_events')->whereIn('candidate_exam_attempt_id', $attemptIds)->delete();
+            DB::table('exam_audit_logs')
+                ->whereIn('candidate_exam_attempt_id', $attemptIds)
+                ->orWhere('exam_id', $exam->id)
+                ->delete();
+
+            if (Schema::hasTable('certificates')) {
+                DB::table('certificates')
+                    ->whereIn('candidate_exam_attempt_id', $attemptIds)
+                    ->orWhere('exam_id', $exam->id)
+                    ->delete();
+            }
+
+            DB::table('candidate_exam_attempts')->whereIn('id', $attemptIds)->delete();
+        }
+
+        foreach (['candidate_performance_profiles', 'continuous_assessments', 'report_cards', 'results'] as $table) {
+            if (Schema::hasTable($table)) {
+                DB::table($table)->where('exam_id', $exam->id)->delete();
+            }
+        }
+
+        DB::table('exam_candidates')->where('exam_id', $exam->id)->delete();
+        $exam->forceDelete();
     }
 
     public function refreshParticipants(Request $request, Exam $exam): RedirectResponse

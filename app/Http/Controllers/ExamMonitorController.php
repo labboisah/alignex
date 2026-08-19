@@ -149,6 +149,7 @@ class ExamMonitorController extends Controller
                 $query->where(function (Builder $inner) use ($user): void {
                     $inner->whereRaw('1 = 0')
                         ->when($user->organization_id, fn ($scope) => $scope->orWhere('organization_id', $user->organization_id))
+                        ->when($user->institution_id, fn ($scope) => $scope->orWhere('institution_id', $user->institution_id))
                         ->when($user->school_id, fn ($scope) => $scope->orWhere('school_id', $user->school_id))
                         ->when($user->center_id, fn ($scope) => $scope->orWhere('center_id', $user->center_id))
                         ->when($user->secondary_school_id, fn ($scope) => $scope->orWhere('secondary_school_id', $user->secondary_school_id))
@@ -156,6 +157,11 @@ class ExamMonitorController extends Controller
                         ->when($user->cbt_center_id, fn ($scope) => $scope->orWhere('cbt_center_id', $user->cbt_center_id));
                 });
             })
-            ->when($user->isTeacher(), fn (Builder $query) => $query->whereHas('examSubjects', fn (Builder $subjectQuery) => $subjectQuery->whereIn('subject_id', $user->assignedSubjects()->select('subjects.id'))));
+            ->when($user->isTeacher(), fn (Builder $query) => $query->whereHas('examSubjects', fn (Builder $subjectQuery) => $subjectQuery->whereIn('subject_id', $user->assignedSubjects()->select('subjects.id'))))
+            ->when($user->isFacilitator(), fn (Builder $query) => $query
+                ->where('exam_category', Exam::CATEGORY_ASSESSMENT)
+                ->whereHas('examSubjects.questionBank', fn (Builder $bankQuery) => $bankQuery
+                    ->whereIn('course_id', $user->assignedCourses()->select('courses.id'))
+                    ->orWhereIn('module_id', $user->assignedModules()->select('modules.id'))));
     }
 }

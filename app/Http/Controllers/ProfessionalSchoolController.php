@@ -282,7 +282,6 @@ class ProfessionalSchoolController extends Controller
 
         return Inertia::render('ProfessionalSchools/Facilitators', [
             'professionalSchool' => $this->row($professionalSchool),
-            'courses' => $professionalSchool->courses()->with('programme:id,name')->orderBy('name')->get(['id', 'programme_id', 'name', 'code']),
             'facilitators' => User::query()
                 ->where('role', User::ROLE_FACILITATOR)
                 ->where('professional_school_id', $professionalSchool->id)
@@ -290,6 +289,16 @@ class ProfessionalSchoolController extends Controller
                 ->orderBy('name')
                 ->get()
                 ->map(fn (User $facilitator) => $this->facilitatorRow($facilitator)),
+        ]);
+    }
+
+    public function createFacilitator(Request $request, ProfessionalSchool $professionalSchool): Response
+    {
+        $this->authorizeRecord($request->user(), $professionalSchool, update: true);
+
+        return Inertia::render('ProfessionalSchools/FacilitatorCreate', [
+            'professionalSchool' => $this->row($professionalSchool),
+            'courses' => $professionalSchool->courses()->with('programme:id,name')->orderBy('name')->get(['id', 'programme_id', 'name', 'code']),
         ]);
     }
 
@@ -313,7 +322,21 @@ class ProfessionalSchoolController extends Controller
             $this->syncFacilitatorAssignments($facilitator, $professionalSchool, $data['course_ids']);
         });
 
-        return back()->with('success', 'Facilitator created.');
+        return redirect()->route('professional-schools.facilitators.index', $professionalSchool)->with('success', 'Facilitator created.');
+    }
+
+    public function editFacilitator(Request $request, ProfessionalSchool $professionalSchool, User $facilitator): Response
+    {
+        $this->authorizeRecord($request->user(), $professionalSchool, update: true);
+        $this->authorizeFacilitatorRecord($professionalSchool, $facilitator);
+
+        return Inertia::render('ProfessionalSchools/FacilitatorEdit', [
+            'professionalSchool' => $this->row($professionalSchool),
+            'facilitator' => $this->facilitatorRow($facilitator->load(['assignedCourses' => fn ($query) => $query
+                ->where('course_facilitator.professional_school_id', $professionalSchool->id)
+                ->orderBy('name')])),
+            'courses' => $professionalSchool->courses()->with('programme:id,name')->orderBy('name')->get(['id', 'programme_id', 'name', 'code']),
+        ]);
     }
 
     public function updateFacilitator(Request $request, ProfessionalSchool $professionalSchool, User $facilitator): RedirectResponse
@@ -340,7 +363,7 @@ class ProfessionalSchoolController extends Controller
             $this->syncFacilitatorAssignments($facilitator, $professionalSchool, $data['course_ids']);
         });
 
-        return back()->with('success', 'Facilitator updated.');
+        return redirect()->route('professional-schools.facilitators.index', $professionalSchool)->with('success', 'Facilitator updated.');
     }
 
     public function destroyFacilitator(Request $request, ProfessionalSchool $professionalSchool, User $facilitator): RedirectResponse

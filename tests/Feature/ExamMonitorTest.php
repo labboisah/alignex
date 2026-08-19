@@ -6,9 +6,15 @@ use App\Models\Candidate;
 use App\Models\CandidateAnswer;
 use App\Models\CandidateExamAttempt;
 use App\Models\Center;
+use App\Models\Course;
+use App\Models\Department;
 use App\Models\Exam;
 use App\Models\ExamAuditLog;
+use App\Models\ExamSubject;
+use App\Models\Faculty;
+use App\Models\Institution;
 use App\Models\Organization;
+use App\Models\Programme;
 use App\Models\ProctoringEvent;
 use App\Models\Question;
 use App\Models\QuestionBank;
@@ -140,6 +146,25 @@ class ExamMonitorTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_institution_lecturer_can_monitor_assessment_for_assigned_course(): void
+    {
+        [$exam, $lecturer] = $this->institutionAssessmentWithLecturer();
+
+        $this->actingAs($lecturer)
+            ->get("/exams/{$exam->id}/monitor")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('ExamMonitor/Show')
+                ->where('summary.total_candidates', 1)
+                ->where('rows.0.registration_number', 'CSC201-001')
+            );
+
+        $this->actingAs($lecturer)
+            ->getJson("/exams/{$exam->id}/monitor/rows")
+            ->assertOk()
+            ->assertJsonPath('rows.0.registration_number', 'CSC201-001');
+    }
+
     private function examWithAttempt(): array
     {
         $organization = Organization::factory()->create();
@@ -196,5 +221,108 @@ class ExamMonitorTest extends TestCase
         ]);
 
         return [$exam->refresh(), $attempt->refresh()->load('candidate')];
+    }
+
+    private function institutionAssessmentWithLecturer(): array
+    {
+        $organization = Organization::factory()->create();
+        $institution = Institution::query()->create([
+            'organization_id' => $organization->id,
+            'name' => 'AlignEx University',
+            'code' => 'AXU',
+            'status' => 'active',
+        ]);
+        $faculty = Faculty::query()->create([
+            'institution_id' => $institution->id,
+            'name' => 'Science',
+            'code' => 'SCI',
+            'status' => 'active',
+        ]);
+        $department = Department::query()->create([
+            'institution_id' => $institution->id,
+            'faculty_id' => $faculty->id,
+            'name' => 'Computer Science',
+            'code' => 'CSC',
+            'status' => 'active',
+        ]);
+        $programme = Programme::query()->create([
+            'institution_id' => $institution->id,
+            'faculty_id' => $faculty->id,
+            'department_id' => $department->id,
+            'name' => 'BSc Computer Science',
+            'code' => 'BSC-CS',
+            'duration' => 48,
+            'status' => 'active',
+        ]);
+        $course = Course::query()->create([
+            'institution_id' => $institution->id,
+            'faculty_id' => $faculty->id,
+            'department_id' => $department->id,
+            'programme_id' => $programme->id,
+            'name' => 'Data Structures',
+            'code' => 'CSC201',
+            'status' => 'active',
+        ]);
+        $bank = QuestionBank::query()->create([
+            'owner_type' => Exam::OWNER_INSTITUTION,
+            'owner_id' => $institution->id,
+            'organization_id' => $organization->id,
+            'institution_id' => $institution->id,
+            'course_id' => $course->id,
+            'name' => 'Data Structures Main Bank',
+            'code' => 'DS-MAIN',
+            'status' => QuestionBank::STATUS_ACTIVE,
+        ]);
+        $exam = Exam::factory()->create([
+            'organization_id' => $organization->id,
+            'institution_id' => $institution->id,
+            'faculty_id' => $faculty->id,
+            'department_id' => $department->id,
+            'course_id' => $course->id,
+            'exam_category' => Exam::CATEGORY_ASSESSMENT,
+            'status' => Exam::STATUS_ACTIVE,
+        ]);
+        ExamSubject::factory()->create([
+            'exam_id' => $exam->id,
+            'subject_id' => null,
+            'question_bank_id' => $bank->id,
+            'question_count' => 1,
+            'marks_per_question' => 1,
+            'total_marks' => 1,
+        ]);
+        $candidate = Candidate::factory()->create([
+            'organization_id' => $organization->id,
+            'institution_id' => $institution->id,
+            'faculty_id' => $faculty->id,
+            'department_id' => $department->id,
+            'candidate_number' => 'CSC201-001',
+        ]);
+        $exam->candidates()->attach($candidate->id, ['status' => 'assigned']);
+        CandidateExamAttempt::factory()->create([
+            'candidate_id' => $candidate->id,
+            'exam_id' => $exam->id,
+            'status' => CandidateExamAttempt::STATUS_IN_PROGRESS,
+            'started_at' => now()->subMinutes(5),
+            'server_due_at' => now()->addMinutes(55),
+            'total_questions' => 1,
+            'total_marks' => 1,
+        ]);
+        $lecturer = User::factory()->create([
+            'role' => User::ROLE_FACILITATOR,
+            'organization_id' => $organization->id,
+            'institution_id' => $institution->id,
+            'faculty_id' => $faculty->id,
+            'department_id' => $department->id,
+            'active_context_type' => 'institution',
+            'active_context_id' => $institution->id,
+        ]);
+        $lecturer->assignedCourses()->attach($course->id, [
+            'institution_id' => $institution->id,
+            'faculty_id' => $faculty->id,
+            'department_id' => $department->id,
+            'module_id' => null,
+        ]);
+
+        return [$exam->refresh(), $lecturer->refresh()];
     }
 }

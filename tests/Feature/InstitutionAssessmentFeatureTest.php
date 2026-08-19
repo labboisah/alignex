@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\Course;
 use App\Models\Candidate;
+use App\Models\CandidateExamAttempt;
 use App\Models\CandidateGroup;
+use App\Models\CandidatePaper;
 use App\Models\Department;
 use App\Models\Exam;
 use App\Models\ExamParticipant;
@@ -12,6 +14,7 @@ use App\Models\Faculty;
 use App\Models\Institution;
 use App\Models\Organization;
 use App\Models\Programme;
+use App\Models\Question;
 use App\Models\QuestionBank;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -318,6 +321,42 @@ class InstitutionAssessmentFeatureTest extends TestCase
             'exam_id' => $exam->id,
             'candidate_id' => $otherGroup->id,
         ]);
+
+        $attempt = CandidateExamAttempt::query()->create([
+            'candidate_id' => $candidate->id,
+            'exam_id' => $exam->id,
+            'exam_session_id' => null,
+            'center_id' => null,
+            'access_code_hash' => bcrypt('CSC201-001'),
+            'attempt_number' => 1,
+            'status' => CandidateExamAttempt::STATUS_IN_PROGRESS,
+        ]);
+        $question = Question::query()->create([
+            'question_bank_id' => $bank->id,
+            'subject_id' => null,
+            'topic_id' => null,
+            'created_by' => $lecturer->id,
+            'question_type' => Question::TYPE_SINGLE_CHOICE,
+            'stem' => 'Which structure uses FIFO ordering?',
+            'difficulty' => 'medium',
+            'marks' => 1,
+            'status' => Question::STATUS_APPROVED,
+        ]);
+
+        CandidatePaper::query()->create([
+            'attempt_id' => $attempt->id,
+            'question_id' => $question->id,
+            'question_order' => 1,
+            'option_order' => [],
+        ]);
+
+        $this->actingAs($lecturer)
+            ->delete(route('exams.destroy', $exam, absolute: false))
+            ->assertRedirect(route('exams.index', absolute: false));
+
+        $this->assertDatabaseMissing('candidate_papers', ['attempt_id' => $attempt->id]);
+        $this->assertDatabaseMissing('candidate_exam_attempts', ['id' => $attempt->id]);
+        $this->assertDatabaseMissing('exams', ['id' => $exam->id]);
     }
 
     private function examPayload(int $institutionId, int $courseId, string $bankId, int|string $candidateGroupId): array
