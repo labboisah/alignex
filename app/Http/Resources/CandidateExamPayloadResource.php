@@ -24,7 +24,7 @@ class CandidateExamPayloadResource extends JsonResource
         $attempt = $this->resource;
         $session = app(CandidateExamSessionService::class);
         $startsInSeconds = $attempt->exam?->starts_at
-            ? max(0, now()->diffInSeconds($attempt->exam->starts_at, false))
+            ? max(0, (int) ceil(now()->diffInSeconds($attempt->exam->starts_at, false)))
             : 0;
         $answers = $attempt->answers()
             ->get()

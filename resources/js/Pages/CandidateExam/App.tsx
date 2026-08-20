@@ -262,9 +262,9 @@ function ExamInstructionsPage() {
                     </div>
                     {!canStart && (
                         <div className="mt-6 rounded-md border-2 border-blue-300 bg-blue-50 p-5 text-info">
-                            <div className="flex flex-wrap items-center gap-3" aria-label={`Exam starts in ${wholeSeconds(startsIn)} seconds`}>
+                            <div className="flex flex-wrap items-center gap-3" aria-label={`Exam starts in ${formatTime(startsIn)}`}>
                                 <Clock className="h-8 w-8" />
-                                <div className="font-mono text-4xl font-black leading-none text-blue-900 md:text-5xl">{wholeSeconds(startsIn)} seconds</div>
+                                <div className="font-mono text-4xl font-black leading-none text-blue-900 md:text-5xl">{formatTime(startsIn)}</div>
                             </div>
                             <p className="mt-3 text-sm font-semibold leading-6 text-slate-700">
                                 You are logged in, but the exam cannot be started until the scheduled start time.
@@ -1087,12 +1087,9 @@ function captureVideoFrame(video: HTMLVideoElement | null): string | null {
 }
 
 function formatTime(seconds: number) {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
+    const normalizedSeconds = Math.max(0, Math.floor(seconds));
+    const hours = Math.floor(normalizedSeconds / 3600);
+    const minutes = Math.floor((normalizedSeconds % 3600) / 60);
+    const secs = normalizedSeconds % 60;
     return [hours, minutes, secs].map((value) => String(value).padStart(2, '0')).join(':');
-}
-
-function wholeSeconds(seconds: number) {
-    return Math.max(0, Math.ceil(seconds));
 }
