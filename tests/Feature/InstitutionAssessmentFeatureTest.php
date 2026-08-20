@@ -9,6 +9,7 @@ use App\Models\CandidateGroup;
 use App\Models\CandidatePaper;
 use App\Models\Department;
 use App\Models\Exam;
+use App\Models\ExamSubject;
 use App\Models\ExamParticipant;
 use App\Models\Faculty;
 use App\Models\Institution;
@@ -16,6 +17,7 @@ use App\Models\Organization;
 use App\Models\Programme;
 use App\Models\Question;
 use App\Models\QuestionBank;
+use App\Models\QuestionOption;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -357,6 +359,142 @@ class InstitutionAssessmentFeatureTest extends TestCase
         $this->assertDatabaseMissing('candidate_papers', ['attempt_id' => $attempt->id]);
         $this->assertDatabaseMissing('candidate_exam_attempts', ['id' => $attempt->id]);
         $this->assertDatabaseMissing('exams', ['id' => $exam->id]);
+    }
+
+    public function test_candidate_can_save_institution_course_answer_without_subject(): void
+    {
+        $organization = Organization::factory()->create();
+        $institution = Institution::query()->create([
+            'organization_id' => $organization->id,
+            'name' => 'AlignEx University',
+            'code' => 'AXU',
+            'status' => 'active',
+        ]);
+        $faculty = Faculty::query()->create([
+            'institution_id' => $institution->id,
+            'name' => 'Science',
+            'code' => 'SCI',
+            'status' => 'active',
+        ]);
+        $department = Department::query()->create([
+            'institution_id' => $institution->id,
+            'faculty_id' => $faculty->id,
+            'name' => 'Computer Science',
+            'code' => 'CSC',
+            'status' => 'active',
+        ]);
+        $programme = Programme::query()->create([
+            'institution_id' => $institution->id,
+            'faculty_id' => $faculty->id,
+            'department_id' => $department->id,
+            'name' => 'BSc Computer Science',
+            'code' => 'BSC-CS',
+            'duration' => 48,
+            'status' => 'active',
+        ]);
+        $course = Course::query()->create([
+            'institution_id' => $institution->id,
+            'faculty_id' => $faculty->id,
+            'department_id' => $department->id,
+            'programme_id' => $programme->id,
+            'name' => 'Data Structures',
+            'code' => 'CSC201',
+            'status' => 'active',
+        ]);
+        $bank = QuestionBank::query()->create([
+            'owner_type' => Exam::OWNER_INSTITUTION,
+            'owner_id' => $institution->id,
+            'organization_id' => $organization->id,
+            'institution_id' => $institution->id,
+            'course_id' => $course->id,
+            'subject_id' => null,
+            'name' => 'Data Structures Main Bank',
+            'code' => 'DS-MAIN',
+            'status' => QuestionBank::STATUS_ACTIVE,
+        ]);
+        $exam = Exam::factory()->create([
+            'organization_id' => $organization->id,
+            'institution_id' => $institution->id,
+            'faculty_id' => $faculty->id,
+            'department_id' => $department->id,
+            'programme_id' => $programme->id,
+            'course_id' => $course->id,
+            'exam_category' => Exam::CATEGORY_ASSESSMENT,
+            'status' => Exam::STATUS_ACTIVE,
+            'starts_at' => now()->subMinute(),
+            'ends_at' => now()->addHour(),
+            'duration_minutes' => 60,
+            'total_marks' => 1,
+        ]);
+        ExamSubject::query()->create([
+            'exam_id' => $exam->id,
+            'subject_id' => null,
+            'question_bank_id' => $bank->id,
+            'question_count' => 1,
+            'marks_per_question' => 1,
+            'total_marks' => 1,
+        ]);
+        $candidate = Candidate::factory()->create([
+            'organization_id' => $organization->id,
+            'institution_id' => $institution->id,
+            'faculty_id' => $faculty->id,
+            'department_id' => $department->id,
+            'candidate_number' => 'CSC201-001',
+        ]);
+        $exam->candidates()->attach($candidate->id, ['status' => 'assigned']);
+        $attempt = CandidateExamAttempt::factory()->create([
+            'candidate_id' => $candidate->id,
+            'exam_id' => $exam->id,
+            'exam_session_id' => null,
+            'center_id' => null,
+            'access_code_hash' => bcrypt('CSC201-001'),
+            'total_questions' => 1,
+            'total_marks' => 1,
+        ]);
+        $question = Question::query()->create([
+            'question_bank_id' => $bank->id,
+            'subject_id' => null,
+            'topic_id' => null,
+            'question_type' => Question::TYPE_SINGLE_CHOICE,
+            'stem' => 'Which structure uses FIFO ordering?',
+            'difficulty' => 'medium',
+            'marks' => 1,
+            'status' => Question::STATUS_APPROVED,
+        ]);
+        $option = QuestionOption::query()->create([
+            'question_id' => $question->id,
+            'label' => 'A',
+            'option_text' => 'Queue',
+            'display_order' => 1,
+            'is_correct' => true,
+        ]);
+        CandidatePaper::query()->create([
+            'attempt_id' => $attempt->id,
+            'question_id' => $question->id,
+            'question_order' => 1,
+            'option_order' => [$option->id],
+        ]);
+
+        $login = $this->postJson('/api/candidate/login', [
+            'exam_code' => $exam->code,
+            'registration_number' => $candidate->candidate_number,
+            'device_fingerprint' => 'device-one',
+        ])->assertOk();
+
+        $this->postJson('/api/candidate/answer', [
+            'question_id' => $question->id,
+            'selected_option_ids' => [$option->id],
+            'device_fingerprint' => 'device-one',
+        ], ['Authorization' => 'Bearer '.$login->json('exam_token')])
+            ->assertOk()
+            ->assertJsonPath('saved', true)
+            ->assertJsonPath('answered_questions', 1);
+
+        $this->assertDatabaseHas('candidate_answers', [
+            'candidate_exam_attempt_id' => $attempt->id,
+            'question_id' => $question->id,
+            'subject_id' => null,
+        ]);
     }
 
     private function examPayload(int $institutionId, int $courseId, string $bankId, int|string $candidateGroupId): array

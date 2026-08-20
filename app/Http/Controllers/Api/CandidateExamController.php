@@ -21,6 +21,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -197,37 +198,52 @@ class CandidateExamController extends Controller
             ->values()
             ->all();
 
-        $answer = CandidateAnswer::query()->updateOrCreate(
-            [
-                'candidate_exam_attempt_id' => $attempt->id,
+        [$answer, $attempt] = DB::transaction(function () use ($request, $attempt, $paper, $selectedOptionIds, $data): array {
+            $answer = CandidateAnswer::query()->updateOrCreate(
+                [
+                    'candidate_exam_attempt_id' => $attempt->id,
+                    'question_id' => $paper->question_id,
+                ],
+                [
+                    'subject_id' => $paper->question?->subject_id,
+                    'answer_payload' => ['selected_option_ids' => $selectedOptionIds],
+                    'selected_option_ids' => $selectedOptionIds,
+                    'is_flagged' => (bool) ($data['is_flagged'] ?? false),
+                    'time_spent_seconds' => (int) ($data['time_spent_seconds'] ?? 0),
+                    'ip_address' => $request->ip(),
+                    'device_fingerprint' => $data['device_fingerprint'] ?? $attempt->device_fingerprint,
+                    'saved_at' => now(),
+                ]
+            );
+
+            $attempt = $this->refreshAttemptProgress($attempt);
+            $this->session->log($request, 'answer_saved', $attempt, ['question_id' => $paper->question_id]);
+
+            return [$answer, $attempt];
+        });
+
+        $answeredQuestions = $this->answeredQuestions($attempt);
+
+        try {
+            app(ExamMonitorService::class)->broadcast($attempt->exam, 'answer_saved', $attempt, [
                 'question_id' => $paper->question_id,
-            ],
-            [
-                'subject_id' => $paper->question?->subject_id,
-                'answer_payload' => ['selected_option_ids' => $selectedOptionIds],
-                'selected_option_ids' => $selectedOptionIds,
-                'is_flagged' => (bool) ($data['is_flagged'] ?? false),
-                'time_spent_seconds' => (int) ($data['time_spent_seconds'] ?? 0),
-                'ip_address' => $request->ip(),
-                'device_fingerprint' => $data['device_fingerprint'] ?? $attempt->device_fingerprint,
-                'saved_at' => now(),
-            ]
-        );
-
-        $attempt = $this->refreshAttemptProgress($attempt);
-
-        $this->session->log($request, 'answer_saved', $attempt, ['question_id' => $paper->question_id]);
-        app(ExamMonitorService::class)->broadcast($attempt->exam, 'answer_saved', $attempt, [
-            'question_id' => $paper->question_id,
-            'answered_questions' => $this->answeredQuestions($attempt),
-            'percentage' => $attempt->percentage,
-        ]);
+                'answered_questions' => $answeredQuestions,
+                'percentage' => $attempt->percentage,
+            ]);
+        } catch (\Throwable $exception) {
+            Log::warning('Candidate answer saved but monitor broadcast failed.', [
+                'attempt_id' => $attempt->id,
+                'exam_id' => $attempt->exam_id,
+                'question_id' => $paper->question_id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
 
         return response()->json([
             'saved' => true,
             'question_id' => $answer->question_id,
             'saved_at' => $answer->saved_at?->toISOString(),
-            'answered_questions' => $this->answeredQuestions($attempt),
+            'answered_questions' => $answeredQuestions,
             'percentage' => $attempt->percentage,
             'remaining_time' => $this->session->remainingSeconds($attempt),
         ]);

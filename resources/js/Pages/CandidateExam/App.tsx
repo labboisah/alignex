@@ -262,9 +262,9 @@ function ExamInstructionsPage() {
                     </div>
                     {!canStart && (
                         <div className="mt-6 rounded-md border-2 border-blue-300 bg-blue-50 p-5 text-info">
-                            <div className="flex flex-wrap items-center gap-3" aria-label={`Exam starts in ${formatTime(startsIn)}`}>
+                            <div className="flex flex-wrap items-center gap-3" aria-label={`Exam starts in ${wholeSeconds(startsIn)} seconds`}>
                                 <Clock className="h-8 w-8" />
-                                <div className="font-mono text-4xl font-black leading-none text-blue-900 md:text-5xl">{formatTime(startsIn)}</div>
+                                <div className="font-mono text-4xl font-black leading-none text-blue-900 md:text-5xl">{wholeSeconds(startsIn)} seconds</div>
                             </div>
                             <p className="mt-3 text-sm font-semibold leading-6 text-slate-700">
                                 You are logged in, but the exam cannot be started until the scheduled start time.
@@ -352,6 +352,7 @@ function ExamScreenPage() {
     const [autoSubmitting, setAutoSubmitting] = useState(false);
     const [confirmSubmit, setConfirmSubmit] = useState(false);
     const [warning, setWarning] = useState('');
+    const [saveStatus, setSaveStatus] = useState('');
     const submittedRef = useRef(false);
     const questionStartedAt = useRef(Date.now());
     const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -503,8 +504,10 @@ function ExamScreenPage() {
                 return clone;
             });
             setAnswers((next) => ({ ...next, [answerForSave.question_id]: answerForSave }));
-        } catch {
+            setSaveStatus('');
+        } catch (exception) {
             setFailed((next) => ({ ...next, [answerForSave.question_id]: answerForSave }));
+            setSaveStatus(exception instanceof Error ? exception.message : 'Answer could not be saved.');
         } finally {
             setPending((next) => {
                 const clone = new Set(next);
@@ -861,7 +864,7 @@ function ExamScreenPage() {
                         {Object.keys(failed).length > 0 && (
                             <div className="mt-5 rounded-md border border-amber-200 bg-amber-50 p-3">
                                 <div className="text-sm font-bold text-warning">Connection issue</div>
-                                <p className="mt-1 text-xs text-slate-600">Some answers still need to be saved. Keep your internet connected and try again.</p>
+                                <p className="mt-1 text-xs text-slate-600">{saveStatus || 'Some answers still need to be saved. Keep your internet connected and try again.'}</p>
                                 <Button type="button" variant="secondary" className="mt-3 w-full" disabled={!online || pending.size > 0} onClick={() => Object.values(failed).forEach((answer) => saveAnswer(answer))}>
                                     Save Again
                                 </Button>
@@ -1088,4 +1091,8 @@ function formatTime(seconds: number) {
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
     return [hours, minutes, secs].map((value) => String(value).padStart(2, '0')).join(':');
+}
+
+function wholeSeconds(seconds: number) {
+    return Math.max(0, Math.ceil(seconds));
 }
