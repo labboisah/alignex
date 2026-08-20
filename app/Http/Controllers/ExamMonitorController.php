@@ -32,6 +32,7 @@ class ExamMonitorController extends Controller
                 'status' => $exam->status,
                 'starts_at' => $exam->starts_at?->toISOString(),
                 'ends_at' => $exam->ends_at?->toISOString(),
+                'timezone' => $exam->timezone ?: config('app.timezone'),
                 'duration_minutes' => $exam->duration_minutes,
                 'server_time' => now()->toISOString(),
             ],

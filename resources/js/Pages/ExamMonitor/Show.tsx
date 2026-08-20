@@ -78,6 +78,7 @@ type MonitorExam = {
     status?: string;
     starts_at?: string | null;
     ends_at?: string | null;
+    timezone?: string | null;
     duration_minutes?: number;
     server_time?: string | null;
 };
@@ -221,6 +222,9 @@ export default function ExamMonitorShow({ exam, summary: initialSummary, rows: i
                         <div>
                             <div className="text-sm font-semibold text-slate-500">{clock.label}</div>
                             <div className="mt-1 font-mono text-3xl font-black tracking-normal text-slateDark md:text-4xl">{clock.value}</div>
+                            <div className="mt-2 text-sm font-semibold text-slate-500">
+                                {formatExamWindow(exam.starts_at, exam.ends_at, exam.timezone)}
+                            </div>
                         </div>
                     </div>
                     <StatusBadge label={clock.status} tone={clock.tone} />
@@ -394,6 +398,25 @@ function formatDuration(milliseconds: number): string {
     return [hours, minutes, seconds]
         .map((value) => String(value).padStart(2, '0'))
         .join(':');
+}
+
+function formatExamWindow(startsAt?: string | null, endsAt?: string | null, timezone?: string | null): string {
+    const zone = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    return `${formatClockTime(startsAt, zone)} - ${formatClockTime(endsAt, zone)} ${zone}`;
+}
+
+function formatClockTime(value: string | null | undefined, timezone: string): string {
+    if (!value) {
+        return 'N/A';
+    }
+
+    return new Intl.DateTimeFormat(undefined, {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: timezone,
+    }).format(new Date(value));
 }
 
 function upsertRow(rows: CandidateRow[], row: CandidateRow) {
