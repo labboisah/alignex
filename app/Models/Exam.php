@@ -270,4 +270,14 @@ class Exam extends Model
     {
         return $this->hasMany(ExamCenterAssignment::class);
     }
+
+    public function supervisors(): HasMany
+    {
+        return $this->hasMany(ExamSupervisor::class);
+    }
+
+    public function activeSupervisors(): HasMany
+    {
+        return $this->hasMany(ExamSupervisor::class)->whereNull('revoked_at');
+    }
 }

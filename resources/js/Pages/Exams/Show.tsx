@@ -1,14 +1,18 @@
-import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Award, BarChart3, BriefcaseBusiness, Monitor, Pencil, RefreshCw, Shuffle, Trash2, UserPlus, XCircle } from 'lucide-react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { Award, BarChart3, BriefcaseBusiness, FileText, Monitor, Pencil, RefreshCw, Shuffle, Trash2, UserCheck, UserPlus, XCircle } from 'lucide-react';
 import { PageHeader, PortalAppShell, ProtectedAction, StatusBadge } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
 import { Exam } from './types';
 
-export default function ShowExam({ exam, can }: { exam: { data: Exam }; can: { update: boolean; cancel: boolean; delete?: boolean } }) {
+type Supervisor = { id: number | string; user_id: number | string; name?: string | null; email?: string | null; role: string; assigned_at?: string | null };
+type SupervisorOption = { id: number | string; name: string; email: string; role: string };
+
+export default function ShowExam({ exam, can, supervisors = [], supervisorOptions = [] }: { exam: { data: Exam }; can: { update: boolean; cancel: boolean; delete?: boolean; manageSupervisors?: boolean }; supervisors?: Supervisor[]; supervisorOptions?: SupervisorOption[] }) {
     const auth = usePage().props.auth as { user?: { role?: string } };
     const isAssessmentRole = auth.user?.role === 'teacher' || auth.user?.role === 'facilitator';
     const noun = isAssessmentRole ? 'Assessment' : 'Exam';
     const record = exam.data;
+    const { data, setData, post, processing, reset } = useForm({ user_id: '', role: 'supervisor' });
     const isSecondary = record.owner_context === 'secondary_school' || record.secondary_school_id;
     const isProfessional = record.owner_context === 'professional_school' || record.professional_school_id;
     const paperLabel = isProfessional ? 'Module' : 'Subject';
@@ -28,6 +32,7 @@ export default function ShowExam({ exam, can }: { exam: { data: Exam }; can: { u
                             <ProtectedAction allowed={can.update}><Button type="button" variant="secondary" onClick={() => window.confirm(`Refresh ${isSecondary ? 'students' : 'candidates'} from the selected ${refreshSourceLabel(record)}?`) && router.post(`/exams/${record.id}/participants/refresh`, {}, { preserveScroll: true })}><RefreshCw className="h-4 w-4" />Refresh {isSecondary ? 'Students' : 'Candidates'}</Button></ProtectedAction>
                             <Button asChild type="button" variant="secondary"><Link href={`/exams/${record.id}/papers`}><Shuffle className="h-4 w-4" />Generate Papers</Link></Button>
                             <Button asChild type="button" variant="secondary"><Link href={`/exams/${record.id}/monitor`}><Monitor className="h-4 w-4" />Monitor</Link></Button>
+                            <Button asChild type="button" variant="secondary"><Link href={`/exams/${record.id}/monitor/incident-report`}><FileText className="h-4 w-4" />Incident Report</Link></Button>
                             <Button asChild type="button" variant="secondary"><Link href={`/results/exams/${record.id}`}><BarChart3 className="h-4 w-4" />Results</Link></Button>
                             {!isAssessmentRole && (record.exam_type === 'professional' || record.exam_type === 'secondary') && <Button asChild type="button" variant="secondary"><Link href={`/exams/${record.id}/certification`}><Award className="h-4 w-4" />Certification</Link></Button>}
                             {!isAssessmentRole && record.exam_type === 'recruitment' && <Button asChild type="button" variant="secondary"><Link href={`/exams/${record.id}/recruitment`}><BriefcaseBusiness className="h-4 w-4" />Recruitment</Link></Button>}
@@ -67,6 +72,59 @@ export default function ShowExam({ exam, can }: { exam: { data: Exam }; can: { u
                         <Metric label="Submitted" value={String(record.results_summary?.submitted ?? 0)} />
                         <Metric label="Passed" value={String(record.results_summary?.passed ?? 0)} />
                         <Metric label="Failed" value={String(record.results_summary?.failed ?? 0)} />
+                    </div>
+                </div>
+                <div className="mt-6 rounded-md border border-border bg-white p-5 shadow-sm">
+                    <div className="flex items-center gap-2">
+                        <UserCheck className="h-5 w-5 text-primary" />
+                        <h2 className="font-semibold text-slateDark">Shared Supervision</h2>
+                    </div>
+                    <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_1.3fr]">
+                        <div>
+                            <p className="text-sm text-slate-600">Give another lecturer, facilitator, teacher, or supervisor access to monitor this {noun.toLowerCase()} and generate incident reports.</p>
+                            {can.manageSupervisors && (
+                                <form
+                                    className="mt-4 grid gap-3"
+                                    onSubmit={(event) => {
+                                        event.preventDefault();
+                                        if (!data.user_id) return;
+                                        post(`/exams/${record.id}/supervisors`, { preserveScroll: true, onSuccess: () => reset('user_id') });
+                                    }}
+                                >
+                                    <select className="rounded-md border-border text-sm shadow-sm focus:border-primary focus:ring-primary" value={data.user_id} onChange={(event) => setData('user_id', event.target.value)}>
+                                        <option value="">Select supervisor</option>
+                                        {supervisorOptions.map((option) => (
+                                            <option key={option.id} value={option.id}>{option.name} ({option.email})</option>
+                                        ))}
+                                    </select>
+                                    <select className="rounded-md border-border text-sm shadow-sm focus:border-primary focus:ring-primary" value={data.role} onChange={(event) => setData('role', event.target.value)}>
+                                        <option value="supervisor">Supervisor</option>
+                                        <option value="co_manager">Co-manager</option>
+                                    </select>
+                                    <Button type="submit" disabled={processing || !data.user_id}>Add Supervisor</Button>
+                                </form>
+                            )}
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead className="text-xs uppercase text-slate-500"><tr><th className="py-2">Name</th><th>Email</th><th>Role</th><th>Action</th></tr></thead>
+                                <tbody className="divide-y divide-border">
+                                    {supervisors.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-slate-500">No shared supervisors yet.</td></tr>}
+                                    {supervisors.map((supervisor) => (
+                                        <tr key={supervisor.id}>
+                                            <td className="py-3 font-semibold">{supervisor.name}</td>
+                                            <td>{supervisor.email}</td>
+                                            <td>{supervisor.role.replaceAll('_', ' ')}</td>
+                                            <td>
+                                                <ProtectedAction allowed={can.manageSupervisors ?? false}>
+                                                    <Button type="button" size="sm" variant="danger" onClick={() => window.confirm('Remove this supervisor?') && router.delete(`/exams/${record.id}/supervisors/${supervisor.id}`, { preserveScroll: true })}>Remove</Button>
+                                                </ProtectedAction>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
                 <div className="mt-6 rounded-md border border-border bg-white p-5 shadow-sm">

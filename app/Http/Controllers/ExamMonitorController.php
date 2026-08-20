@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Exam;
 use App\Models\CandidateExamAttempt;
+use App\Models\ExamSupervisor;
 use App\Models\User;
 use App\Services\ExamMonitorService;
 use Illuminate\Database\Eloquent\Builder;
@@ -28,7 +29,11 @@ class ExamMonitorController extends Controller
                 'id' => $exam->id,
                 'title' => $exam->title,
                 'exam_code' => $exam->code,
+                'status' => $exam->status,
+                'starts_at' => $exam->starts_at?->toISOString(),
+                'ends_at' => $exam->ends_at?->toISOString(),
                 'duration_minutes' => $exam->duration_minutes,
+                'server_time' => now()->toISOString(),
             ],
             'summary' => $this->monitor->summary($exam),
             'rows' => $this->monitor->rows($exam),
@@ -44,6 +49,52 @@ class ExamMonitorController extends Controller
             ],
         ]);
     }
+
+    public function assignedExams(Request $request): Response
+    {
+        $exams = $request->user()->supervisedExams()
+            ->with('course:id,name,code')
+            ->whereNull('exam_supervisors.revoked_at')
+            ->whereIn('exams.status', [Exam::STATUS_ACTIVE, Exam::STATUS_SCHEDULED])
+            ->orderByRaw('CASE WHEN exams.status = ? THEN 0 ELSE 1 END', [Exam::STATUS_ACTIVE])
+            ->orderBy('exams.starts_at')
+            ->get(['exams.id', 'exams.title', 'exams.code', 'exams.course_id', 'exams.exam_category', 'exams.delivery_mode', 'exams.duration_minutes', 'exams.starts_at', 'exams.ends_at', 'exams.status'])
+            ->map(fn (Exam $exam) => [
+                'id' => $exam->id,
+                'title' => $exam->title,
+                'exam_code' => $exam->code,
+                'course_label' => $this->courseLabel($exam),
+                'exam_category' => $exam->exam_category,
+                'delivery_mode' => $exam->delivery_mode,
+                'duration_minutes' => $exam->duration_minutes,
+                'starts_at' => $exam->starts_at?->toISOString(),
+                'ends_at' => $exam->ends_at?->toISOString(),
+                'status' => $exam->status,
+                'status_label' => str($exam->status)->replace('_', ' ')->title()->toString(),
+                'supervision_role' => $exam->pivot?->role ?? 'supervisor',
+                'can_manage' => ($exam->pivot?->role ?? null) === 'co_manager' && $request->user()->hasPermission('manageExams'),
+            ])
+            ->values()
+            ->all();
+
+        return Inertia::render('ExamMonitor/AssignedExams', [
+            'exams' => $exams,
+        ]);
+    }
+
+    private function courseLabel(Exam $exam): ?string
+    {
+        if (! $exam->course) {
+            return null;
+        }
+
+        $code = str((string) $exam->course->code)->squish()->upper()->toString();
+
+        return $code !== ''
+            ? $code
+            : (str($exam->course->name)->squish()->toString() ?: null);
+    }
+
 
     public function summary(Request $request, Exam $exam): JsonResponse
     {
@@ -71,6 +122,32 @@ class ExamMonitorController extends Controller
         $this->authorizeExam($request->user(), $exam);
 
         return response()->json(['events' => $this->monitor->events($exam)]);
+    }
+
+    public function incidentReport(Request $request, Exam $exam): Response
+    {
+        $this->authorizeExam($request->user(), $exam);
+
+        return Inertia::render('ExamMonitor/IncidentReport', [
+            'exam' => [
+                'id' => $exam->id,
+                'title' => $exam->title,
+                'exam_code' => $exam->code,
+                'status' => $exam->status,
+                'starts_at' => $exam->starts_at?->toISOString(),
+                'ends_at' => $exam->ends_at?->toISOString(),
+                'duration_minutes' => $exam->duration_minutes,
+            ],
+            'supervisor' => [
+                'name' => $request->user()->name,
+                'email' => $request->user()->email,
+            ],
+            'summary' => $this->monitor->summary($exam),
+            'rows' => $this->monitor->rows($exam),
+            'events' => $this->monitor->events($exam, 500),
+            'feed' => $this->monitor->feed($exam, 500),
+            'generatedAt' => now()->toISOString(),
+        ]);
     }
 
     public function reset(Request $request, Exam $exam, CandidateExamAttempt $attempt): JsonResponse
@@ -138,8 +215,20 @@ class ExamMonitorController extends Controller
 
     private function authorizeExam(User $user, Exam $exam): void
     {
-        abort_unless($user->hasPermission('viewSupervisorMonitor') || $user->hasPermission('manageExams'), 403);
-        abort_unless($this->examScope($user)->whereKey($exam->id)->exists(), 403);
+        $hasMonitorPermission = $user->hasPermission('viewSupervisorMonitor') || $user->hasPermission('manageExams');
+        $isSharedSupervisor = $this->isSharedSupervisor($user, $exam);
+
+        abort_unless($hasMonitorPermission || $isSharedSupervisor, 403);
+        abort_unless($isSharedSupervisor || $this->examScope($user)->whereKey($exam->id)->exists(), 403);
+    }
+
+    private function isSharedSupervisor(User $user, Exam $exam): bool
+    {
+        return ExamSupervisor::query()
+            ->where('exam_id', $exam->id)
+            ->where('user_id', $user->id)
+            ->whereNull('revoked_at')
+            ->exists();
     }
 
     private function examScope(User $user): Builder

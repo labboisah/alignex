@@ -1,5 +1,5 @@
-import { Head } from '@inertiajs/react';
-import { Activity, AlertTriangle, CheckCircle2, LogIn, RefreshCw, RotateCcw, StopCircle, Users, WifiOff } from 'lucide-react';
+import { Head, Link } from '@inertiajs/react';
+import { Activity, AlertTriangle, CheckCircle2, Clock, FileText, LogIn, RefreshCw, RotateCcw, StopCircle, Users, WifiOff } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { PageHeader, PortalAppShell, StatusBadge } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
@@ -71,11 +71,32 @@ declare global {
     }
 }
 
-export default function ExamMonitorShow({ exam, summary: initialSummary, rows: initialRows, feed: initialFeed, events: initialEvents, broadcast }: { exam: { id: string; title: string; exam_code: string }; summary: Summary; rows: CandidateRow[]; feed: FeedItem[]; events: ProctoringEventItem[]; broadcast: { channel: string; event: string } }) {
+type MonitorExam = {
+    id: string;
+    title: string;
+    exam_code: string;
+    status?: string;
+    starts_at?: string | null;
+    ends_at?: string | null;
+    duration_minutes?: number;
+    server_time?: string | null;
+};
+
+export default function ExamMonitorShow({ exam, summary: initialSummary, rows: initialRows, feed: initialFeed, events: initialEvents, broadcast }: { exam: MonitorExam; summary: Summary; rows: CandidateRow[]; feed: FeedItem[]; events: ProctoringEventItem[]; broadcast: { channel: string; event: string } }) {
+    const serverTimeOffset = useMemo(() => {
+        if (!exam.server_time) {
+            return 0;
+        }
+
+        const serverTime = new Date(exam.server_time).getTime();
+
+        return Number.isNaN(serverTime) ? 0 : serverTime - Date.now();
+    }, [exam.server_time]);
     const [summary, setSummary] = useState(initialSummary);
     const [rows, setRows] = useState(initialRows);
     const [feed, setFeed] = useState(initialFeed);
     const [events, setEvents] = useState(initialEvents);
+    const [now, setNow] = useState(() => new Date(Date.now() + serverTimeOffset));
     const [liveStatus, setLiveStatus] = useState(window.Echo ? 'Live' : 'Polling');
     const [loading, setLoading] = useState(false);
     const [flaggedOnly, setFlaggedOnly] = useState(false);
@@ -105,6 +126,12 @@ export default function ExamMonitorShow({ exam, summary: initialSummary, rows: i
 
         return () => window.clearInterval(timer);
     }, [exam.id]);
+
+    useEffect(() => {
+        const timer = window.setInterval(() => setNow(new Date(Date.now() + serverTimeOffset)), 1000);
+
+        return () => window.clearInterval(timer);
+    }, [serverTimeOffset]);
 
     useEffect(() => {
         if (!window.Echo) {
@@ -138,6 +165,7 @@ export default function ExamMonitorShow({ exam, summary: initialSummary, rows: i
 
     const sortedRows = useMemo(() => [...rows].sort((a, b) => a.registration_number.localeCompare(b.registration_number)), [rows]);
     const visibleRows = useMemo(() => flaggedOnly ? sortedRows.filter((row) => row.suspicious_event_count > 0) : sortedRows, [flaggedOnly, sortedRows]);
+    const clock = useMemo(() => examClock(exam, now), [exam, now]);
 
     const resetCandidate = async (row: CandidateRow) => {
         const reason = window.prompt(`Reset ${row.candidate_name}'s attempt? Saved answers will remain.`, 'Candidate device issue during exam.');
@@ -183,8 +211,20 @@ export default function ExamMonitorShow({ exam, summary: initialSummary, rows: i
                     eyebrow="Supervisor Dashboard"
                     title={exam.title}
                     description={`${exam.exam_code} | ${liveStatus}`}
-                    actions={<div className="flex flex-wrap gap-2"><Button type="button" variant="danger" onClick={endExam} disabled={ending}><StopCircle className="h-4 w-4" />End Exam</Button><Button type="button" variant="secondary" onClick={refresh} disabled={loading}><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh</Button></div>}
+                    actions={<div className="flex flex-wrap gap-2"><Button asChild type="button" variant="secondary"><Link href={`/exams/${exam.id}/monitor/incident-report`}><FileText className="h-4 w-4" />Incident Report</Link></Button><Button type="button" variant="danger" onClick={endExam} disabled={ending}><StopCircle className="h-4 w-4" />End Exam</Button><Button type="button" variant="secondary" onClick={refresh} disabled={loading}><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />Refresh</Button></div>}
                 />
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-white p-5 shadow-sm">
+                    <div className="flex items-center gap-3">
+                        <span className="flex h-11 w-11 items-center justify-center rounded-md bg-primary/10 text-primary">
+                            <Clock className="h-6 w-6" />
+                        </span>
+                        <div>
+                            <div className="text-sm font-semibold text-slate-500">{clock.label}</div>
+                            <div className="mt-1 font-mono text-3xl font-black tracking-normal text-slateDark md:text-4xl">{clock.value}</div>
+                        </div>
+                    </div>
+                    <StatusBadge label={clock.status} tone={clock.tone} />
+                </div>
                 <div className="grid gap-4 md:grid-cols-4 xl:grid-cols-7">
                     <Metric label="Total Candidates" value={summary.total_candidates} icon={Users} />
                     <Metric label="Logged In" value={summary.logged_in} icon={LogIn} />
@@ -310,6 +350,50 @@ function statusTone(status: string): 'success' | 'danger' | 'warning' | 'neutral
     if (['disqualified', 'suspicious'].includes(status)) return 'danger';
     if (['disconnected', 'auto_submit'].includes(status)) return 'warning';
     return 'neutral';
+}
+
+function examClock(exam: MonitorExam, now: Date): { label: string; value: string; status: string; tone: 'success' | 'danger' | 'warning' | 'neutral' | 'info' } {
+    const startsAt = exam.starts_at ? new Date(exam.starts_at) : null;
+    const endsAt = exam.ends_at ? new Date(exam.ends_at) : null;
+    const current = now.getTime();
+    const hasValidStart = startsAt && !Number.isNaN(startsAt.getTime());
+    const hasValidEnd = endsAt && !Number.isNaN(endsAt.getTime());
+
+    if (exam.status === 'scheduled' || (hasValidStart && startsAt.getTime() > current)) {
+        return {
+            label: 'Starts In',
+            value: hasValidStart ? formatDuration(startsAt.getTime() - current) : '00:00:00',
+            status: 'Not Due',
+            tone: 'info',
+        };
+    }
+
+    if (hasValidEnd && endsAt.getTime() > current) {
+        return {
+            label: 'Time Remaining',
+            value: formatDuration(endsAt.getTime() - current),
+            status: 'In Progress',
+            tone: 'success',
+        };
+    }
+
+    return {
+        label: 'Time Remaining',
+        value: '00:00:00',
+        status: 'Ended',
+        tone: 'neutral',
+    };
+}
+
+function formatDuration(milliseconds: number): string {
+    const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    return [hours, minutes, seconds]
+        .map((value) => String(value).padStart(2, '0'))
+        .join(':');
 }
 
 function upsertRow(rows: CandidateRow[], row: CandidateRow) {

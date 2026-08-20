@@ -162,6 +162,13 @@ class User extends Authenticatable
             ->withTimestamps();
     }
 
+    public function supervisedExams(): BelongsToMany
+    {
+        return $this->belongsToMany(Exam::class, 'exam_supervisors', 'user_id', 'exam_id')
+            ->withPivot('id', 'role', 'permissions', 'assigned_at', 'revoked_at')
+            ->withTimestamps();
+    }
+
     public function reviewedQuestions(): HasMany
     {
         return $this->hasMany(Question::class, 'reviewed_by');

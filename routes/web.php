@@ -366,6 +366,8 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
             Route::patch('/exams/{exam}', [ExamController::class, 'update'])->name('exams.update');
             Route::patch('/exams/{exam}/cancel', [ExamController::class, 'cancel'])->name('exams.cancel');
             Route::delete('/exams/{exam}', [ExamController::class, 'destroy'])->name('exams.destroy');
+            Route::post('/exams/{exam}/supervisors', [ExamController::class, 'storeSupervisor'])->name('exams.supervisors.store');
+            Route::delete('/exams/{exam}/supervisors/{supervisor}', [ExamController::class, 'destroySupervisor'])->name('exams.supervisors.destroy');
             Route::post('/exams/{exam}/participants/refresh', [ExamController::class, 'refreshParticipants'])->name('exams.participants.refresh');
             Route::get('/exams/{exam}/papers', [ExamPaperController::class, 'show'])->name('exams.papers.show');
             Route::post('/exams/{exam}/papers/generate', [ExamPaperController::class, 'generate'])->name('exams.papers.generate');
@@ -439,8 +441,10 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
         Route::get('/exams/{exam}/monitor/rows', [ExamMonitorController::class, 'rows'])->name('exams.monitor.rows');
         Route::get('/exams/{exam}/monitor/feed', [ExamMonitorController::class, 'feed'])->name('exams.monitor.feed');
         Route::get('/exams/{exam}/monitor/events', [ExamMonitorController::class, 'events'])->name('exams.monitor.events');
+        Route::get('/exams/{exam}/monitor/incident-report', [ExamMonitorController::class, 'incidentReport'])->name('exams.monitor.incident-report');
         Route::post('/exams/{exam}/monitor/end', [ExamMonitorController::class, 'end'])->name('exams.monitor.end');
         Route::post('/exams/{exam}/monitor/attempts/{attempt}/reset', [ExamMonitorController::class, 'reset'])->name('exams.monitor.reset');
+        Route::get('/assigned-exams', [ExamMonitorController::class, 'assignedExams'])->name('assigned-exams.index');
 
         Route::middleware('permission:manageExams')->group(function (): void {
             Route::get('/candidates/template', [CandidateController::class, 'template'])->name('candidates.template');
@@ -479,10 +483,6 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
     });
 
     Route::middleware('role:super_admin,supervisor,center_admin')->group(function (): void {
-        Route::get('/assigned-exams', fn () => Inertia::render('Portal/Placeholder', [
-            'title' => 'Assigned Exams',
-        ]))->middleware('permission:viewSupervisorMonitor')->name('assigned-exams.index');
-
         Route::get('/supervisor-monitor', fn () => Inertia::render('Portal/Placeholder', [
             'title' => 'Supervisor Monitor',
         ]))->middleware('permission:viewSupervisorMonitor')->name('supervisor-monitor.index');

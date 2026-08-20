@@ -3,12 +3,14 @@
 namespace App\Http\Middleware;
 
 use App\Models\Department;
+use App\Models\Exam;
 use App\Models\User;
 use App\Services\CurrentContextService;
 use App\Services\ExamSetupGuideService;
 use App\Services\PlanFeatureService;
 use App\Support\AccessControl;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -122,6 +124,7 @@ class HandleInertiaRequests extends Middleware
         $cbtCenterBase = $contextType === 'cbt_center' && $contextId
             ? '/cbt-centers/'.$contextId
             : '/cbt-centers';
+        $sharedSupervisionNavigation = $this->sharedSupervisionNavigation($user);
 
         if ($user->isSuperAdmin()) {
             $navigation = collect([
@@ -147,6 +150,12 @@ class HandleInertiaRequests extends Middleware
                 ['label' => 'Offline Server', 'href' => '/offline-server/download', 'feature' => 'offline_activation'],
                 ['label' => 'Client App', 'href' => '/candidate-client/download'],
                 ['label' => 'Activation Codes', 'href' => '/offline-activation-codes', 'permission' => 'downloadOfflineServer', 'feature' => 'offline_activation'],
+                ['label' => 'Documentation', 'href' => '/documentation'],
+            ]);
+        } elseif ($sharedSupervisionNavigation !== []) {
+            $navigation = collect([
+                ['label' => 'Dashboard', 'href' => '/dashboard'],
+                ['label' => 'Supervision', 'children' => $sharedSupervisionNavigation],
                 ['label' => 'Documentation', 'href' => '/documentation'],
             ]);
         } elseif ($user->isInstitutionAdmin() && ! $contextType) {
@@ -441,6 +450,30 @@ class HandleInertiaRequests extends Middleware
         ];
     }
 
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function sharedSupervisionNavigation(User $user): array
+    {
+        if (! Schema::hasTable('exam_supervisors')) {
+            return [];
+        }
+
+        $assignments = $user->supervisedExams()
+            ->with('course:id,name,code')
+            ->whereNull('exam_supervisors.revoked_at')
+            ->whereIn('exams.status', [Exam::STATUS_ACTIVE, Exam::STATUS_SCHEDULED])
+            ->orderByRaw('CASE WHEN exams.status = ? THEN 0 ELSE 1 END', [Exam::STATUS_ACTIVE])
+            ->orderBy('exams.starts_at')
+            ->limit(20)
+            ->get(['exams.id', 'exams.title', 'exams.course_id']);
+
+        return $assignments->map(fn (Exam $exam): array => [
+            'label' => $this->supervisionAssessmentNavigationLabel($exam),
+            'href' => '/exams/'.$exam->id.'/monitor',
+        ])->values()->all();
+    }
+
     private function roleLabelFor(User $user): string
     {
         return $user->isInstitutionLecturer() ? 'Lecturer' : AccessControl::roleLabel($user->role);
@@ -455,6 +488,14 @@ class HandleInertiaRequests extends Middleware
         }
 
         return str($course->name)->squish()->limit(16, '')->toString() ?: 'Course';
+    }
+
+    private function supervisionAssessmentNavigationLabel(Exam $exam): string
+    {
+        $title = str($exam->title)->squish()->limit(32, '')->toString() ?: 'Assessment';
+        $course = $exam->course ? $this->courseNavigationLabel($exam->course) : '';
+
+        return $course !== '' ? "{$title} - {$course}" : $title;
     }
 
     private function departmentNavigationLabel(Department $department): string

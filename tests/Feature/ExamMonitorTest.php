@@ -10,6 +10,7 @@ use App\Models\Course;
 use App\Models\Department;
 use App\Models\Exam;
 use App\Models\ExamAuditLog;
+use App\Models\ExamSupervisor;
 use App\Models\ExamSubject;
 use App\Models\Faculty;
 use App\Models\Institution;
@@ -41,6 +42,10 @@ class ExamMonitorTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('ExamMonitor/Show')
+                ->where('exam.status', $exam->status)
+                ->where('exam.starts_at', $exam->starts_at?->toISOString())
+                ->where('exam.ends_at', $exam->ends_at?->toISOString())
+                ->has('exam.server_time')
                 ->where('summary.total_candidates', 1)
                 ->where('summary.logged_in', 1)
                 ->where('summary.suspicious', 1)
@@ -142,6 +147,93 @@ class ExamMonitorTest extends TestCase
         ]);
 
         $this->actingAs($supervisor)
+            ->get("/exams/{$exam->id}/monitor")
+            ->assertForbidden();
+    }
+
+    public function test_shared_supervisor_can_monitor_and_generate_incident_report(): void
+    {
+        [$exam] = $this->examWithAttempt();
+        $course = Course::query()->create([
+            'name' => 'Data Structures',
+            'code' => 'CSC201',
+            'status' => Course::STATUS_ACTIVE,
+        ]);
+        $exam->update([
+            'title' => 'Mid Semester Assessment',
+            'course_id' => $course->id,
+        ]);
+        $exam->refresh();
+        $owner = User::factory()->create([
+            'role' => User::ROLE_EXAMINER,
+            'organization_id' => $exam->organization_id,
+        ]);
+        $sharedSupervisor = User::factory()->create([
+            'role' => User::ROLE_FACILITATOR,
+            'organization_id' => $exam->organization_id,
+        ]);
+
+        $this->actingAs($owner)
+            ->post("/exams/{$exam->id}/supervisors", [
+                'user_id' => $sharedSupervisor->id,
+                'role' => ExamSupervisor::ROLE_SUPERVISOR,
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('exam_supervisors', [
+            'exam_id' => $exam->id,
+            'user_id' => $sharedSupervisor->id,
+            'revoked_at' => null,
+        ]);
+
+        $this->actingAs($sharedSupervisor)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('auth.navigation', 3)
+                ->where('auth.navigation.1.label', 'Supervision')
+                ->where('auth.navigation.1.children.0.label', 'Mid Semester Assessment - CSC201')
+                ->where('auth.navigation.1.children.0.href', "/exams/{$exam->id}/monitor")
+            );
+
+        $this->actingAs($sharedSupervisor)
+            ->get('/assigned-exams')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('ExamMonitor/AssignedExams')
+                ->where('exams.0.id', $exam->id)
+                ->where('exams.0.exam_code', $exam->code)
+                ->where('exams.0.course_label', 'CSC201')
+                ->where('exams.0.supervision_role', ExamSupervisor::ROLE_SUPERVISOR)
+            );
+
+        $this->actingAs($sharedSupervisor)
+            ->get("/exams/{$exam->id}/monitor")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('ExamMonitor/Show')
+                ->where('summary.total_candidates', 1)
+            );
+
+        $this->actingAs($sharedSupervisor)
+            ->get("/exams/{$exam->id}/monitor/incident-report")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('ExamMonitor/IncidentReport')
+                ->where('summary.suspicious', 1)
+                ->where('events.0.event_type', 'focus_loss')
+            );
+
+        $assignment = ExamSupervisor::query()
+            ->where('exam_id', $exam->id)
+            ->where('user_id', $sharedSupervisor->id)
+            ->firstOrFail();
+
+        $this->actingAs($owner)
+            ->delete("/exams/{$exam->id}/supervisors/{$assignment->id}")
+            ->assertRedirect();
+
+        $this->actingAs($sharedSupervisor)
             ->get("/exams/{$exam->id}/monitor")
             ->assertForbidden();
     }

@@ -1,13 +1,28 @@
 <?php
 
 use App\Models\Exam;
+use App\Models\ExamSupervisor;
 use Illuminate\Support\Facades\Broadcast;
 
 Broadcast::channel('exam-monitor.{exam}', function ($user, string $examId): bool {
     $exam = Exam::query()->find($examId);
 
-    if (! $exam || (! $user?->hasPermission('viewSupervisorMonitor') && ! $user?->hasPermission('manageExams'))) {
+    if (! $exam) {
         return false;
+    }
+
+    $isSharedSupervisor = ExamSupervisor::query()
+        ->where('exam_id', $exam->id)
+        ->where('user_id', $user?->id)
+        ->whereNull('revoked_at')
+        ->exists();
+
+    if (! $isSharedSupervisor && ! $user?->hasPermission('viewSupervisorMonitor') && ! $user?->hasPermission('manageExams')) {
+        return false;
+    }
+
+    if ($isSharedSupervisor) {
+        return true;
     }
 
     if ($user->isSuperAdmin()) {

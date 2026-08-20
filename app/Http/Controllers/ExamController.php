@@ -14,6 +14,7 @@ use App\Models\Center;
 use App\Models\CbtCenter;
 use App\Models\Course;
 use App\Models\Exam;
+use App\Models\ExamSupervisor;
 use App\Models\ExamType;
 use App\Models\Institution;
 use App\Models\Organization;
@@ -78,10 +79,13 @@ class ExamController extends Controller
 
         return Inertia::render('Exams/Show', [
             'exam' => ExamResource::make($exam->load(['organization', 'institution', 'faculty', 'department', 'school', 'center', 'secondarySchool', 'professionalSchool', 'cbtCenter', 'examType', 'questionBank', 'examSubjects.subject', 'examSubjects.questionBank', 'candidates'])->loadCount(['participants', 'attempts', 'examSubjects'])),
+            'supervisors' => $this->supervisorRows($exam),
+            'supervisorOptions' => $this->supervisorOptions($request->user(), $exam),
             'can' => [
                 'update' => $request->user()->can('update', $exam),
                 'cancel' => $request->user()->can('update', $exam) && $exam->status !== Exam::STATUS_CANCELLED,
                 'delete' => $request->user()->can('delete', $exam),
+                'manageSupervisors' => $request->user()->can('update', $exam),
             ],
         ]);
     }
@@ -129,6 +133,59 @@ class ExamController extends Controller
         }
 
         return redirect()->route('exams.index')->with('success', request()->user()?->isTeacher() || request()->user()?->isFacilitator() ? 'Assessment deleted.' : 'Exam deleted.');
+    }
+
+    public function storeSupervisor(Request $request, Exam $exam): RedirectResponse
+    {
+        Gate::authorize('update', $exam);
+
+        $data = $request->validate([
+            'user_id' => ['required', 'integer'],
+            'role' => ['nullable', 'in:supervisor,co_manager'],
+        ]);
+
+        $supervisor = $this->supervisorCandidateScope($request->user(), $exam)->whereKey($data['user_id'])->firstOrFail();
+
+        ExamSupervisor::query()->updateOrCreate(
+            ['exam_id' => $exam->id, 'user_id' => $supervisor->id],
+            [
+                'assigned_by' => $request->user()->id,
+                'role' => $data['role'] ?? ExamSupervisor::ROLE_SUPERVISOR,
+                'permissions' => ['monitor' => true, 'incident_report' => true],
+                'assigned_at' => now(),
+                'revoked_at' => null,
+            ]
+        );
+
+        $exam->auditLogs()->create([
+            'actor_user_id' => $request->user()->id,
+            'actor_type' => 'user',
+            'event_type' => 'supervisor_assigned',
+            'description' => 'Supervisor assigned to exam monitoring.',
+            'metadata' => ['supervisor_user_id' => $supervisor->id, 'supervisor_name' => $supervisor->name],
+            'occurred_at' => now(),
+        ]);
+
+        return back()->with('success', 'Supervisor assigned.');
+    }
+
+    public function destroySupervisor(Request $request, Exam $exam, ExamSupervisor $supervisor): RedirectResponse
+    {
+        Gate::authorize('update', $exam);
+        abort_unless((string) $supervisor->exam_id === (string) $exam->id, 404);
+
+        $supervisor->update(['revoked_at' => now()]);
+
+        $exam->auditLogs()->create([
+            'actor_user_id' => $request->user()->id,
+            'actor_type' => 'user',
+            'event_type' => 'supervisor_revoked',
+            'description' => 'Supervisor access revoked from exam monitoring.',
+            'metadata' => ['supervisor_user_id' => $supervisor->user_id],
+            'occurred_at' => now(),
+        ]);
+
+        return back()->with('success', 'Supervisor removed.');
     }
 
     private function canPurgeAttemptedAssessment(?User $user, Exam $exam): bool
@@ -521,6 +578,84 @@ class ExamController extends Controller
             ->when(! $user->isSuperAdmin() && $user->secondary_school_id, fn ($query) => $query->where('secondary_school_id', $user->secondary_school_id))
             ->when(! $user->isSuperAdmin() && $user->professional_school_id, fn ($query) => $query->where('professional_school_id', $user->professional_school_id))
             ->when(! $user->isSuperAdmin() && $user->cbt_center_id, fn ($query) => $query->where('cbt_center_id', $user->cbt_center_id));
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function supervisorRows(Exam $exam): array
+    {
+        return $exam->activeSupervisors()
+            ->with('user:id,name,email,role')
+            ->latest('assigned_at')
+            ->get()
+            ->map(fn (ExamSupervisor $supervisor) => [
+                'id' => $supervisor->id,
+                'user_id' => $supervisor->user_id,
+                'name' => $supervisor->user?->name,
+                'email' => $supervisor->user?->email,
+                'role' => $supervisor->role,
+                'assigned_at' => $supervisor->assigned_at?->toISOString(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function supervisorOptions(User $user, Exam $exam): array
+    {
+        return $this->supervisorCandidateScope($user, $exam)
+            ->whereKeyNot($user->id)
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'role'])
+            ->map(fn (User $candidate) => [
+                'id' => $candidate->id,
+                'name' => $candidate->name,
+                'email' => $candidate->email,
+                'role' => $candidate->role,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function supervisorCandidateScope(User $user, Exam $exam): Builder
+    {
+        $query = User::query()
+            ->whereIn('role', [User::ROLE_TEACHER, User::ROLE_FACILITATOR, User::ROLE_SUPERVISOR, User::ROLE_EXAMINER]);
+
+        return match ($exam->effectiveOwnerType()) {
+            Exam::OWNER_INSTITUTION => $query
+                ->where('institution_id', $exam->institution_id)
+                ->when($exam->department_id, fn (Builder $scope) => $scope->where(function (Builder $inner) use ($exam): void {
+                    $inner->whereNull('department_id')->orWhere('department_id', $exam->department_id);
+                }))
+                ->when($exam->course_id, fn (Builder $scope) => $scope->where(function (Builder $inner) use ($exam): void {
+                    $inner
+                        ->whereHas('assignedCourses', fn (Builder $courseScope) => $courseScope->whereKey($exam->course_id))
+                        ->orWhere('role', User::ROLE_SUPERVISOR)
+                        ->orWhere('role', User::ROLE_EXAMINER);
+                })),
+            Exam::OWNER_PROFESSIONAL_SCHOOL => $query
+                ->where('professional_school_id', $exam->professional_school_id)
+                ->when($exam->course_id, fn (Builder $scope) => $scope->where(function (Builder $inner) use ($exam): void {
+                    $inner
+                        ->whereHas('assignedCourses', fn (Builder $courseScope) => $courseScope->whereKey($exam->course_id))
+                        ->orWhere('role', User::ROLE_SUPERVISOR)
+                        ->orWhere('role', User::ROLE_EXAMINER);
+                })),
+            Exam::OWNER_SECONDARY_SCHOOL => $query
+                ->where('secondary_school_id', $exam->secondary_school_id)
+                ->when($exam->subject_id, fn (Builder $scope) => $scope->where(function (Builder $inner) use ($exam): void {
+                    $inner
+                        ->whereHas('assignedSubjects', fn (Builder $subjectScope) => $subjectScope->whereKey($exam->subject_id))
+                        ->orWhere('role', User::ROLE_SUPERVISOR)
+                        ->orWhere('role', User::ROLE_EXAMINER);
+                })),
+            Exam::OWNER_CBT_CENTER => $query->where('cbt_center_id', $exam->cbt_center_id),
+            default => $query->where('organization_id', $exam->organization_id),
+        };
     }
 
     private function scopedSubjects(Request $request)

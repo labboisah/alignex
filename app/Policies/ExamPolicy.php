@@ -17,6 +17,10 @@ class ExamPolicy
 
     public function view(User $user, Exam $exam): bool
     {
+        if ($this->isSharedSupervisor($user, $exam)) {
+            return true;
+        }
+
         if ($user->isTeacher()) {
             return $exam->examSubjects()
                 ->whereIn('subject_id', $user->assignedSubjects()->select('subjects.id'))
@@ -37,6 +41,10 @@ class ExamPolicy
 
     public function update(User $user, Exam $exam): bool
     {
+        if ($this->isCoManager($user, $exam)) {
+            return true;
+        }
+
         if ($user->isTeacher()) {
             return $this->teacherCanManageAssessment($user, $exam);
         }
@@ -67,6 +75,21 @@ class ExamPolicy
         return $exam->exam_category === Exam::CATEGORY_ASSESSMENT
             && (string) $exam->created_by === (string) $user->id
             && $this->view($user, $exam);
+    }
+
+    private function isSharedSupervisor(User $user, Exam $exam): bool
+    {
+        return $exam->activeSupervisors()
+            ->where('user_id', $user->id)
+            ->exists();
+    }
+
+    private function isCoManager(User $user, Exam $exam): bool
+    {
+        return $exam->activeSupervisors()
+            ->where('user_id', $user->id)
+            ->where('role', 'co_manager')
+            ->exists();
     }
 
     private function facilitatorCanViewAssessment(User $user, Exam $exam): bool

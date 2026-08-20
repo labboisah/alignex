@@ -57,6 +57,8 @@ const iconByLabel = {
     Teachers: Users,
     Lecturers: Users,
     'Assigned Courses': BookOpen,
+    Supervision: Monitor,
+    'Incident Report': FileText,
     Faculties: GraduationCap,
     Departments: Building2,
     Programmes: GraduationCap,
