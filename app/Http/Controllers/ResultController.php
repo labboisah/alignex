@@ -260,6 +260,7 @@ class ResultController extends Controller
                 $query->where(function (Builder $inner) use ($user): void {
                     $inner->whereRaw('1 = 0')
                         ->when($user->organization_id, fn ($scope) => $scope->orWhere('organization_id', $user->organization_id))
+                        ->when($user->institution_id, fn ($scope) => $scope->orWhere('institution_id', $user->institution_id))
                         ->when($user->school_id, fn ($scope) => $scope->orWhere('school_id', $user->school_id))
                         ->when($user->center_id, fn ($scope) => $scope->orWhere('center_id', $user->center_id))
                         ->when($user->secondary_school_id, fn ($scope) => $scope->orWhere('secondary_school_id', $user->secondary_school_id))
@@ -477,6 +478,14 @@ class ResultController extends Controller
 
     private function scopeFacilitatorQuestionBanks(Builder $query, User $user): void
     {
+        if ($user->isInstitutionLecturer()) {
+            $query
+                ->where('institution_id', $user->institution_id)
+                ->whereIn('course_id', $user->assignedCourses()->select('courses.id'));
+
+            return;
+        }
+
         $query
             ->where('professional_school_id', $user->professional_school_id)
             ->where(function (Builder $scope) use ($user): void {

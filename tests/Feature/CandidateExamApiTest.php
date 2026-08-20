@@ -16,6 +16,7 @@ use App\Models\QuestionBank;
 use App\Models\QuestionOption;
 use App\Models\Subject;
 use App\Services\ExamPaperGeneratorService;
+use App\Services\ExamMonitorService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
@@ -54,7 +55,9 @@ class CandidateExamApiTest extends TestCase
             'device_fingerprint' => 'device-one',
         ], ['Authorization' => "Bearer {$token}"])
             ->assertOk()
-            ->assertJsonPath('saved', true);
+            ->assertJsonPath('saved', true)
+            ->assertJsonPath('answered_questions', 1)
+            ->assertJsonPath('percentage', '50.00');
 
         $this->assertDatabaseHas('candidate_answers', [
             'candidate_exam_attempt_id' => $login->json('attempt.id'),
@@ -62,6 +65,10 @@ class CandidateExamApiTest extends TestCase
             'is_flagged' => true,
             'time_spent_seconds' => 12,
             'device_fingerprint' => 'device-one',
+        ]);
+        $this->assertDatabaseHas('candidate_exam_attempts', [
+            'id' => $login->json('attempt.id'),
+            'percentage' => 50,
         ]);
 
         $this->postJson('/api/candidate/submit', [], ['Authorization' => "Bearer {$token}"])
@@ -93,6 +100,48 @@ class CandidateExamApiTest extends TestCase
         ], ['Authorization' => "Bearer {$token}"])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('exam');
+    }
+
+    public function test_answer_save_falls_back_to_question_options_when_paper_option_order_is_empty(): void
+    {
+        [$exam, $candidate] = $this->activeExamWithPaper();
+
+        $login = $this->postJson('/api/candidate/login', [
+            'exam_code' => $exam->code,
+            'registration_number' => $candidate->candidate_number,
+            'device_fingerprint' => 'device-one',
+        ])->assertOk();
+
+        $token = $login->json('exam_token');
+        $question = $login->json('questions.0');
+        $optionId = $question['options'][0]['id'];
+
+        CandidateExamAttempt::query()
+            ->whereKey($login->json('attempt.id'))
+            ->firstOrFail()
+            ->papers()
+            ->where('question_id', $question['question_id'])
+            ->update(['option_order' => null]);
+
+        $this->postJson('/api/candidate/answer', [
+            'question_id' => $question['question_id'],
+            'selected_option_ids' => [$optionId],
+        ], ['Authorization' => "Bearer {$token}"])
+            ->assertOk()
+            ->assertJsonPath('saved', true)
+            ->assertJsonPath('answered_questions', 1)
+            ->assertJsonPath('percentage', '50.00');
+
+        $this->assertSame([$optionId], CandidateAnswer::query()
+            ->where('candidate_exam_attempt_id', $login->json('attempt.id'))
+            ->where('question_id', $question['question_id'])
+            ->firstOrFail()
+            ->selected_option_ids);
+
+        $row = app(ExamMonitorService::class)->rows($exam->refresh())[0];
+
+        $this->assertSame(1, $row['answered_questions']);
+        $this->assertSame(50.0, $row['progress']);
     }
 
     public function test_candidate_login_requires_active_exam_assignment_and_open_attempt(): void

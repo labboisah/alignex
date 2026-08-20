@@ -178,14 +178,22 @@ class CandidateExamController extends Controller
             'device_fingerprint' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $paper = $attempt->papers->firstWhere('question_id', $data['question_id']);
+        $paper = $attempt->papers
+            ->loadMissing('question.options')
+            ->firstWhere('question_id', $data['question_id']);
 
         if (! $paper) {
             throw ValidationException::withMessages(['question_id' => 'Question is not on this candidate paper.']);
         }
 
+        $allowedOptionIds = collect($paper->option_order ?? [])
+            ->whenEmpty(fn ($options) => $paper->question?->options?->pluck('id') ?? collect())
+            ->map(fn ($optionId) => (string) $optionId)
+            ->all();
+
         $selectedOptionIds = collect($data['selected_option_ids'] ?? [])
-            ->filter(fn ($optionId) => in_array($optionId, $paper->option_order ?? [], true))
+            ->map(fn ($optionId) => (string) $optionId)
+            ->filter(fn ($optionId) => in_array($optionId, $allowedOptionIds, true))
             ->values()
             ->all();
 
@@ -206,18 +214,44 @@ class CandidateExamController extends Controller
             ]
         );
 
+        $attempt = $this->refreshAttemptProgress($attempt);
+
         $this->session->log($request, 'answer_saved', $attempt, ['question_id' => $paper->question_id]);
         app(ExamMonitorService::class)->broadcast($attempt->exam, 'answer_saved', $attempt, [
             'question_id' => $paper->question_id,
-            'answered_questions' => $attempt->answers()->whereNotNull('saved_at')->count(),
+            'answered_questions' => $this->answeredQuestions($attempt),
+            'percentage' => $attempt->percentage,
         ]);
 
         return response()->json([
             'saved' => true,
             'question_id' => $answer->question_id,
             'saved_at' => $answer->saved_at?->toISOString(),
+            'answered_questions' => $this->answeredQuestions($attempt),
+            'percentage' => $attempt->percentage,
             'remaining_time' => $this->session->remainingSeconds($attempt),
         ]);
+    }
+
+    private function refreshAttemptProgress(CandidateExamAttempt $attempt): CandidateExamAttempt
+    {
+        $answered = $this->answeredQuestions($attempt);
+        $totalQuestions = max(0, (int) $attempt->total_questions);
+
+        $attempt->forceFill([
+            'percentage' => $totalQuestions > 0 ? round(($answered / $totalQuestions) * 100, 2) : 0,
+        ])->save();
+
+        return $attempt->refresh()->load(['candidate', 'exam', 'answers', 'auditLogs', 'proctoringEvents']);
+    }
+
+    private function answeredQuestions(CandidateExamAttempt $attempt): int
+    {
+        return $attempt->answers()
+            ->whereNotNull('saved_at')
+            ->get(['selected_option_ids'])
+            ->filter(fn (CandidateAnswer $answer) => ! empty($answer->selected_option_ids))
+            ->count();
     }
 
     public function submit(Request $request): JsonResponse

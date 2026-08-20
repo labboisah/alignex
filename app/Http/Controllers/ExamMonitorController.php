@@ -32,7 +32,11 @@ class ExamMonitorController extends Controller
                 'status' => $exam->status,
                 'starts_at' => $exam->starts_at?->toISOString(),
                 'ends_at' => $exam->ends_at?->toISOString(),
-                'timezone' => $exam->timezone ?: config('app.timezone'),
+                'starts_at_timestamp' => $exam->starts_at ? $exam->starts_at->getTimestamp() * 1000 : null,
+                'ends_at_timestamp' => $exam->ends_at ? $exam->ends_at->getTimestamp() * 1000 : null,
+                'start_time_label' => $this->clockTimeLabel($exam->starts_at),
+                'end_time_label' => $this->clockTimeLabel($exam->ends_at),
+                'timezone' => config('app.timezone', 'Africa/Lagos'),
                 'duration_minutes' => $exam->duration_minutes,
                 'server_time' => now()->toISOString(),
             ],
@@ -49,6 +53,13 @@ class ExamMonitorController extends Controller
                 'reverb_scheme' => config('broadcasting.connections.reverb.options.scheme'),
             ],
         ]);
+    }
+
+    private function clockTimeLabel($date): ?string
+    {
+        return $date?->copy()
+            ->timezone(config('app.timezone', 'Africa/Lagos'))
+            ->format('h:i A');
     }
 
     public function assignedExams(Request $request): Response

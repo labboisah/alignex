@@ -78,6 +78,10 @@ type MonitorExam = {
     status?: string;
     starts_at?: string | null;
     ends_at?: string | null;
+    starts_at_timestamp?: number | null;
+    ends_at_timestamp?: number | null;
+    start_time_label?: string | null;
+    end_time_label?: string | null;
     timezone?: string | null;
     duration_minutes?: number;
     server_time?: string | null;
@@ -223,7 +227,7 @@ export default function ExamMonitorShow({ exam, summary: initialSummary, rows: i
                             <div className="text-sm font-semibold text-slate-500">{clock.label}</div>
                             <div className="mt-1 font-mono text-3xl font-black tracking-normal text-slateDark md:text-4xl">{clock.value}</div>
                             <div className="mt-2 text-sm font-semibold text-slate-500">
-                                {formatExamWindow(exam.starts_at, exam.ends_at, exam.timezone)}
+                                {formatExamWindow(exam)}
                             </div>
                         </div>
                     </div>
@@ -357,25 +361,23 @@ function statusTone(status: string): 'success' | 'danger' | 'warning' | 'neutral
 }
 
 function examClock(exam: MonitorExam, now: Date): { label: string; value: string; status: string; tone: 'success' | 'danger' | 'warning' | 'neutral' | 'info' } {
-    const startsAt = exam.starts_at ? new Date(exam.starts_at) : null;
-    const endsAt = exam.ends_at ? new Date(exam.ends_at) : null;
     const current = now.getTime();
-    const hasValidStart = startsAt && !Number.isNaN(startsAt.getTime());
-    const hasValidEnd = endsAt && !Number.isNaN(endsAt.getTime());
+    const startsAt = validTimestamp(exam.starts_at_timestamp) ?? dateTimestamp(exam.starts_at);
+    const endsAt = validTimestamp(exam.ends_at_timestamp) ?? dateTimestamp(exam.ends_at);
 
-    if (exam.status === 'scheduled' || (hasValidStart && startsAt.getTime() > current)) {
+    if (exam.status === 'scheduled' || (startsAt !== null && startsAt > current)) {
         return {
             label: 'Starts In',
-            value: hasValidStart ? formatDuration(startsAt.getTime() - current) : '00:00:00',
+            value: startsAt !== null ? formatDuration(startsAt - current) : '00:00:00',
             status: 'Not Due',
             tone: 'info',
         };
     }
 
-    if (hasValidEnd && endsAt.getTime() > current) {
+    if (endsAt !== null && endsAt > current) {
         return {
             label: 'Time Remaining',
-            value: formatDuration(endsAt.getTime() - current),
+            value: formatDuration(endsAt - current),
             status: 'In Progress',
             tone: 'success',
         };
@@ -400,10 +402,26 @@ function formatDuration(milliseconds: number): string {
         .join(':');
 }
 
-function formatExamWindow(startsAt?: string | null, endsAt?: string | null, timezone?: string | null): string {
-    const zone = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+function validTimestamp(value: number | null | undefined): number | null {
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
 
-    return `${formatClockTime(startsAt, zone)} - ${formatClockTime(endsAt, zone)} ${zone}`;
+function dateTimestamp(value: string | null | undefined): number | null {
+    if (!value) {
+        return null;
+    }
+
+    const timestamp = new Date(value).getTime();
+
+    return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function formatExamWindow(exam: MonitorExam): string {
+    const zone = exam.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const start = exam.start_time_label ?? formatClockTime(exam.starts_at, zone);
+    const end = exam.end_time_label ?? formatClockTime(exam.ends_at, zone);
+
+    return `${start} - ${end} ${zone}`;
 }
 
 function formatClockTime(value: string | null | undefined, timezone: string): string {
