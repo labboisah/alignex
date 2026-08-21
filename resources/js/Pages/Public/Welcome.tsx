@@ -186,6 +186,9 @@ function Navbar() {
                         <Button asChild variant="secondary">
                             <Link href="/exam/login">Candidate Exam</Link>
                         </Button>
+                        <Button asChild variant="secondary">
+                            <Link href="/candidate-result">Check Result</Link>
+                        </Button>
                         <Button asChild>
                             <Link href="/register-admin">Register</Link>
                         </Button>
@@ -220,6 +223,9 @@ function Navbar() {
                             </Button>
                             <Button asChild variant="secondary" className="w-full justify-center">
                                 <Link href="/exam/login">Candidate Exam</Link>
+                            </Button>
+                            <Button asChild variant="secondary" className="w-full justify-center">
+                                <Link href="/candidate-result">Check Result</Link>
                             </Button>
                             <Button asChild variant="secondary" className="w-full justify-center">
                                 <Link href="/verify-certificate">Verify Certificate</Link>
@@ -257,6 +263,9 @@ function HeroSection({ hero, metrics, activity, candidateMockup }: { hero: Requi
                         </Button>
                         <Button asChild variant="secondary" className="h-11 w-full justify-center sm:w-auto">
                             <Link href="/exam/login">Write Exam</Link>
+                        </Button>
+                        <Button asChild variant="secondary" className="h-11 w-full justify-center sm:w-auto">
+                            <Link href="/candidate-result">Check Result</Link>
                         </Button>
                         <Button asChild variant="secondary" className="h-11 w-full justify-center sm:w-auto">
                             <Link href="/verify-certificate">Verify Certificate</Link>

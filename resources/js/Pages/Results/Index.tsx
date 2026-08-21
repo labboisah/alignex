@@ -1,5 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
-import { Eye } from 'lucide-react';
+import { Download, Eye, FileText } from 'lucide-react';
 import { type ReactNode } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { PageHeader, PortalAppShell, StatusBadge } from '@/Components/Platform';
@@ -25,11 +25,11 @@ export default function ResultsIndex({ exams, dashboard }: { exams: ExamRow[]; d
                 <Summary dashboard={dashboard} />
                 <Charts dashboard={dashboard} />
                 <div className="mt-6 rounded-md border border-border bg-white p-5 shadow-sm">
-                    <h2 className="font-semibold text-slateDark">Exam Results</h2>
+                    <h2 className="font-semibold text-slateDark">Exam and Assessment Results</h2>
                     <div className="mt-4 overflow-x-auto">
                         <table className="w-full text-left text-sm">
                             <thead className="text-xs uppercase text-slate-500">
-                                <tr><th className="py-2">Exam</th><th>Code</th><th>Status</th><th>Submitted</th><th>Total Marks</th><th>Pass Mark</th><th>Actions</th></tr>
+                                <tr><th className="py-2">Exam / Assessment</th><th>Code</th><th>Status</th><th>Submitted</th><th>Total Marks</th><th>Pass Mark</th><th>Actions</th></tr>
                             </thead>
                             <tbody className="divide-y divide-border">
                                 {exams.map((exam) => (
@@ -40,7 +40,13 @@ export default function ResultsIndex({ exams, dashboard }: { exams: ExamRow[]; d
                                         <td>{exam.submitted_attempts_count}</td>
                                         <td>{exam.total_marks}</td>
                                         <td>{exam.pass_mark}</td>
-                                        <td><Button asChild size="sm" variant="secondary"><Link href={`/results/exams/${exam.id}`}><Eye className="h-4 w-4" />View</Link></Button></td>
+                                        <td>
+                                            <div className="flex flex-wrap gap-2">
+                                                <Button asChild size="sm" variant="secondary"><Link href={`/results/exams/${exam.id}`}><Eye className="h-4 w-4" />View</Link></Button>
+                                                <Button asChild size="sm" variant="secondary"><a href={`/results/exams/${exam.id}/export.csv`}><Download className="h-4 w-4" />CSV</a></Button>
+                                                <Button asChild size="sm" variant="secondary"><a href={`/results/exams/${exam.id}/summary.pdf`}><FileText className="h-4 w-4" />PDF</a></Button>
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>

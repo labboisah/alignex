@@ -4,7 +4,7 @@ import { Button } from '@/Components/ui/button';
 import { ResultRow } from './types';
 
 export default function SelfResult() {
-    return <Lookup title="Candidate Result" endpoint="/api/candidate/result" fields={['exam_code', 'identifier']} />;
+    return <Lookup title="Online Exam Result" endpoint="/api/candidate/result" fields={['exam_code', 'registration_number']} />;
 }
 
 export function Lookup({ title, endpoint, fields }: { title: string; endpoint: string; fields: string[] }) {
@@ -19,7 +19,9 @@ export function Lookup({ title, endpoint, fields }: { title: string; endpoint: s
         const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(form) });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || payload.valid === false) {
-            setError(payload.message ?? 'Result was not found or is not available.');
+            const errors = payload.errors ?? {};
+            const firstError = Object.values(errors)[0];
+            setError(Array.isArray(firstError) ? firstError[0] : payload.message ?? 'Result was not found or is not available.');
             return;
         }
         setResult(payload.result);
@@ -31,8 +33,9 @@ export function Lookup({ title, endpoint, fields }: { title: string; endpoint: s
             <section className="mx-auto max-w-lg rounded-md border border-border bg-white p-6 shadow-sm">
                 <Link href="/" className="text-sm font-semibold text-primary">AlignEx</Link>
                 <h1 className="mt-4 text-2xl font-bold">{title}</h1>
+                <p className="mt-2 text-sm leading-6 text-slate-600">Enter your exam code and registration number to view your released online exam result.</p>
                 <form onSubmit={submit} className="mt-5 space-y-4">
-                    {fields.map((field) => <label key={field} className="block text-sm font-semibold">{field.replaceAll('_', ' ')}<input className="mt-1 block w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary" value={form[field] ?? ''} onChange={(event) => setForm((next) => ({ ...next, [field]: event.target.value }))} required /></label>)}
+                    {fields.map((field) => <label key={field} className="block text-sm font-semibold">{fieldLabel(field)}<input className="mt-1 block w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary" value={form[field] ?? ''} onChange={(event) => setForm((next) => ({ ...next, [field]: field === 'exam_code' ? event.target.value.toUpperCase() : event.target.value }))} required /></label>)}
                     {error && <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm font-semibold text-danger">{error}</div>}
                     <Button type="submit" className="w-full">Check Result</Button>
                 </form>
@@ -61,4 +64,12 @@ export function ResultCard({ result }: { result: ResultRow }) {
 
 function Info({ label, value }: { label: string; value: string | number }) {
     return <div><div className="text-xs font-semibold uppercase text-slate-500">{label}</div><div className="break-all font-bold text-slateDark">{value}</div></div>;
+}
+
+function fieldLabel(field: string) {
+    return {
+        exam_code: 'Exam Code',
+        registration_number: 'Registration Number',
+        identifier: 'Registration Number',
+    }[field] ?? field.replaceAll('_', ' ');
 }

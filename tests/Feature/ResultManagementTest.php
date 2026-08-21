@@ -93,7 +93,7 @@ class ResultManagementTest extends TestCase
 
         $response = $this->postJson('/api/candidate/result', [
             'exam_code' => $exam->code,
-            'identifier' => $attempt->candidate->candidate_number,
+            'registration_number' => $attempt->candidate->candidate_number,
         ])
             ->assertOk()
             ->assertJsonPath('result.registration_number', $attempt->candidate->candidate_number);
@@ -104,6 +104,15 @@ class ResultManagementTest extends TestCase
             ->assertOk()
             ->assertJsonPath('valid', true)
             ->assertJsonPath('result.result_hash', $hash);
+    }
+
+    public function test_online_result_checking_page_is_available_to_candidates(): void
+    {
+        $this->get('/candidate-result')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Results/Self')
+            );
     }
 
     public function test_candidate_self_result_is_hidden_until_released(): void

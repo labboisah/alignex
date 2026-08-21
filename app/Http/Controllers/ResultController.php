@@ -218,8 +218,10 @@ class ResultController extends Controller
     {
         $data = $request->validate([
             'exam_code' => ['required', 'string'],
-            'identifier' => ['required', 'string'],
+            'registration_number' => ['required_without:identifier', 'nullable', 'string'],
+            'identifier' => ['required_without:registration_number', 'nullable', 'string'],
         ]);
+        $identifier = trim((string) ($data['registration_number'] ?? $data['identifier'] ?? ''));
 
         $exam = Exam::query()->where('code', strtoupper(trim($data['exam_code'])))->first();
 
@@ -229,13 +231,13 @@ class ResultController extends Controller
 
         $candidate = $exam->candidates()
             ->where(fn ($query) => $query
-                ->where('candidate_number', trim($data['identifier']))
-                ->orWhere('phone', trim($data['identifier']))
-                ->orWhere('email', trim($data['identifier'])))
+                ->where('candidate_number', $identifier)
+                ->orWhere('phone', $identifier)
+                ->orWhere('email', $identifier))
             ->first();
 
         if (! $candidate) {
-            throw ValidationException::withMessages(['identifier' => 'Candidate result was not found.']);
+            throw ValidationException::withMessages(['registration_number' => 'Candidate result was not found.']);
         }
 
         $attempt = CandidateExamAttempt::query()
@@ -246,7 +248,7 @@ class ResultController extends Controller
             ->first();
 
         if (! $attempt) {
-            throw ValidationException::withMessages(['identifier' => 'Candidate result was not found.']);
+            throw ValidationException::withMessages(['registration_number' => 'Candidate result was not found.']);
         }
 
         return response()->json(['result' => $this->results->row($attempt)]);
