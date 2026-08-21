@@ -50,6 +50,10 @@ export function ResultCard({ result }: { result: ResultRow }) {
         <div className="mt-6 rounded-md border border-border bg-surface p-4">
             <div className="font-bold">{result.candidate_name}</div>
             <div className="text-sm text-slate-600">{result.registration_number} | {result.exam_title}</div>
+            <div className="mt-3 rounded-md border border-border bg-white p-3 text-sm">
+                <div className="font-semibold text-slateDark">{result.owner_name ?? 'AlignEx'}</div>
+                <div className="text-xs text-slate-500">{result.owner_type ?? 'Platform'} | {result.service_provider ?? 'Service provided by AlignEx CBT, Sokoto'}</div>
+            </div>
             <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                 <Info label="Score" value={`${result.score}/${result.total_marks}`} />
                 <Info label="Percentage" value={`${result.percentage}%`} />

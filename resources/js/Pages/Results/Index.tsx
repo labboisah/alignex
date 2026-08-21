@@ -10,6 +10,11 @@ type ExamRow = {
     id: string;
     title: string;
     exam_code: string;
+    owner?: {
+        type: string;
+        name: string;
+    };
+    service_provider?: string;
     status: string;
     submitted_attempts_count: number;
     total_marks: string;
@@ -29,12 +34,16 @@ export default function ResultsIndex({ exams, dashboard }: { exams: ExamRow[]; d
                     <div className="mt-4 overflow-x-auto">
                         <table className="w-full text-left text-sm">
                             <thead className="text-xs uppercase text-slate-500">
-                                <tr><th className="py-2">Exam / Assessment</th><th>Code</th><th>Status</th><th>Submitted</th><th>Total Marks</th><th>Pass Mark</th><th>Actions</th></tr>
+                                <tr><th className="py-2">Exam / Assessment</th><th>Body</th><th>Code</th><th>Status</th><th>Submitted</th><th>Total Marks</th><th>Pass Mark</th><th>Actions</th></tr>
                             </thead>
                             <tbody className="divide-y divide-border">
                                 {exams.map((exam) => (
                                     <tr key={exam.id}>
                                         <td className="py-3 font-semibold">{exam.title}</td>
+                                        <td>
+                                            <div className="font-semibold text-slateDark">{exam.owner?.name ?? 'AlignEx'}</div>
+                                            <div className="text-xs text-slate-500">{exam.owner?.type ?? 'Platform'} | {exam.service_provider ?? 'Service provided by AlignEx CBT, Sokoto'}</div>
+                                        </td>
                                         <td>{exam.exam_code}</td>
                                         <td><StatusBadge label={exam.status} tone={exam.status === 'active' ? 'success' : 'neutral'} /></td>
                                         <td>{exam.submitted_attempts_count}</td>

@@ -22,7 +22,7 @@ type AdaptiveAnalysis = {
     recommended_practice_areas: PerformanceRow[];
 };
 
-export default function ExamResults({ exam, rows, dashboard, adaptive_analysis }: { exam: { id: string; title: string; exam_code: string; total_marks: string; pass_mark: string }; rows: ResultRow[]; dashboard: ResultsDashboard; adaptive_analysis: AdaptiveAnalysis }) {
+export default function ExamResults({ exam, rows, dashboard, adaptive_analysis }: { exam: { id: string; title: string; exam_code: string; owner?: { type: string; name: string }; service_provider?: string; total_marks: string; pass_mark: string }; rows: ResultRow[]; dashboard: ResultsDashboard; adaptive_analysis: AdaptiveAnalysis }) {
     return (
         <PortalAppShell title={exam.title}>
             <Head title={`${exam.title} Results`} />
@@ -30,7 +30,7 @@ export default function ExamResults({ exam, rows, dashboard, adaptive_analysis }
                 <PageHeader
                     eyebrow="Exam Results"
                     title={exam.title}
-                    description={`${exam.exam_code} | Total marks ${exam.total_marks} | Pass mark ${exam.pass_mark}`}
+                    description={`${exam.owner?.name ?? 'AlignEx'} | ${exam.service_provider ?? 'Service provided by AlignEx CBT, Sokoto'} | ${exam.exam_code} | Total marks ${exam.total_marks} | Pass mark ${exam.pass_mark}`}
                     actions={<><Button asChild variant="secondary"><a href={`/results/exams/${exam.id}/export.csv`}><Download className="h-4 w-4" />CSV</a></Button><Button asChild variant="secondary"><a href={`/results/exams/${exam.id}/summary.pdf`}><FileText className="h-4 w-4" />PDF Summary</a></Button></>}
                 />
                 <Summary dashboard={dashboard} />

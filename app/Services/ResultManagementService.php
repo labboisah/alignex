@@ -18,7 +18,7 @@ class ResultManagementService
                 CandidateExamAttempt::STATUS_SUBMITTED,
                 CandidateExamAttempt::STATUS_AUTO_SUBMITTED,
             ])
-            ->with(['candidate', 'exam', 'answers.subject', 'proctoringEvents']);
+            ->with(['candidate', 'exam.organization', 'exam.institution', 'exam.school', 'exam.secondarySchool', 'exam.professionalSchool', 'exam.center', 'exam.cbtCenter', 'answers.subject', 'proctoringEvents']);
     }
 
     /**
@@ -26,7 +26,8 @@ class ResultManagementService
      */
     public function row(CandidateExamAttempt $attempt): array
     {
-        $attempt->loadMissing(['candidate', 'exam', 'answers.subject', 'proctoringEvents']);
+        $attempt->loadMissing(['candidate', 'exam.organization', 'exam.institution', 'exam.school', 'exam.secondarySchool', 'exam.professionalSchool', 'exam.center', 'exam.cbtCenter', 'answers.subject', 'proctoringEvents']);
+        $owner = $attempt->exam ? $this->examOwner($attempt->exam) : ['type' => 'Platform', 'name' => 'AlignEx'];
         $totalMarks = max((float) ($attempt->total_marks ?? $attempt->exam?->total_marks ?? 0), 0);
         $score = (float) ($attempt->score ?? 0);
         $percentage = $totalMarks > 0 ? round(($score / $totalMarks) * 100, 2) : 0.0;
@@ -40,6 +41,9 @@ class ResultManagementService
             'exam_id' => $attempt->exam_id,
             'exam_title' => $attempt->exam?->title,
             'exam_code' => $attempt->exam?->code,
+            'owner_type' => $owner['type'],
+            'owner_name' => $owner['name'],
+            'service_provider' => $this->serviceProvider(),
             'candidate_id' => $attempt->candidate_id,
             'candidate_name' => trim(($attempt->candidate?->first_name ?? '').' '.($attempt->candidate?->last_name ?? '')),
             'registration_number' => $attempt->candidate?->candidate_number,
@@ -116,10 +120,12 @@ class ResultManagementService
     public function csv(Collection $rows): string
     {
         $handle = fopen('php://temp', 'r+');
-        fputcsv($handle, ['Candidate Name', 'Registration Number', 'Score', 'Total Marks', 'Percentage', 'Grade', 'Pass/Fail', 'Submitted At', 'Duration Used', 'Suspicious Events', 'Verification Hash']);
+        fputcsv($handle, ['Body', 'Service Provider', 'Candidate Name', 'Registration Number', 'Score', 'Total Marks', 'Percentage', 'Grade', 'Pass/Fail', 'Submitted At', 'Duration Used', 'Suspicious Events', 'Verification Hash']);
 
         foreach ($rows as $row) {
             fputcsv($handle, [
+                $row['owner_name'] ?? '',
+                $row['service_provider'] ?? $this->serviceProvider(),
                 $row['candidate_name'],
                 $row['registration_number'],
                 $row['score'],
@@ -139,6 +145,35 @@ class ResultManagementService
         fclose($handle);
 
         return $content ?: '';
+    }
+
+    /**
+     * @return array{type: string, name: string}
+     */
+    public function examOwner(Exam $exam): array
+    {
+        $exam->loadMissing(['organization', 'institution', 'school', 'secondarySchool', 'professionalSchool', 'center', 'cbtCenter']);
+
+        $owner = match (true) {
+            $exam->institution !== null => ['type' => 'Institution', 'name' => $exam->institution->name],
+            $exam->secondarySchool !== null => ['type' => 'School', 'name' => $exam->secondarySchool->name],
+            $exam->professionalSchool !== null => ['type' => 'Professional School', 'name' => $exam->professionalSchool->name],
+            $exam->cbtCenter !== null => ['type' => 'CBT Center', 'name' => $exam->cbtCenter->name],
+            $exam->school !== null => ['type' => 'School', 'name' => $exam->school->name],
+            $exam->center !== null => ['type' => 'Center', 'name' => $exam->center->name],
+            $exam->organization !== null => ['type' => 'Organization', 'name' => $exam->organization->name],
+            default => ['type' => 'Platform', 'name' => config('app.name', 'AlignEx')],
+        };
+
+        return [
+            'type' => $owner['type'],
+            'name' => $owner['name'],
+        ];
+    }
+
+    public function serviceProvider(): string
+    {
+        return 'Service provided by AlignEx CBT, Sokoto';
     }
 
     public function pdf(string $title, array $lines): string

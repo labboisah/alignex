@@ -41,7 +41,7 @@ export default function CandidateResultDetails({ result, answers, adaptive }: { 
                 <PageHeader
                     eyebrow="Candidate Result"
                     title={result.candidate_name}
-                    description={result.registration_number}
+                    description={`${result.registration_number} | ${result.owner_name ?? 'AlignEx'} | ${result.service_provider ?? 'Service provided by AlignEx CBT, Sokoto'}`}
                     backHref={`/results/exams/${result.exam_id}`}
                     actions={<Button asChild variant="secondary"><a href={`/results/attempts/${result.attempt_id}/marked-paper.pdf`}><Printer className="h-4 w-4" />Marked Paper</a></Button>}
                 />
@@ -52,6 +52,8 @@ export default function CandidateResultDetails({ result, answers, adaptive }: { 
                     <div className="rounded-md border border-border bg-white p-4 shadow-sm"><div className="text-sm font-semibold text-slate-500">Status</div><div className="mt-2"><StatusBadge label={result.status} tone={result.passed ? 'success' : 'danger'} /></div></div>
                     <Metric label="Duration Used" value={result.duration_used} />
                     <Metric label="Suspicious Events" value={result.suspicious_event_count} />
+                    <Metric label={result.owner_type ?? 'Body'} value={result.owner_name ?? 'AlignEx'} wide />
+                    <Metric label="Service Provider" value={result.service_provider ?? 'Service provided by AlignEx CBT, Sokoto'} wide />
                     <Metric label="Verification Hash" value={result.result_hash} wide />
                 </div>
                 <section className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">

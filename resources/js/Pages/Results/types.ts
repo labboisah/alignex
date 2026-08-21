@@ -3,6 +3,9 @@ export type ResultRow = {
     exam_id: string;
     exam_title?: string;
     exam_code?: string;
+    owner_type?: string;
+    owner_name?: string;
+    service_provider?: string;
     candidate_name: string;
     registration_number: string;
     score: number;

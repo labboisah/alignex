@@ -1,0 +1,1 @@
+import{j as t}from"./app-CKtc0TAh.js";import{Lookup as e}from"./Self-BJZ_bor2.js";import"./button-DzS5hOsY.js";function s(){return t.jsx(e,{title:"Verify Result",endpoint:"/api/results/verify",fields:["hash"]})}export{s as default};
