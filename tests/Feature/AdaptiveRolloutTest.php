@@ -45,7 +45,8 @@ class AdaptiveRolloutTest extends TestCase
         config(['adaptive.pilot_enabled' => true, 'adaptive.pilot_owners' => ['organization:'.$organization->id]]);
         $status = app(AdaptiveRolloutService::class)->status($exam);
         $this->assertTrue($status['owner_allowlisted']);
-        $this->assertFalse($status['runtime_ready']);
+        $this->assertTrue($status['runtime_ready']);
+        $this->assertFalse($status['exam_allowlisted']);
         foreach (['scheduled', 'active'] as $state) {
             $this->patch('/exams/'.$exam->id, [...$payload, 'status' => $state])->assertSessionHasErrors('exam');
             $this->assertSame('draft', $exam->fresh()->status);

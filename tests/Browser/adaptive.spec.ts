@@ -235,3 +235,47 @@ test('authorized supervisor sees level history, immutable reset and stop events'
     await expect(page.getByText('Your supervisor has ended this progression.')).toBeVisible();
     await supervisor.close();
 });
+
+test('adaptive diagnostic report shows recovery history and handles export failure and retry', async ({ page, request, context }) => {
+    const data = await start(page, request, { report_exports: true });
+    await answer(page, true);
+    await page.getByRole('button', { name: 'Finish level', exact: true }).click();
+    await page.getByRole('button', { name: 'Start recovery level' }).click();
+    await expect(page.getByRole('radio')).toHaveCount(2);
+    const report = await context.newPage();
+    await report.goto('/login');
+    await report.getByLabel('Email', { exact: true }).fill(data.actor_email);
+    await report.getByLabel('Password', { exact: true }).fill('password');
+    await report.getByRole('button', { name: 'Log in', exact: true }).click();
+    await expect(report).not.toHaveURL(/\/login$/);
+    await report.goto('/results/adaptive/exams/' + data.exam_id);
+    await expect(report.getByRole('link', { name: 'View progression' })).toHaveCount(1);
+    await report.getByRole('link', { name: 'View progression' }).click();
+    await expect(report.getByRole('heading', { name: 'Recovered marks', exact: true })).toBeVisible();
+    await expect(report.getByText('Withheld', { exact: true })).toBeVisible();
+    await expect(report.getByRole('heading', { name: /Level 1/ })).toBeVisible();
+    await expect(report.getByRole('heading', { name: /Level 2/ })).toBeVisible();
+    await expect(report.getByText(/Do not use for recruitment/)).toBeVisible();
+    await report.locator('article').first().locator('summary').click();
+    await expect(report.locator('article').first().getByText('Unconfirmed', { exact: true })).toBeVisible();
+    await report.route('**/results/adaptive/progressions/*/export.csv', route => route.fulfill({ status: 503, body: 'Unavailable' }));
+    await report.getByRole('button', { name: 'Download diagnostic CSV' }).click();
+    await expect(report.getByText(/Export could not be downloaded/)).toBeVisible();
+    await report.unroute('**/results/adaptive/progressions/*/export.csv');
+    const download = report.waitForEvent('download');
+    await report.getByRole('button', { name: 'Download diagnostic CSV' }).click();
+    expect((await download).suggestedFilename()).toMatch(/adaptive-progression-\d+\.csv/);
+    await expect(report.getByText('Report downloaded.', { exact: true })).toBeVisible();
+    await report.close();
+});
+
+test('adaptive report list explains its empty state before candidate preparation', async ({ page, request }) => {
+    const data = await fixture(request);
+    await page.goto('/login');
+    await page.getByLabel('Email', { exact: true }).fill(data.actor_email);
+    await page.getByLabel('Password', { exact: true }).fill('password');
+    await page.getByRole('button', { name: 'Log in', exact: true }).click();
+    await expect(page).not.toHaveURL(/\/login$/);
+    await page.goto('/results/adaptive/exams/' + data.exam_id);
+    await expect(page.getByText('No adaptive candidate progressions have been prepared.')).toBeVisible();
+});

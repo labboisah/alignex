@@ -1,6 +1,12 @@
 # Adaptive examination knowledge base
 
-Reviewed: 8 September 2026. Status: Phase 4 candidate and supervisor experience implemented behind rollout containment; live adaptive starts remain disabled pending reporting and controlled-pilot acceptance.
+Reviewed: 8 September 2026. Status: Phase 5 diagnostic reporting and restricted online pilot controls implemented. Pilot defaults remain disabled; no live cohort was enabled.
+
+## Phase 5 implementation status
+
+Authorized staff now have one report per candidate progression, with retained level paths, topic coverage, evidence, raw accuracy, exact recovery budgets, stop reasons, frozen versions and audited CSV exports. Candidate release remains aggregate-only. Bound adaptive levels are excluded from traditional grades, verification and exports, and cannot drive recruitment shortlists or certificates.
+
+New starts require the pilot flag plus exact owner and exam allowlists. Online diagnostics are supported for organizations, institutions, professional schools and CBT centers; secondary-school adaptive remains blocked. See [Phase 5 implementation, verification and pilot guidance](adaptive-phase-5.md). Earlier phase notes below describe their historical state.
 
 ## Phase 4 implementation status
 
@@ -26,7 +32,7 @@ Phase 1 containment and regression reconciliation are implemented. Adaptive draf
 
 An adaptive examination should use committed candidate responses to influence which eligible question is issued next, under server-controlled coverage, length, timing and scoring rules.
 
-AlignEx supports adaptive preparation and a separate server lifecycle for frozen adaptive attempts. The [traditional fixed-paper workflow](traditional.md) remains the live candidate experience; ordinary adaptive publication/new starts remain blocked until the later reporting and controlled-pilot gates pass.
+AlignEx supports adaptive preparation and a separate server lifecycle for frozen adaptive attempts. The [traditional fixed-paper workflow](traditional.md) remains the live candidate experience; adaptive publication/new starts require explicit owner/exam pilot approval and remain disabled by default.
 
 ## Implemented pieces
 
@@ -34,10 +40,10 @@ AlignEx supports adaptive preparation and a separate server lifecycle for frozen
 | --- | --- | --- |
 | Mode storage | Exam mode plus frozen adaptive attempt state | Bound attempts dispatch separately; legacy started papers retain traditional behavior |
 | Owner eligibility | Central ownership rules and exam request validation | Permission to configure is not runtime readiness |
-| Setup UI | Validated difficulty, policy, length and optional progressive settings | Preparation only; the runtime is not enabled |
+| Setup UI | Validated difficulty, policy, length and optional progressive settings | Online diagnostic runtime is available only to approved pilot exams |
 | Preparation and persistence | Readiness, frozen settings/items, progression/ledger state and attempt binding | Text-based objective items; immutable media support remains future work |
-| Candidate and supervisor UI | Explicit start, current-item confirmation, durable retries, recovery messages, proctor controls and retained level history | Online only; live starts remain disabled |
-| Server lifecycle and recovery | Draft/commit, persisted selection, deadlines, weak-area levels, exact penalties, practice isolation and aggregate release | Public rollout disabled; richer reports remain Phase 5 |
+| Candidate and supervisor UI | Explicit start, current-item confirmation, durable retries, recovery messages, proctor controls and retained level history | Online only; new starts default to disabled |
+| Server lifecycle and recovery | Draft/commit, persisted selection, deadlines, weak-area levels, exact penalties, practice isolation and aggregate release | Default-off controlled pilots; no validated ability scoring |
 | Difficulty helper | Start medium; correct moves up, incorrect moves down, clamped at easy/hard | Simple rule-based stepping only |
 | Next-question selection | Scoped immutable pool, required coverage, nearest difficulty fallback and persisted decisions | Simple rule-based objective engine, not calibrated ability estimation |
 | Performance profiles | Subject/topic/difficulty counts and percentage-based mastery | Descriptive post-exam analysis, not ability estimation |
@@ -73,7 +79,7 @@ Changing secondary policy requires category-aware validation, permissions, UI, d
 - An approved scoring/reporting interpretation for unequal question paths.
 - Integrated Python FastAPI engine, calibration workflow and validated ability/uncertainty estimates.
 - Browser acceptance across all enabled contexts, offline integration and controlled deployment.
-- Full adaptive administrative reports/exports, richer practice mastery reporting, immutable media and validated aggregate certification policy.
+- Validated ability reporting, practice mastery models beyond descriptive counts, immutable media and approved aggregate certification policy.
 
 No Python engine implementation was found in the audited repository. The architecture in the older system-design document describes future intent.
 
@@ -93,7 +99,7 @@ Additive tables/columns should preserve active attempts, historical results, exi
 
 The current scorer calculates raw marks and a raw pass threshold. Existing “Adaptive Analysis” views summarize performance by topic and difficulty using percentage thresholds. They should not be interpreted as a calibrated ability scale or proof of comparable adaptive scores.
 
-A future adaptive report needs attempt identity, item path, coverage, evidence count, engine/scoring version and stopping reason. Consequential certification/recruitment decisions require approved scoring validation before rollout. Practice pilots must clearly state what their descriptive results mean.
+Phase 5 reports provide progression/attempt identity, persisted item paths, coverage, evidence counts, engine/scoring versions and stop reasons. Consequential certification/recruitment decisions require approved scoring validation before rollout. Practice pilots must clearly state what their descriptive results mean.
 
 ## Agreed extension: progressive weakness-focused levels
 

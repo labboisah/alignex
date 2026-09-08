@@ -80,7 +80,7 @@ Adaptive Phase 1 now includes default-off pilot controls, exact owner allowlist 
 
 ## Adaptive delivery and progressive remediation plan
 
-Status: Phase 4 candidate/supervisor adaptive experience implemented behind rollout containment. Reporting and controlled pilots are next. See [Phase 4 evidence and Phase 5 handoff](exams/adaptive-phase-4.md), and the [adaptive knowledge base](exams/adaptive.md#agreed-extension-progressive-weakness-focused-levels) for behavior and scoring, and the [detailed implementation plan](adaptive-examination-audit-2026-09-08.md#progressive-remediation-implementation-plan-agreed-extension) for backend tasks and acceptance tests.
+Status: Phase 5 diagnostic reports, authorized exports and exact owner/exam pilot controls are implemented. Pilots remain off by default; no live cohort was enabled. FastAPI/calibration and validated assessment are next. See [Phase 5 evidence and Phase 6 handoff](exams/adaptive-phase-5.md), and the [adaptive knowledge base](exams/adaptive.md#agreed-extension-progressive-weakness-focused-levels) for behavior and scoring, and the [detailed implementation plan](adaptive-examination-audit-2026-09-08.md#progressive-remediation-implementation-plan-agreed-extension) for backend tasks and acceptance tests.
 
 Adaptive work includes two independently controlled capabilities: response-dependent question selection within a level, and optional weakness-focused progression across levels.
 

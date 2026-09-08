@@ -2,11 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\AdaptiveAttemptState;
 use App\Models\CandidateExamAttempt;
 use App\Models\Exam;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 class ResultManagementService
 {
@@ -14,6 +14,7 @@ class ResultManagementService
     {
         return CandidateExamAttempt::query()
             ->where('exam_id', $exam->id)
+            ->whereNotIn('id', AdaptiveAttemptState::select('attempt_id'))
             ->whereIn('status', [
                 CandidateExamAttempt::STATUS_SUBMITTED,
                 CandidateExamAttempt::STATUS_AUTO_SUBMITTED,
@@ -26,6 +27,9 @@ class ResultManagementService
      */
     public function row(CandidateExamAttempt $attempt): array
     {
+        if (app(AdaptiveLifecycleService::class)->handles($attempt)) {
+            throw new \LogicException('Use the adaptive progression report for diagnostic results.');
+        }
         $attempt->loadMissing(['candidate', 'exam.organization', 'exam.institution', 'exam.school', 'exam.secondarySchool', 'exam.professionalSchool', 'exam.center', 'exam.cbtCenter', 'answers.subject', 'proctoringEvents']);
         $owner = $attempt->exam ? $this->examOwner($attempt->exam) : ['type' => 'Platform', 'name' => 'AlignEx'];
         $totalMarks = max((float) ($attempt->total_marks ?? $attempt->exam?->total_marks ?? 0), 0);
@@ -68,6 +72,8 @@ class ResultManagementService
      */
     public function dashboard(Collection $attempts): array
     {
+        $adaptiveIds = AdaptiveAttemptState::whereIn('attempt_id', $attempts->pluck('id'))->pluck('attempt_id');
+        $attempts = $attempts->reject(fn ($attempt) => $adaptiveIds->contains($attempt->id));
         $rows = $attempts->map(fn (CandidateExamAttempt $attempt) => $this->row($attempt))->values();
         $passed = $rows->where('passed', true)->count();
         $failed = $rows->count() - $passed;
@@ -90,6 +96,9 @@ class ResultManagementService
 
     public function ensureHash(CandidateExamAttempt $attempt): string
     {
+        if (app(AdaptiveLifecycleService::class)->handles($attempt)) {
+            throw new \LogicException('Adaptive pilot results cannot receive traditional verification hashes.');
+        }
         if ($attempt->result_hash) {
             return $attempt->result_hash;
         }
@@ -179,19 +188,19 @@ class ResultManagementService
     public function pdf(string $title, array $lines): string
     {
         $text = $title."\n\n".implode("\n", array_map(fn ($line) => preg_replace('/[^\x20-\x7E]/', '', $line), $lines));
-        $stream = "BT /F1 12 Tf 50 780 Td 14 TL ";
+        $stream = 'BT /F1 12 Tf 50 780 Td 14 TL ';
 
         foreach (explode("\n", $text) as $line) {
-            $stream .= '('.str_replace(['\\', '(', ')'], ['\\\\', '\\(', '\\)'], $line).") Tj T* ";
+            $stream .= '('.str_replace(['\\', '(', ')'], ['\\\\', '\\(', '\\)'], $line).') Tj T* ';
         }
 
         $stream .= 'ET';
         $objects = [
-            "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
-            "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj",
-            "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj",
-            "4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj",
-            "5 0 obj << /Length ".strlen($stream)." >> stream\n{$stream}\nendstream endobj",
+            '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj',
+            '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj',
+            '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj',
+            '4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj',
+            '5 0 obj << /Length '.strlen($stream)." >> stream\n{$stream}\nendstream endobj",
         ];
         $pdf = "%PDF-1.4\n";
         $offsets = [0];
@@ -208,7 +217,7 @@ class ResultManagementService
             $pdf .= sprintf("%010d 00000 n \n", $offset);
         }
 
-        return $pdf."trailer << /Size ".(count($objects) + 1)." /Root 1 0 R >>\nstartxref\n{$xref}\n%%EOF";
+        return $pdf.'trailer << /Size '.(count($objects) + 1)." /Root 1 0 R >>\nstartxref\n{$xref}\n%%EOF";
     }
 
     private function grade(float $percentage): string

@@ -24,6 +24,12 @@ The candidate and supervisor experience is implemented behind the existing rollo
 
 Verification: **140 backend tests / 1,392 assertions**, **3 MySQL contention tests / 42 assertions**, and **15 browser scenarios verified** (including the corrected-case rerun). See [Phase 4 verification and Phase 5 handoff](exams/adaptive-phase-4.md). Traditional CBT retains its existing writing flow, and secondary-school adaptive remains blocked. The next phase is reporting and controlled practice pilots; runtime readiness has not been enabled.
 
+## Phase 5 implementation update
+
+Diagnostic progression reports, scoped/audited exports, release containment and exact owner/exam pilot controls are implemented. The online diagnostic runtime is ready for explicitly approved cohorts; flags remain off by default and no live cohort was enabled. Traditional grading/export paths exclude bound adaptive levels. Recruitment shortlisting and certificate classification cannot use these pilot results.
+
+Verification: **152 backend tests / 1,632 assertions**, followed by **20 targeted tests / 377 assertions** for the final ownership/legacy safeguards; **four browser scenarios verified** across the suite and corrected-case rerun. See [Phase 5 delivery notes, browser verification and pilot acceptance checklist](exams/adaptive-phase-5.md). Live cohort observation and assessment-owner acceptance remain operational gates. Phase 6 is the next engineering phase; earlier audit/phase statements below are historical.
+
 ## Assessment
 
 **Adaptive examination is at foundation/prototype level, not a completed adaptive candidate workflow.** Administrators can select adaptive mode in several contexts, a standalone service can move between difficulty bands, and results include topic/difficulty summaries. However, paper generation and candidate delivery still use the fixed-paper workflow regardless of mode. Selecting “adaptive” does not currently establish response-dependent question delivery.
@@ -218,6 +224,8 @@ Add mode-specific instructions and an adaptive writing view inside the existing 
 **Gate:** end-to-end browser tests pass for all enabled contexts, refresh/disconnect, duplicate clicks, multi-tab use, time expiry and proctor intervention. Traditional navigation, flags, bulk paper display and existing timing behavior pass their regression suite.
 
 ### Phase 5 — Reporting and controlled practice pilots
+
+Status: software implemented; live cohort acceptance remains an operational gate. See [Phase 5 reports, verification and pilot guidance](exams/adaptive-phase-5.md). Defaults remain disabled; no live cohort was enabled.
 
 Add attempt-specific item-path history, topic coverage, evidence counts, raw practice performance, stop reason, engine/configuration version and authorized exports. Exercise release controls and keep traditional exports/grades stable. Pilot online practice/diagnostics per enabled owner context; implement the secondary assessment policy here if accepted earlier.
 

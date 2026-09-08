@@ -7,6 +7,7 @@ use App\Models\Exam;
 use App\Models\ExamSubject;
 use App\Models\Institution;
 use App\Models\Organization;
+use App\Models\PricingPlan;
 use App\Models\ProfessionalSchool;
 use App\Models\Question;
 use App\Models\QuestionBank;
@@ -36,6 +37,14 @@ function browserFixture(array $input): array
     }
     $actor = User::factory()->create(['organization_id' => $organization->id, 'role' => User::ROLE_ORGANIZATION_ADMIN,
         ...$ownerFields]);
+    if ($input['report_exports'] ?? false) {
+        $plan = PricingPlan::create([
+            'name' => 'Browser report plan', 'description' => 'Isolated report export test.', 'slug' => 'browser-'.Str::uuid(), 'price' => 0,
+            'currency' => 'NGN', 'billing_cycle' => 'monthly', 'is_active' => true,
+            'features' => ['csv_export' => true],
+        ]);
+        $organization->update(['pricing_plan_id' => $plan->id]);
+    }
     $subject = Subject::factory()->create(['organization_id' => $organization->id]);
     $bank = QuestionBank::factory()->create(['organization_id' => $organization->id, 'subject_id' => $subject->id,
         'owner_type' => $type, 'owner_id' => $ownerId, 'status' => 'active', ...$ownerFields]);

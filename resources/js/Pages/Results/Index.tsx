@@ -19,6 +19,7 @@ type ExamRow = {
     submitted_attempts_count: number;
     total_marks: string;
     pass_mark: string;
+    has_adaptive_progressions?: boolean;
 };
 
 export default function ResultsIndex({ exams, dashboard }: { exams: ExamRow[]; dashboard: ResultsDashboard }) {
@@ -27,6 +28,7 @@ export default function ResultsIndex({ exams, dashboard }: { exams: ExamRow[]; d
             <Head title="Results" />
             <section className="mx-auto max-w-7xl">
                 <PageHeader eyebrow="Result Management" title="Results Dashboard" description="Review exam outcomes, exports, verification, and score trends." />
+                <p className="mb-3 text-sm text-slate-500">Charts and Pass/Fail statistics cover traditional CBT attempts. Adaptive diagnostic progressions have separate reports.</p>
                 <Summary dashboard={dashboard} />
                 <Charts dashboard={dashboard} />
                 <div className="mt-6 rounded-md border border-border bg-white p-5 shadow-sm">
@@ -51,6 +53,7 @@ export default function ResultsIndex({ exams, dashboard }: { exams: ExamRow[]; d
                                         <td>{exam.pass_mark}</td>
                                         <td>
                                             <div className="flex flex-wrap gap-2">
+                                                {exam.has_adaptive_progressions && <Button asChild size="sm" variant="secondary"><Link href={`/results/adaptive/exams/${exam.id}`}>Adaptive diagnostics</Link></Button>}
                                                 <Button asChild size="sm" variant="secondary"><Link href={`/results/exams/${exam.id}`}><Eye className="h-4 w-4" />View</Link></Button>
                                                 <Button asChild size="sm" variant="secondary"><a href={`/results/exams/${exam.id}/export.csv`}><Download className="h-4 w-4" />CSV</a></Button>
                                                 <Button asChild size="sm" variant="secondary"><a href={`/results/exams/${exam.id}/summary.pdf`}><FileText className="h-4 w-4" />PDF</a></Button>

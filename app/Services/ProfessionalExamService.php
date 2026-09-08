@@ -211,7 +211,8 @@ class ProfessionalExamService
 
     public function passed(CandidateExamAttempt $attempt): bool
     {
-        return in_array($attempt->status, [CandidateExamAttempt::STATUS_SUBMITTED, CandidateExamAttempt::STATUS_AUTO_SUBMITTED], true)
+        return ! app(AdaptiveLifecycleService::class)->handles($attempt)
+            && in_array($attempt->status, [CandidateExamAttempt::STATUS_SUBMITTED, CandidateExamAttempt::STATUS_AUTO_SUBMITTED], true)
             && (float) ($attempt->score ?? 0) >= (float) ($attempt->exam?->pass_mark ?? 0);
     }
 

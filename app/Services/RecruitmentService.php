@@ -7,9 +7,17 @@ use App\Models\Exam;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class RecruitmentService
 {
+    private function ensureTraditionalDecision(Exam $exam): void
+    {
+        if (app(AdaptiveReportService::class)->hasProgressions($exam)) {
+            throw ValidationException::withMessages(['exam' => 'Adaptive pilot results cannot be ranked or shortlisted for recruitment.']);
+        }
+    }
+
     public function settings(Exam $exam): array
     {
         return [
@@ -66,6 +74,8 @@ class RecruitmentService
 
     public function ranking(Exam $exam): Collection
     {
+        $this->ensureTraditionalDecision($exam);
+
         return CandidateExamAttempt::query()
             ->where('exam_id', $exam->id)
             ->whereIn('status', [CandidateExamAttempt::STATUS_SUBMITTED, CandidateExamAttempt::STATUS_AUTO_SUBMITTED])
@@ -100,6 +110,7 @@ class RecruitmentService
 
     public function applyShortlist(Exam $exam): int
     {
+        $this->ensureTraditionalDecision($exam);
         $settings = $this->settings($exam);
         $limit = $settings['shortlist_limit'] ? (int) $settings['shortlist_limit'] : null;
         $ranking = $this->ranking($exam)

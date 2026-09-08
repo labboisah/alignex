@@ -5,6 +5,7 @@ namespace App\Policies;
 use App\Models\Exam;
 use App\Models\User;
 use App\Policies\Concerns\AuthorizesOrganizationAccess;
+use App\Services\AdaptiveRolloutService;
 
 class ExamPolicy
 {
@@ -32,6 +33,27 @@ class ExamPolicy
         }
 
         return $this->viewAny($user) && $this->canAccessOrganization($user, $exam);
+    }
+
+    public function viewAdaptiveReport(User $user, Exam $exam): bool
+    {
+        if (! $user->isPortalUser() || ! $user->hasPermission('viewReports')) {
+            return false;
+        }
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+        // Reports contain every area. Partial teaching/facilitator access is insufficient.
+        if ($user->isTeacher() || $user->isFacilitator()) {
+            return false;
+        }
+        $type = $exam->effectiveOwnerType();
+        $column = $type.'_id';
+
+        return in_array($type, ['organization', 'institution', 'professional_school', 'cbt_center'], true)
+            && $exam->$column !== null
+            && app(AdaptiveRolloutService::class)->ownerKey($exam) === $type.':'.$exam->$column
+            && (string) $user->$column === (string) $exam->$column;
     }
 
     public function create(User $user): bool

@@ -7,6 +7,7 @@ use App\Http\Resources\AdaptiveReadinessResource;
 use App\Models\AdaptiveSnapshot;
 use App\Models\Exam;
 use App\Services\AdaptivePreparationService;
+use App\Services\AdaptiveRolloutService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -22,6 +23,7 @@ class AdaptivePreparationController extends Controller
 
         return Inertia::render('Exams/AdaptivePreparation', [
             'exam' => ['id' => $exam->id, 'title' => $exam->title],
+            'rollout' => app(AdaptiveRolloutService::class)->status($exam),
             'readiness' => (new AdaptiveReadinessResource($data['readiness']))->resolve($request),
             'snapshots' => AdaptiveSnapshot::where('exam_id', $exam->id)->latest('version')
                 ->get(['id', 'version', 'ready', 'created_at']),
@@ -32,6 +34,6 @@ class AdaptivePreparationController extends Controller
     {
         $snapshot = $service->prepare($exam, $request->user()->id);
 
-        return back()->with('success', 'Adaptive snapshot version '.$snapshot->version.' saved. Live delivery remains disabled.');
+        return back()->with('success', 'Adaptive snapshot version '.$snapshot->version.' saved. Delivery requires explicit pilot approval for this owner and exam.');
     }
 }

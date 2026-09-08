@@ -71,7 +71,7 @@ class AdaptivePresentationService
                 'settings' => ['require_fullscreen' => (bool) ($controls['require_fullscreen'] ?? false),
                     'require_webcam' => (bool) ($controls['require_webcam'] ?? false),
                     'monitor_screenshots' => (bool) ($controls['monitor_screenshots'] ?? false)],
-                'instructions' => 'Confirm each answer to continue. Confirmed answers cannot be changed. Only your current question is available.'],
+                'instructions' => 'This is an adaptive practice/diagnostic pilot, not a certification or recruitment result. Confirm each answer to continue. Confirmed answers cannot be changed. Only your current question is available.'],
             'can_start' => $allowed && $level->status === 'prepared' && $attempt->exam->status === 'active'
                 && (! $starts || ! $starts->isFuture()) && (! $ends || $ends->isFuture()) && $open,
             'starts_in_seconds' => $starts ? max(0, (int) now()->diffInSeconds($starts, false)) : 0,

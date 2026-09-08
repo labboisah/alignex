@@ -8,7 +8,7 @@ use Illuminate\Validation\ValidationException;
 
 class AdaptiveRolloutService
 {
-    public const MESSAGE = 'Adaptive delivery is not available yet. Save this exam as a draft. Existing started attempts keep their original paper.';
+    public const MESSAGE = 'Adaptive practice requires an enabled pilot, an approved owner and exam, and online assessment/practice delivery. Existing started attempts retain their original delivery.';
 
     public function isAdaptive(Exam $exam): bool
     {
@@ -36,16 +36,19 @@ class AdaptiveRolloutService
         $enabled = (bool) config('adaptive.pilot_enabled', false);
         $allowlisted = in_array($this->ownerKey($exam), config('adaptive.pilot_owners', []), true);
         $categoryEligible = in_array($exam->exam_category, [Exam::CATEGORY_ASSESSMENT, Exam::CATEGORY_PRACTICE], true)
-            && $exam->effectiveOwnerType() !== Exam::OWNER_SECONDARY_SCHOOL;
-        // Change only when the implementation acceptance gates are met, not via an environment toggle.
-        $runtimeReady = false;
+            && in_array($exam->effectiveOwnerType(), [Exam::OWNER_ORGANIZATION, Exam::OWNER_INSTITUTION, Exam::OWNER_PROFESSIONAL_SCHOOL, Exam::OWNER_CBT_CENTER], true);
+        $runtimeReady = true; // Online descriptive diagnostics only; not validated ability scoring.
+        $examAllowlisted = $exam->id && in_array((string) $exam->id, config('adaptive.pilot_exams', []), true);
+        $online = $exam->delivery_mode === 'online';
 
         return [
             'pilot_enabled' => $enabled,
             'owner_allowlisted' => $allowlisted,
             'category_eligible' => $categoryEligible,
             'runtime_ready' => $runtimeReady,
-            'can_publish' => $enabled && $allowlisted && $categoryEligible && $runtimeReady,
+            'exam_allowlisted' => (bool) $examAllowlisted,
+            'online_eligible' => $online,
+            'can_publish' => $enabled && $allowlisted && $examAllowlisted && $categoryEligible && $online && $runtimeReady,
             'message' => self::MESSAGE,
         ];
     }
@@ -75,6 +78,8 @@ class AdaptiveRolloutService
         }
 
         if ($this->isAdaptive($proposed) && in_array($proposed->status, [Exam::STATUS_SCHEDULED, Exam::STATUS_ACTIVE], true)) {
+            $proposed = clone $proposed;
+            $proposed->setAttribute('id', $existing?->id);
             $this->ensureDeliveryAllowed($proposed);
         }
     }

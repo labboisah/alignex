@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AdaptiveAttemptState;
+use App\Models\AdaptiveProgression;
 use App\Models\CandidateExamAttempt;
 use App\Models\CandidatePerformanceProfile;
 use App\Models\Exam;
 use App\Models\User;
 use App\Services\AdaptiveLifecycleService;
+use App\Services\AdaptiveReportService;
 use App\Services\CandidatePerformanceProfileService;
 use App\Services\ResultManagementService;
 use Illuminate\Database\Eloquent\Builder;
@@ -28,7 +31,7 @@ class ResultController extends Controller
             ->withCount(['attempts as submitted_attempts_count' => fn ($query) => $query->whereIn('status', [
                 CandidateExamAttempt::STATUS_SUBMITTED,
                 CandidateExamAttempt::STATUS_AUTO_SUBMITTED,
-            ])])
+            ])->whereNotIn('id', AdaptiveAttemptState::select('attempt_id'))])
             ->latest()
             ->get()
             ->map(fn (Exam $exam) => [
@@ -41,10 +44,12 @@ class ResultController extends Controller
                 'submitted_attempts_count' => $exam->submitted_attempts_count,
                 'total_marks' => $exam->total_marks,
                 'pass_mark' => $exam->pass_mark,
+                'has_adaptive_progressions' => app(AdaptiveReportService::class)->hasProgressions($exam),
             ]);
 
         $attempts = CandidateExamAttempt::query()
             ->whereIn('exam_id', $exams->pluck('id'))
+            ->whereNotIn('id', AdaptiveAttemptState::select('attempt_id'))
             ->whereIn('status', [CandidateExamAttempt::STATUS_SUBMITTED, CandidateExamAttempt::STATUS_AUTO_SUBMITTED])
             ->with(['candidate', 'exam', 'answers.subject', 'proctoringEvents'])
             ->get();
@@ -57,6 +62,10 @@ class ResultController extends Controller
 
     public function show(Request $request, Exam $exam): InertiaResponse
     {
+        if (app(AdaptiveReportService::class)->hasProgressions($exam)
+            && ! $this->results->queryForExam($exam)->exists()) {
+            return app(AdaptiveReportController::class)->index($request, $exam);
+        }
         $this->authorizeExam($request->user(), $exam);
         $exam->loadMissing(['organization', 'institution', 'school', 'secondarySchool', 'professionalSchool', 'center', 'cbtCenter']);
         $attempts = $this->results->queryForExam($exam)->get();
@@ -80,6 +89,11 @@ class ResultController extends Controller
 
     public function candidate(Request $request, CandidateExamAttempt $attempt): InertiaResponse
     {
+        if (app(AdaptiveLifecycleService::class)->handles($attempt)) {
+            $progression = AdaptiveProgression::where('exam_id', $attempt->exam_id)->where('candidate_id', $attempt->candidate_id)->firstOrFail();
+
+            return app(AdaptiveReportController::class)->show($request, $progression, app(AdaptiveReportService::class));
+        }
         $attempt->loadMissing(['exam', 'candidate', 'answers.question.options', 'answers.subject', 'papers.question.options', 'papers.question.subject', 'papers.question.questionBank', 'proctoringEvents']);
         $this->authorizeExam($request->user(), $attempt->exam);
 
@@ -149,6 +163,7 @@ class ResultController extends Controller
 
     public function markedPaperPdf(Request $request, CandidateExamAttempt $attempt)
     {
+        abort_if(app(AdaptiveLifecycleService::class)->handles($attempt), 404, 'Use the adaptive progression report.');
         $attempt->loadMissing(['exam.organization', 'exam.institution', 'exam.school', 'exam.secondarySchool', 'exam.professionalSchool', 'exam.center', 'exam.cbtCenter', 'candidate', 'answers.question.options', 'answers.subject', 'papers.question.options', 'papers.question.subject', 'papers.question.questionBank', 'proctoringEvents']);
         $this->authorizeExam($request->user(), $attempt->exam);
 
@@ -212,6 +227,7 @@ class ResultController extends Controller
         $data = $request->validate(['hash' => ['required', 'string']]);
         $attempt = CandidateExamAttempt::query()
             ->where('result_hash', strtoupper(trim($data['hash'])))
+            ->whereNotIn('id', AdaptiveAttemptState::select('attempt_id'))
             ->with(['candidate', 'exam', 'answers.subject', 'proctoringEvents'])
             ->first();
 

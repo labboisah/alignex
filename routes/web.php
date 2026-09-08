@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccessControlController;
 use App\Http\Controllers\AdaptivePreparationController;
+use App\Http\Controllers\AdaptiveReportController;
 use App\Http\Controllers\AdminRegistrationController;
 use App\Http\Controllers\AppReleaseController;
 use App\Http\Controllers\CandidateClientDownloadController;
@@ -107,6 +108,12 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
     Route::patch('/organizations/{organization}/deactivate', [OrganizationController::class, 'deactivate'])
         ->middleware(['role:super_admin', 'permission:manageOrganizations'])
         ->name('organizations.deactivate');
+
+    Route::middleware('permission:viewReports')->group(function (): void {
+        Route::get('/results/adaptive/exams/{exam}', [AdaptiveReportController::class, 'index'])->name('results.adaptive.index');
+        Route::get('/results/adaptive/progressions/{progression}', [AdaptiveReportController::class, 'show'])->name('results.adaptive.show');
+        Route::get('/results/adaptive/progressions/{progression}/export.csv', [AdaptiveReportController::class, 'export'])->middleware('plan.feature:csv_export')->name('results.adaptive.export');
+    });
 
     Route::middleware(['role:super_admin', 'permission:manageAccessControls'])->group(function (): void {
         Route::get('/access-controls', [AccessControlController::class, 'index'])->name('access-controls.index');
