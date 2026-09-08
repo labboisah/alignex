@@ -35,3 +35,6 @@ Thumbs.db
 /public/phase4-test/
 /test-results/
 /playwright-report/
+/services/adaptive-engine/.venv/
+**/__pycache__/
+**/.pytest_cache/

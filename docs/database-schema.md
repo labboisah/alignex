@@ -770,3 +770,8 @@ Question banks and candidates also carry corrected ownership fields so exam crea
 ## Offline Sync Notes
 
 The tables marked `Both` should eventually support offline package generation and sync. Future migrations may add `uuid`, `sync_batch_id`, `synced_at`, `source_device_id`, or checksum columns where needed. Do not add those fields until the offline center module is being designed.
+
+
+## Phase 6 adaptive research persistence
+
+`adaptive_calibrations` stores an immutable encrypted parameter/provenance payload tied to a frozen snapshot, a version/fingerprint, importer/reviewer identities and draft/reviewed/revoked research status. `adaptive_engine_runs` stores immutable encrypted requests/results, request hashes, progression/level/calibration identity, replay links, actor, duration and fixed failure codes. Both use restrictive foreign keys and retain historical records. No candidate scoring table is altered. See [Phase 6 schema and operational details](exams/adaptive-phase-6.md).

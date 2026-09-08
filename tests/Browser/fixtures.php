@@ -93,5 +93,9 @@ function browserFixture(array $input): array
     }
     $exam->update(['status' => 'active']);
 
-    return ['exam_id' => $exam->id, 'code' => $exam->code, 'identifier' => $candidate->candidate_number, 'actor_id' => $actor->id, 'actor_email' => $actor->email];
+    $researchReviewer = ($input['research'] ?? false) ? User::factory()->create([
+        'organization_id' => $organization->id, 'role' => User::ROLE_ORGANIZATION_ADMIN, ...$ownerFields,
+    ]) : null;
+
+    return ['reviewer_email' => $researchReviewer?->email, 'exam_id' => $exam->id, 'code' => $exam->code, 'identifier' => $candidate->candidate_number, 'actor_id' => $actor->id, 'actor_email' => $actor->email];
 }

@@ -95,3 +95,8 @@ Adaptive work includes two independently controlled capabilities: response-depen
 The penalty is a configured percentage of remaining recoverable marks. For example, 60 remaining marks with a 10% penalty yields 54 available marks, not 50. Penalties do not remove already earned marks. Explicit maximum levels and minimum budgets are required because percentage deductions alone may never exhaust the balance.
 
 Scored closure does not imply mastery. Practice after closure cannot increase the final score. Progressive settings default off, must not change active/historical attempts, and must not affect traditional terminal exams or ordinary CBT scoring.
+
+
+## Phase 6 engineering foundation
+
+Authenticated FastAPI shadow evaluation, frozen calibration import/review/revocation, replayable research history and a reference-case validation runner are implemented. Full Phase 6 acceptance awaits the promised calibration data and specialist criteria, representative validation, operational evidence and owner approval. No live external-engine dispatch or consequential scoring is enabled. See [Phase 6 engineering and acceptance work](exams/adaptive-phase-6.md).

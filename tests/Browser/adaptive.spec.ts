@@ -279,3 +279,40 @@ test('adaptive report list explains its empty state before candidate preparation
     await page.goto('/results/adaptive/exams/' + data.exam_id);
     await expect(page.getByText('No adaptive candidate progressions have been prepared.')).toBeVisible();
 });
+
+test('phase 6 calibration template import independent review and revocation', async ({ page, request }) => {
+    const data = await fixture(request, { research: true });
+    async function adminLogin(email: string) {
+        await page.goto('/login');
+        await page.getByLabel('Email', { exact: true }).fill(email);
+        await page.getByLabel('Password', { exact: true }).fill('password');
+        await page.getByRole('button', { name: 'Log in', exact: true }).click();
+        await expect(page).not.toHaveURL(/\/login$/);
+    }
+    await adminLogin(data.actor_email);
+    const url = '/exams/' + data.exam_id + '/adaptive/research';
+    await page.goto(url);
+    await expect(page.getByText('No calibration data has been imported.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Run shadow evaluation' })).toBeDisabled();
+    const templateUrl = await page.getByRole('link', { name: /Snapshot.*template/ }).first().getAttribute('href');
+    const response = await page.request.get(templateUrl!);
+    expect(response.ok()).toBeTruthy();
+    const payload = await response.json();
+    expect(payload.items[0].a).toBeNull();
+    Object.assign(payload, { source_reference: 'Synthetic browser data', specialist: 'Browser reviewer', sample_size: 100, criteria_reference: 'Synthetic criteria', validation_notes: 'Not validated.' });
+    payload.policy.target_sd = 0.5;
+    payload.items.forEach((item: Record<string, unknown>) => Object.assign(item, { a: 1, b: 0, exposure_limit: 100 }));
+    await page.getByLabel('Calibration JSON').fill(JSON.stringify(payload));
+    await page.getByRole('button', { name: 'Import draft' }).click();
+    await expect(page.getByRole('heading', { name: /Calibration.*draft/ })).toBeVisible();
+    await page.getByRole('button', { name: 'Review for shadow use' }).click();
+    await expect(page.getByRole('alert').filter({ hasText: /different reviewer/ })).toBeVisible();
+    await page.getByRole('button', { name: 'Logout', exact: true }).click();
+    await adminLogin(data.reviewer_email);
+    await page.goto(url);
+    await page.getByRole('button', { name: 'Review for shadow use' }).click();
+    await expect(page.getByRole('heading', { name: /Calibration.*reviewed/ })).toBeVisible();
+    await page.getByRole('button', { name: 'Revoke', exact: true }).click();
+    await expect(page.getByRole('heading', { name: /Calibration.*revoked/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Run shadow evaluation' })).toBeDisabled();
+});

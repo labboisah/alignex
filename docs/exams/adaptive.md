@@ -1,6 +1,12 @@
 # Adaptive examination knowledge base
 
-Reviewed: 8 September 2026. Status: Phase 5 diagnostic reporting and restricted online pilot controls implemented. Pilot defaults remain disabled; no live cohort was enabled.
+Reviewed: 8 September 2026. Status: Phase 6 engineering foundation implemented in shadow mode. Full Phase 6 validation remains pending the promised calibration data and specialist criteria. Pilot/engine defaults remain disabled.
+
+## Phase 6 engineering status
+
+A separate authenticated FastAPI research engine now computes experimental 2PL/EAP estimates, uncertainty, constrained item proposals and stopping/classification results. Laravel supports versioned calibration imports, independent review/revocation, bounded shadow requests and immutable replay history. Candidate delivery and exact recovery scoring continue to use the existing diagnostic lifecycle.
+
+The external engine cannot issue candidate questions or promote estimates into grades, certificates or recruitment decisions. See [Phase 6 implementation, calibration format and remaining acceptance work](adaptive-phase-6.md). The owner has confirmed that calibration data and criteria will be provided; no representative dataset has yet been assessed.
 
 ## Phase 5 implementation status
 

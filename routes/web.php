@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccessControlController;
 use App\Http\Controllers\AdaptivePreparationController;
 use App\Http\Controllers\AdaptiveReportController;
+use App\Http\Controllers\AdaptiveResearchController;
 use App\Http\Controllers\AdminRegistrationController;
 use App\Http\Controllers\AppReleaseController;
 use App\Http\Controllers\CandidateClientDownloadController;
@@ -110,6 +111,12 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
         ->name('organizations.deactivate');
 
     Route::middleware('permission:viewReports')->group(function (): void {
+        Route::get('/exams/{exam}/adaptive/research', [AdaptiveResearchController::class, 'show'])->name('adaptive.research');
+        Route::get('/exams/{exam}/adaptive/research/template/{snapshot}', [AdaptiveResearchController::class, 'template'])->name('adaptive.research.template');
+        Route::post('/exams/{exam}/adaptive/research/calibrations', [AdaptiveResearchController::class, 'import'])->name('adaptive.research.import');
+        Route::post('/exams/{exam}/adaptive/research/calibrations/{calibration}', [AdaptiveResearchController::class, 'transition'])->name('adaptive.research.transition');
+        Route::post('/exams/{exam}/adaptive/research/evaluate', [AdaptiveResearchController::class, 'evaluate'])->middleware('throttle:10,1')->name('adaptive.research.evaluate');
+        Route::post('/exams/{exam}/adaptive/research/runs/{run}/replay', [AdaptiveResearchController::class, 'replay'])->middleware('throttle:10,1')->name('adaptive.research.replay');
         Route::get('/results/adaptive/exams/{exam}', [AdaptiveReportController::class, 'index'])->name('results.adaptive.index');
         Route::get('/results/adaptive/progressions/{progression}', [AdaptiveReportController::class, 'show'])->name('results.adaptive.show');
         Route::get('/results/adaptive/progressions/{progression}/export.csv', [AdaptiveReportController::class, 'export'])->middleware('plan.feature:csv_export')->name('results.adaptive.export');

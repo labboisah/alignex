@@ -27,6 +27,7 @@ export default function AdaptivePreparation({ exam, readiness, snapshots, rollou
                         <tbody>{readiness.areas.map(area => <tr key={area.area_key}><td className="py-2">{area.area_key}</td><td>{area.question_count}</td><td>{area.required}</td><td>{area.available}</td><td>{area.difficulty.easy} / {area.difficulty.medium} / {area.difficulty.hard}</td></tr>)}</tbody>
                     </table>}
             </div>
+            <Link className="text-primary underline" href={'/exams/' + exam.id + '/adaptive/research'}>Calibration and shadow engine research</Link>
             <Button disabled={processing} onClick={() => post('/exams/' + exam.id + '/adaptive/prepare', { preserveScroll: true })}>{processing ? 'Saving snapshot...' : 'Save preparation snapshot'}</Button>
             <div className="rounded-md border border-border bg-white p-4">
                 <h2 className="font-semibold">Snapshot history</h2>

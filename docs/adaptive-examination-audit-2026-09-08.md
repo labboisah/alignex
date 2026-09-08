@@ -30,6 +30,12 @@ Diagnostic progression reports, scoped/audited exports, release containment and 
 
 Verification: **152 backend tests / 1,632 assertions**, followed by **20 targeted tests / 377 assertions** for the final ownership/legacy safeguards; **four browser scenarios verified** across the suite and corrected-case rerun. See [Phase 5 delivery notes, browser verification and pilot acceptance checklist](exams/adaptive-phase-5.md). Live cohort observation and assessment-owner acceptance remain operational gates. Phase 6 is the next engineering phase; earlier audit/phase statements below are historical.
 
+## Phase 6 engineering update
+
+The authenticated FastAPI shadow engine, frozen calibration import/review/revoke lifecycle, immutable evaluation/replay history, bounded Laravel client and reference-data validation runner are implemented. Live candidate dispatch and consequential scoring remain gated; no representative calibration dataset or specialist acceptance evidence has been supplied yet.
+
+See [Phase 6 engineering evidence, input format and remaining acceptance work](exams/adaptive-phase-6.md). The Phase 6 gate is not complete: the promised data/criteria, representative validity and operational checks, owner approval and a validated live external-engine path remain outstanding.
+
 ## Assessment
 
 **Adaptive examination is at foundation/prototype level, not a completed adaptive candidate workflow.** Administrators can select adaptive mode in several contexts, a standalone service can move between difficulty bands, and results include topic/difficulty summaries. However, paper generation and candidate delivery still use the fixed-paper workflow regardless of mode. Selecting “adaptive” does not currently establish response-dependent question delivery.
@@ -232,6 +238,8 @@ Add attempt-specific item-path history, topic coverage, evidence counts, raw pra
 **Gate:** reports accurately distinguish descriptive practice results from validated adaptive scores; reviewer/auditor access is scoped; no automatic recruitment/certification decision depends on an unvalidated pilot result. Every enabled context has creation-to-result tests.
 
 ### Phase 6 — FastAPI and validated adaptive assessment
+
+Status: engineering foundation implemented in shadow mode; full acceptance remains pending. See [Phase 6 implementation and validation requirements](exams/adaptive-phase-6.md).
 
 Implement the internal engine contract, calibrated item data lifecycle, ability/uncertainty computation where selected, content/exposure controls, stopping/classification rules, replayability, and versioned result interpretation. Assign a qualified assessment specialist to item calibration and scoring validation; engineering tests alone are insufficient acceptance for this phase.
 
