@@ -12,7 +12,7 @@ class ExamOwnershipRules
     public static function allowedCategories(string $ownerType): array
     {
         return match ($ownerType) {
-            Exam::OWNER_SECONDARY_SCHOOL => [Exam::CATEGORY_TERMINAL, Exam::CATEGORY_ASSESSMENT],
+            Exam::OWNER_SECONDARY_SCHOOL => [Exam::CATEGORY_TERMINAL, Exam::CATEGORY_ASSESSMENT, Exam::CATEGORY_PRACTICE],
             Exam::OWNER_INSTITUTION => [Exam::CATEGORY_ASSESSMENT],
             Exam::OWNER_PROFESSIONAL_SCHOOL => [Exam::CATEGORY_PROFESSIONAL, Exam::CATEGORY_CERTIFICATION, Exam::CATEGORY_PRACTICE, Exam::CATEGORY_ASSESSMENT],
             Exam::OWNER_CBT_CENTER,
@@ -34,7 +34,7 @@ class ExamOwnershipRules
     public static function allowedModes(string $ownerType): array
     {
         return match ($ownerType) {
-            Exam::OWNER_SECONDARY_SCHOOL => [Exam::MODE_TRADITIONAL],
+            Exam::OWNER_SECONDARY_SCHOOL => [Exam::MODE_TRADITIONAL, Exam::MODE_ADAPTIVE],
             Exam::OWNER_INSTITUTION,
             Exam::OWNER_PROFESSIONAL_SCHOOL,
             Exam::OWNER_CBT_CENTER,
@@ -45,6 +45,11 @@ class ExamOwnershipRules
 
     public static function isValid(string $ownerType, string $category, string $mode): bool
     {
+        if ($ownerType === Exam::OWNER_SECONDARY_SCHOOL && $mode === Exam::MODE_ADAPTIVE
+            && ! in_array($category, [Exam::CATEGORY_ASSESSMENT, Exam::CATEGORY_PRACTICE], true)) {
+            return false;
+        }
+
         return in_array($category, self::allowedCategories($ownerType), true)
             && in_array($mode, self::allowedModes($ownerType), true);
     }

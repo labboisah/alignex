@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccessControlController;
+use App\Http\Controllers\AdaptivePilotController;
 use App\Http\Controllers\AdaptivePreparationController;
 use App\Http\Controllers\AdaptiveReportController;
 use App\Http\Controllers\AdaptiveResearchController;
@@ -384,6 +385,9 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
             Route::post('/exams/{exam}/supervisors', [ExamController::class, 'storeSupervisor'])->name('exams.supervisors.store');
             Route::delete('/exams/{exam}/supervisors/{supervisor}', [ExamController::class, 'destroySupervisor'])->name('exams.supervisors.destroy');
             Route::post('/exams/{exam}/participants/refresh', [ExamController::class, 'refreshParticipants'])->name('exams.participants.refresh');
+            Route::get('/exams/{exam}/adaptive/pilot', [AdaptivePilotController::class, 'show'])->name('exams.adaptive.pilot');
+            Route::post('/exams/{exam}/adaptive/pilot', [AdaptivePilotController::class, 'update']);
+            Route::post('/exams/{exam}/adaptive/pilot/packages', [AdaptivePilotController::class, 'package']);
             Route::get('/exams/{exam}/adaptive', [AdaptivePreparationController::class, 'show'])->name('exams.adaptive.show');
             Route::post('/exams/{exam}/adaptive/prepare', [AdaptivePreparationController::class, 'store'])->name('exams.adaptive.prepare');
             Route::get('/exams/{exam}/papers', [ExamPaperController::class, 'show'])->name('exams.papers.show');

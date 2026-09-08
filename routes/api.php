@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AdaptiveCandidateController;
+use App\Http\Controllers\Api\AdaptiveOfflinePilotController;
 use App\Http\Controllers\Api\CandidateExamController;
 use App\Http\Controllers\Api\OfflineExamPackageController;
 use App\Http\Controllers\Api\OfflineServerActivationController;
@@ -27,3 +28,6 @@ Route::post('/offline/activate', [OfflineServerActivationController::class, 'sto
 Route::get('/offline/exam-packages/{examCode}', [OfflineExamPackageController::class, 'show']);
 Route::get('/offline/updates', [OfflineUpdateController::class, 'index']);
 Route::get('/offline/updates/{artifact}/download', [OfflineUpdateController::class, 'download']);
+
+Route::get('/offline/adaptive/packages/{package}', [AdaptiveOfflinePilotController::class, 'package'])->middleware('throttle:10,1');
+Route::post('/offline/adaptive/leases/{lease}/sync', [AdaptiveOfflinePilotController::class, 'sync'])->middleware('throttle:10,1');

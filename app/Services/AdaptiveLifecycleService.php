@@ -130,11 +130,12 @@ class AdaptiveLifecycleService
 
     private function eligible(CandidateExamAttempt $attempt, AdaptiveSnapshot $snapshot, bool $starting): void
     {
+        app(AdaptivePilotService::class)->ensureCloudCandidate($attempt->exam, $attempt->candidate_id);
         Gate::forUser($attempt->candidate)->authorize('participate', $attempt);
         $exam = $attempt->exam;
         if (! $exam->candidates()->where('candidates.id', $attempt->candidate_id)->exists()
             || app(AdaptiveRolloutService::class)->ownerKey($exam) !== $snapshot->owner_key
-            || $exam->effectiveOwnerType() === Exam::OWNER_SECONDARY_SCHOOL
+            || ! in_array($snapshot->blueprint['category'], [Exam::CATEGORY_ASSESSMENT, Exam::CATEGORY_PRACTICE], true)
             || $snapshot->blueprint['delivery_mode'] !== 'online') {
             $this->reject('exam', 'This candidate is no longer eligible for this adaptive exam.');
         }

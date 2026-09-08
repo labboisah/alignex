@@ -22,6 +22,7 @@ class AdaptiveAttemptPreparationService
     {
         return DB::transaction(function () use ($exam, $candidate): CandidateExamAttempt {
             $exam = Exam::whereKey($exam->id)->lockForUpdate()->firstOrFail();
+            app(AdaptivePilotService::class)->ensureCloudCandidate($exam, $candidate->id);
             app(AdaptiveRolloutService::class)->ensureDeliveryAllowed($exam);
             if ($exam->effectiveMode() !== Exam::MODE_ADAPTIVE || $exam->status !== Exam::STATUS_ACTIVE
                 || ($exam->ends_at && $exam->ends_at->lessThanOrEqualTo(now()))

@@ -8,8 +8,8 @@ use App\Models\CandidateExamAttempt;
 use App\Models\Exam;
 use App\Models\Question;
 use App\Models\User;
-use App\Services\AdaptiveRolloutService;
 use App\Services\OfflineActivationGuard;
+use App\Services\OfflineExamCapabilityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -48,7 +48,7 @@ class OfflineExamPackageController extends Controller
             return response()->json(['message' => 'Exam is not available for offline import.'], 409);
         }
 
-        app(AdaptiveRolloutService::class)->ensureDeliveryAllowed($exam);
+        app(OfflineExamCapabilityService::class)->ensureExportAllowed($exam, $user);
 
         $candidates = $exam->candidates()->orderBy('candidate_number')->get();
 
@@ -98,6 +98,8 @@ class OfflineExamPackageController extends Controller
 
         $package = [
             'manifest' => [
+                'package_contract' => OfflineExamCapabilityService::PACKAGE_CONTRACT,
+                'exam_mode' => Exam::MODE_TRADITIONAL,
                 'package_id' => 'exam-'.$exam->id.'-'.optional($exam->updated_at)->timestamp,
                 'exam_id' => (string) $exam->id,
                 'exam_code' => (string) $exam->code,
@@ -291,12 +293,7 @@ class OfflineExamPackageController extends Controller
 
     private function ownerType(Exam $exam): string
     {
-        return $exam->owner_type ?? match (true) {
-            $exam->professional_school_id !== null => Exam::OWNER_PROFESSIONAL_SCHOOL,
-            $exam->secondary_school_id !== null || $exam->school_id !== null => Exam::OWNER_SECONDARY_SCHOOL,
-            $exam->cbt_center_id !== null || $exam->center_id !== null => Exam::OWNER_CBT_CENTER,
-            default => Exam::OWNER_ORGANIZATION,
-        };
+        return $exam->effectiveOwnerType() ?? Exam::OWNER_ORGANIZATION;
     }
 
     private function unitLabel(string $ownerType): string

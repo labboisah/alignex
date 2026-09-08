@@ -31,7 +31,7 @@ function browserFixture(array $input): array
             'cbt_center' => CbtCenter::class, 'secondary_school' => SecondarySchool::class][$type];
         $entity = $model::create(['organization_id' => $organization->id, 'name' => $type,
             'code' => 'B'.Str::random(8), 'status' => 'active', 'contact_person' => 'Browser Admin',
-            'email' => 'browser@example.test', 'phone' => '08030000000', 'address' => 'Lagos', 'location' => 'Lagos', 'capacity' => 30]);
+            'email' => 'browser-'.Str::uuid().'@example.test', 'phone' => '08030000000', 'address' => 'Lagos', 'location' => 'Lagos', 'capacity' => 30]);
         $ownerId = $entity->id;
         $ownerFields[$type.'_id'] = $ownerId;
     }

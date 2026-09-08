@@ -128,13 +128,13 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
     const allowedCategories = isAssessmentRole
         ? examCategories.filter((category) => category.value === 'assessment')
         : isSecondaryExam
-        ? examCategories.filter((category) => ['terminal', 'assessment'].includes(category.value))
+        ? examCategories.filter((category) => ['terminal', 'assessment', 'practice'].includes(category.value))
         : isInstitutionExam
             ? examCategories.filter((category) => category.value === 'assessment')
         : isProfessionalExam
-            ? examCategories.filter((category) => ['professional', 'certification', 'practice'].includes(category.value))
+            ? examCategories.filter((category) => ['professional', 'certification', 'practice', 'assessment'].includes(category.value))
             : examCategories.filter((category) => category.value !== 'terminal');
-    const allowedModes = isSecondaryExam ? modes.filter((mode) => mode.value === 'traditional') : modes;
+    const allowedModes = isSecondaryExam && !['assessment', 'practice'].includes(data.exam_category) ? modes.filter((mode) => mode.value === 'traditional') : modes;
     const paperLabel = isInstitutionExam ? 'Course' : isProfessionalExam ? 'Module' : 'Subject';
     const paperLabelPlural = isInstitutionExam ? 'Courses' : isProfessionalExam ? 'Modules' : 'Subjects';
     const paperStepLabel = isInstitutionExam ? 'Course Paper' : isProfessionalExam ? 'Course / Module Paper' : 'Subjects';

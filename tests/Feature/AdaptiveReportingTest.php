@@ -206,6 +206,8 @@ class AdaptiveReportingTest extends TestCase
         $this->assertFalse($service->status($exam)['can_publish']);
         $exam->exam_owner_type = 'secondary_school';
         config(['adaptive.pilot_exams' => [$exam->id], 'adaptive.pilot_owners' => [$service->ownerKey($exam)]]);
+        $this->assertTrue($service->status($exam)['can_publish']);
+        $exam->exam_category = 'terminal';
         $this->assertFalse($service->status($exam)['can_publish']);
     }
 }

@@ -30,7 +30,7 @@ async function envelope(page: Page) {
 }
 test.beforeEach(async ({ page }) => { page.on('dialog', dialog => dialog.accept()); });
 
-for (const owner of ['organization', 'institution', 'professional_school', 'cbt_center']) {
+for (const owner of ['organization', 'institution', 'professional_school', 'cbt_center', 'secondary_school']) {
     test(owner + ': explicit start, current-only answers and recovery', async ({ page, request }) => {
         const data = await start(page, request, { owner });
         const first = await envelope(page);
@@ -315,4 +315,26 @@ test('phase 6 calibration template import independent review and revocation', as
     await page.getByRole('button', { name: 'Revoke', exact: true }).click();
     await expect(page.getByRole('heading', { name: /Calibration.*revoked/ })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Run shadow evaluation' })).toBeDisabled();
+});
+
+test('diagnostic pilot controls save explicit owner approval', async ({page,request})=>{
+    const data=await fixture(request);
+    await page.goto('/login');
+    await page.getByLabel('Email',{exact:true}).fill(data.actor_email);
+    await page.getByLabel('Password',{exact:true}).fill('password');
+    await page.getByRole('button',{name:'Log in',exact:true}).click();
+    await page.waitForURL(url => !url.pathname.startsWith('/login'));
+    await page.goto('/exams/'+data.exam_id+'/adaptive/pilot');
+    await expect(page.getByRole('heading',{name:'Pilot controls',exact:true})).toBeVisible();
+    await page.getByLabel('Enable online diagnostic starts').check();
+    await page.getByLabel('Permit new offline package reservations').check();
+    await page.getByLabel('Purpose and cohort limits').fill('Supervised diagnostic pilot with a small assigned cohort.');
+    await page.getByLabel('This is a diagnostic pilot', {exact:false}).check();
+    await Promise.all([
+        page.waitForResponse(r=>r.request().method()==='POST' && r.url().endsWith('/adaptive/pilot')),
+        page.getByRole('button',{name:'Save pilot controls',exact:true}).click(),
+    ]);
+    await expect(page.getByLabel('Enable online diagnostic starts')).toBeChecked();
+    await page.reload();
+    await expect(page.getByLabel('Permit new offline package reservations')).toBeChecked();
 });

@@ -230,7 +230,7 @@ class AdaptiveContractsTest extends TestCase
         $this->assertSame(1250, AdaptiveSettings::units('12.5'));
     }
 
-    public function test_each_supported_entity_scopes_its_pool_and_secondary_remains_blocked(): void
+    public function test_each_supported_entity_scopes_its_formative_pool(): void
     {
         foreach ([
             'institution' => Institution::class,
@@ -250,8 +250,8 @@ class AdaptiveContractsTest extends TestCase
                 $row->update(['selection_rules' => ['question_bank_ids' => [$bank->id], 'course_id' => $course->id]]);
             }
             $inspection = app(AdaptivePreparationService::class)->inspect($exam->fresh());
-            $this->assertSame($type !== 'secondary_school', $inspection['readiness']['ready'], $type);
-            $this->assertCount($type === 'secondary_school' ? 0 : 9, $inspection['items']);
+            $this->assertTrue($inspection['readiness']['ready'], $type);
+            $this->assertCount(9, $inspection['items']);
             $bank->update(['owner_id' => $entity->id + 1000]);
             $this->assertCount(0, app(AdaptivePreparationService::class)->inspect($exam->fresh())['items']);
         }

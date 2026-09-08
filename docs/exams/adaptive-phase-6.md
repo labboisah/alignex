@@ -2,7 +2,13 @@
 
 Implemented: 8 September 2026. **Phase 6 is not fully accepted.** Its engineering foundation runs in shadow mode; representative calibration data, specialist criteria and consequential-use approval are still required.
 
-The owner has confirmed that calibration data and validation criteria will be supplied. No such dataset was supplied or assessed during this implementation. Synthetic fixtures are used only to verify code.
+No real-response calibration dataset or specialist-approved criteria have been supplied. At the owner's request, the synthetic demonstration below was generated and evaluated for engineering checks only.
+
+## Synthetic demonstration supplied and evaluated
+
+At the owner's request, a reproducible [synthetic validation pack](../../services/adaptive-engine/examples/synthetic-validation/README.md) now provides 60 artificial item parameters, 150 simulated response histories and explicitly illustrative criteria. The existing Python engine/validator evaluated 6,000 simulated responses: all demo thresholds passed, while an inverted-reference negative control failed as expected.
+
+This pack uses assigned parameters, not parameters estimated from actual candidate responses. It does not map to or modify a Laravel question snapshot. Consequential approval remains false, real calibration sample size is zero, and no specialist approval is asserted. It proves neither empirical calibration nor the Phase 6 acceptance gate. See the pack for results, limitations, reproducible commands and the real-data requirements.
 
 ## What runs now
 

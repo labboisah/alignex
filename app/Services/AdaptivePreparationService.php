@@ -18,6 +18,10 @@ class AdaptivePreparationService
         if ($exam->effectiveMode() !== Exam::MODE_ADAPTIVE || $exam->mode !== $exam->effectiveMode()) {
             throw ValidationException::withMessages(['exam' => 'Choose consistent adaptive mode fields before preparing a snapshot.']);
         }
+        if ($exam->effectiveOwnerType() === Exam::OWNER_SECONDARY_SCHOOL
+            && ! in_array($exam->exam_category, [Exam::CATEGORY_ASSESSMENT, Exam::CATEGORY_PRACTICE], true)) {
+            throw ValidationException::withMessages(['exam' => 'Secondary-school adaptive delivery is limited to formative assessment or practice.']);
+        }
         $exam->load('examSubjects');
         $quota = (int) $exam->examSubjects->sum('question_count');
         $settings = AdaptiveSettings::validate($exam->settings ?? [], $quota, $exam->starts_at?->toDateTimeString());
@@ -173,6 +177,7 @@ class AdaptivePreparationService
             Exam::OWNER_INSTITUTION => 'institution_id',
             Exam::OWNER_PROFESSIONAL_SCHOOL => 'professional_school_id',
             Exam::OWNER_CBT_CENTER => 'cbt_center_id',
+            Exam::OWNER_SECONDARY_SCHOOL => 'secondary_school_id',
             default => null,
         };
         if (! $column || ! $exam->$column || (string) $bank->$column !== (string) $exam->$column || $bank->status !== QuestionBank::STATUS_ACTIVE) {

@@ -50,7 +50,7 @@ class ExamPolicy
         $type = $exam->effectiveOwnerType();
         $column = $type.'_id';
 
-        return in_array($type, ['organization', 'institution', 'professional_school', 'cbt_center'], true)
+        return in_array($type, ['organization', 'institution', 'professional_school', 'cbt_center', 'secondary_school'], true)
             && $exam->$column !== null
             && app(AdaptiveRolloutService::class)->ownerKey($exam) === $type.':'.$exam->$column
             && (string) $user->$column === (string) $exam->$column;

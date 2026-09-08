@@ -1,12 +1,14 @@
 # Adaptive examination knowledge base
 
-Reviewed: 8 September 2026. Status: Phase 6 engineering foundation implemented in shadow mode. Full Phase 6 validation remains pending the promised calibration data and specialist criteria. Pilot/engine defaults remain disabled.
+Reviewed: 8 September 2026. Supervised online/offline diagnostic pilots are implemented for all five owner contexts, including secondary-school formative assessment/practice. Terminal exams remain traditional. Consequential assessment validation remains pending.
+
+See [pilot setup and recovery runbook](adaptive-pilot.md) and [Phase 7 current status](adaptive-phase-7.md). Per-exam approval is required; no live cohort was automatically enabled. Earlier phase notes below describe historical increments and are superseded by the pilot runbook where they differ.
 
 ## Phase 6 engineering status
 
 A separate authenticated FastAPI research engine now computes experimental 2PL/EAP estimates, uncertainty, constrained item proposals and stopping/classification results. Laravel supports versioned calibration imports, independent review/revocation, bounded shadow requests and immutable replay history. Candidate delivery and exact recovery scoring continue to use the existing diagnostic lifecycle.
 
-The external engine cannot issue candidate questions or promote estimates into grades, certificates or recruitment decisions. See [Phase 6 implementation, calibration format and remaining acceptance work](adaptive-phase-6.md). The owner has confirmed that calibration data and criteria will be provided; no representative dataset has yet been assessed.
+The external engine cannot issue candidate questions or promote estimates into grades, certificates or recruitment decisions. See [Phase 6 implementation, calibration format and remaining acceptance work](adaptive-phase-6.md). A synthetic demonstration dataset and illustrative criteria have now been generated and evaluated; see the Phase 6 notes. No representative real-response dataset or specialist-approved criteria have yet been assessed.
 
 ## Phase 5 implementation status
 

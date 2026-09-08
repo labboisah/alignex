@@ -1,5 +1,10 @@
 # Adaptive examination implementation audit
 
+## Current diagnostic pilot update — 8 September 2026
+
+Online/offline supervised diagnostic delivery is implemented, including all five owner contexts and secondary-school formative assessments. Terminal exams remain traditional. See [the current pilot runbook](exams/adaptive-pilot.md) and [Phase 7 implementation](exams/adaptive-phase-7.md). These supersede older statements below that offline delivery or secondary formative adaptive is entirely unavailable. The remaining consequential calibration/validation and target-hardware rollout tasks are explicitly listed there.
+
+
 Date: 8 September 2026  
 Repository baseline: `e8050a7b`  
 Scope: Laravel backend, Inertia administration, candidate React Router app, database foundations, result reporting, offline package boundary, and existing tests. This records the original audit baseline and completion plan; subsequent implementation updates are documented below.
@@ -246,6 +251,8 @@ Implement the internal engine contract, calibrated item data lifecycle, ability/
 **Gate:** agreed accuracy, classification, content coverage, fairness, security, throughput and availability criteria pass on representative evaluation data. Recruitment/certification owners approve the decision rules before consequential use. Engine outage tests prove traditional CBT remains functional.
 
 ### Phase 7 — Offline center adaptation and staged rollout
+
+**Foundation implemented (8 September 2026):** cloud and offline server capability guards, additive fixed-paper manifest versioning, five-context package compatibility tests, aggregate operations reporting and rollout pause/resume regression coverage. See [Phase 7 notes](exams/adaptive-phase-7.md). **The full gate remains open:** adaptive offline runtime, signed packages, local/cloud replay, reconciliation, live selection metrics and supervised recovery are not yet implemented or validated. Phase 6 calibration/assessment acceptance is still pending.
 
 Treat adaptive offline delivery as a separate extension to the existing package boundary. Define supported local engine/runtime, approved signed pool/configuration packages, server-held scoring secrets, tamper-evident decisions, local deadline authority, recovery and synchronization conflict rules. Preserve existing fixed-paper package compatibility; unsupported adaptive offline imports must fail explicitly.
 

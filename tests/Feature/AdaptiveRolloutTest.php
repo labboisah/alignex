@@ -117,7 +117,7 @@ class AdaptiveRolloutTest extends TestCase
         }
         $this->assertTrue(ExamOwnershipRules::isValid('secondary_school', 'terminal', 'traditional'));
         $this->assertFalse(ExamOwnershipRules::isValid('secondary_school', 'terminal', 'adaptive'));
-        $this->assertFalse(ExamOwnershipRules::isValid('secondary_school', 'assessment', 'adaptive'));
+        $this->assertTrue(ExamOwnershipRules::isValid('secondary_school', 'assessment', 'adaptive'));
     }
 
     public function test_started_papers_cannot_be_converted_to_another_mode(): void

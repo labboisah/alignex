@@ -1,0 +1,50 @@
+{
+  "engine_version": "shadow-2pl-eap-v1",
+  "dataset_hash": "55dfa452ac5ec6d725418e36752d1672fba4a4e07ff641f21733ea8e6b1a37d0",
+  "source_reference": "SYNTHETIC ONLY: generate_synthetic_validation.py seed 20260908; no observed candidates; NEGATIVE CONTROL: inverted reference theta",
+  "criteria_reference": "SYNTHETIC-DEMO-v1: illustrative engineering thresholds; no specialist approval",
+  "overall": {
+    "n": 150,
+    "bias": -0.01973585728000196,
+    "rmse": 2.336536964210799,
+    "interval_coverage": 0.10666666666666667,
+    "classification_rate": 0.74,
+    "classification_accuracy": 0.0,
+    "p95_compute_ms": 16.480499994941056
+  },
+  "groups": {
+    "central_theta": {
+      "n": 50,
+      "bias": -0.1431036538653367,
+      "rmse": 0.933967736009321,
+      "interval_coverage": 0.32,
+      "classification_rate": 0.26,
+      "classification_accuracy": 0.0,
+      "p95_compute_ms": 11.617599986493587
+    },
+    "higher_theta": {
+      "n": 50,
+      "bias": 2.736930392538185,
+      "rmse": 2.8147774164853194,
+      "interval_coverage": 0.0,
+      "classification_rate": 0.98,
+      "classification_accuracy": 0.0,
+      "p95_compute_ms": 30.985199991846457
+    },
+    "lower_theta": {
+      "n": 50,
+      "bias": -2.6530343105128544,
+      "rmse": 2.7537151848199737,
+      "interval_coverage": 0.0,
+      "classification_rate": 0.98,
+      "classification_accuracy": 0.0,
+      "p95_compute_ms": 12.628300028154626
+    }
+  },
+  "criteria_passed": false,
+  "consequential_approved": false,
+  "limitations": "Reference-case computation only. Requires independent scale, sampling, DIF/fairness, load, availability and owner review. Timings exclude HTTP and database overhead.",
+  "synthetic": true,
+  "negative_control": "inverted_reference_theta",
+  "specialist_approved": false
+}
