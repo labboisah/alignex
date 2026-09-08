@@ -116,7 +116,7 @@ class SecondarySchoolFeatureTest extends TestCase
         $this->actingAs($admin)->post("/secondary-schools/{$school->id}/students", $payload)->assertSessionHasErrors('admission_number');
     }
 
-    public function test_subject_topic_and_question_bank_can_be_created_for_secondary_school(): void
+    public function test_secondary_subject_bank_creation_keeps_topic_authoring_disabled(): void
     {
         [$school, $admin] = $this->secondarySchoolAdmin();
 
@@ -128,12 +128,12 @@ class SecondarySchoolFeatureTest extends TestCase
 
         $subject = Subject::query()->where('secondary_school_id', $school->id)->firstOrFail();
 
-        $this->actingAs($admin)->post("/secondary-schools/{$school->id}/topics", [
+        $this->actingAs($admin)->post('/topics', [
             'subject_id' => $subject->id,
             'name' => 'Algebra',
             'code' => 'ALG',
             'status' => Topic::STATUS_ACTIVE,
-        ])->assertRedirect();
+        ])->assertNotFound();
 
         $this->actingAs($admin)->post('/question-bank', [
             'subject_id' => $subject->id,
@@ -142,7 +142,7 @@ class SecondarySchoolFeatureTest extends TestCase
             'status' => QuestionBank::STATUS_ACTIVE,
         ])->assertRedirect();
 
-        $this->assertDatabaseHas('topics', ['subject_id' => $subject->id, 'code' => 'ALG']);
+        $this->assertDatabaseMissing('topics', ['subject_id' => $subject->id, 'code' => 'ALG']);
         $this->assertDatabaseHas('question_banks', ['secondary_school_id' => $school->id, 'code' => 'MATH-TERM']);
     }
 
@@ -312,9 +312,9 @@ class SecondarySchoolFeatureTest extends TestCase
                         ->flatMap(fn ($item) => collect([data_get($item, 'label')])->merge(collect(data_get($item, 'children', []))->pluck('label')))
                         ->all();
 
-                    return in_array('Administration', $labels, true)
+                    return in_array('Admin', $labels, true)
                         && in_array('Academic Sessions', $labels, true)
-                        && in_array('Arms / Sections', $labels, true)
+                        && ! in_array('Arms / Sections', $labels, true)
                         && in_array('Exam', $labels, true)
                         && in_array('Questions', $labels, true)
                         && in_array('Exams', $labels, true)
@@ -366,7 +366,6 @@ class SecondarySchoolFeatureTest extends TestCase
             "/secondary-schools/{$school->id}/academic-sessions",
             "/secondary-schools/{$school->id}/terms",
             "/secondary-schools/{$school->id}/classes",
-            "/secondary-schools/{$school->id}/arms",
             "/secondary-schools/{$school->id}/student-groups",
             "/secondary-schools/{$school->id}/students",
         ] as $path) {
@@ -388,14 +387,13 @@ class SecondarySchoolFeatureTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->where('current_context.source', 'legacy_school')
                 ->where('auth.navigation', function ($navigation) {
-                    $administration = collect($navigation)->firstWhere('label', 'Administration');
+                    $administration = collect($navigation)->firstWhere('label', 'Admin');
 
                     $this->assertNotNull($administration);
                     $this->assertSame([
                         '/secondary-school/academic-sessions',
                         '/secondary-school/terms',
                         '/secondary-school/classes',
-                        '/secondary-school/arms',
                         '/secondary-school/students',
                         '/secondary-school/student-groups',
                     ], collect($administration['children'])->pluck('href')->values()->all());
@@ -408,7 +406,6 @@ class SecondarySchoolFeatureTest extends TestCase
             '/secondary-school/academic-sessions' => 'SecondarySchools/AcademicSessions',
             '/secondary-school/terms' => 'SecondarySchools/Terms',
             '/secondary-school/classes' => 'SecondarySchools/Classes',
-            '/secondary-school/arms' => 'SecondarySchools/Arms',
             '/secondary-school/students' => 'SecondarySchools/Students',
             '/secondary-school/student-groups' => 'SecondarySchools/StudentGroups',
         ] as $path => $component) {
@@ -532,8 +529,8 @@ class SecondarySchoolFeatureTest extends TestCase
             'school_class_id' => $class->id,
             'name' => 'Blue',
             'status' => 'inactive',
-        ])->assertRedirect();
-        $this->assertDatabaseHas('class_arms', ['id' => $arm->id, 'name' => 'Blue', 'status' => 'inactive']);
+        ])->assertNotFound();
+        $this->assertDatabaseHas('class_arms', ['id' => $arm->id, 'name' => 'Gold', 'status' => 'active']);
 
         $group = StudentGroup::query()->create(['school_class_id' => $class->id, 'name' => 'Science', 'code' => 'SCI', 'status' => 'active']);
         $this->actingAs($admin)->patch("/secondary-schools/{$school->id}/student-groups/{$group->id}", [
@@ -555,14 +552,14 @@ class SecondarySchoolFeatureTest extends TestCase
 
         $this->actingAs($admin)->delete("/secondary-schools/{$school->id}/students/{$student->id}")->assertRedirect();
         $this->actingAs($admin)->delete("/secondary-schools/{$school->id}/student-groups/{$group->id}")->assertRedirect();
-        $this->actingAs($admin)->delete("/secondary-schools/{$school->id}/arms/{$arm->id}")->assertRedirect();
+        $this->actingAs($admin)->delete("/secondary-schools/{$school->id}/arms/{$arm->id}")->assertNotFound();
         $this->actingAs($admin)->delete("/secondary-schools/{$school->id}/classes/{$class->id}")->assertRedirect();
         $this->actingAs($admin)->delete("/secondary-schools/{$school->id}/terms/{$term->id}")->assertRedirect();
         $this->actingAs($admin)->delete("/secondary-schools/{$school->id}/academic-sessions/{$session->id}")->assertRedirect();
 
         $this->assertSoftDeleted('students', ['id' => $student->id]);
         $this->assertSoftDeleted('student_groups', ['id' => $group->id]);
-        $this->assertDatabaseMissing('class_arms', ['id' => $arm->id]);
+        $this->assertDatabaseHas('class_arms', ['id' => $arm->id]);
         $this->assertSoftDeleted('school_classes', ['id' => $class->id]);
         $this->assertSoftDeleted('academic_terms', ['id' => $term->id]);
         $this->assertSoftDeleted('academic_sessions', ['id' => $session->id]);
@@ -594,7 +591,7 @@ class SecondarySchoolFeatureTest extends TestCase
                 'name' => 'Science',
                 'code' => 'SCI',
                 'status' => 'active',
-                'student_ids' => [$studentA->id, $studentB->id],
+                'student_ids' => [(string) $studentA->id, (string) $studentB->id],
             ])
             ->assertRedirect();
 
@@ -762,6 +759,8 @@ class SecondarySchoolFeatureTest extends TestCase
             'role' => User::ROLE_SECONDARY_SCHOOL_ADMIN,
             'secondary_school_id' => $school->id,
         ]);
+
+        $this->grantPlanFeatures($school, ['teacher_management', 'custom_reports', 'certificate_generation']);
 
         return [$school, $admin];
     }

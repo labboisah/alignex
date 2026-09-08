@@ -4,6 +4,10 @@ Date: 8 September 2026
 Repository baseline: `e8050a7b`  
 Scope: Laravel backend, Inertia administration, candidate React Router app, database foundations, result reporting, offline package boundary, and existing tests. This is an implementation audit and completion plan; application behavior has not been changed.
 
+## Phase 1 follow-up
+
+The findings and initial test results below are the historical audit baseline. Phase 1 containment, local inventory and regression reconciliation have now been implemented: the expanded selection passes 92 tests with 1,073 assertions. Adaptive live delivery remains disabled. See [Phase 1 implementation evidence](exams/adaptive-phase-1.md) for the complete disposition of the original 22 non-passing outcomes and the Phase 2 handoff.
+
 ## Assessment
 
 **Adaptive examination is at foundation/prototype level, not a completed adaptive candidate workflow.** Administrators can select adaptive mode in several contexts, a standalone service can move between difficulty bands, and results include topic/difficulty summaries. However, paper generation and candidate delivery still use the fixed-paper workflow regardless of mode. Selecting “adaptive” does not currently establish response-dependent question delivery.

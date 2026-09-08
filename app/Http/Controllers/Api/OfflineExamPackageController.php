@@ -8,6 +8,7 @@ use App\Models\CandidateExamAttempt;
 use App\Models\Exam;
 use App\Models\Question;
 use App\Models\User;
+use App\Services\AdaptiveRolloutService;
 use App\Services\OfflineActivationGuard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,9 +19,7 @@ use Illuminate\Support\Str;
 
 class OfflineExamPackageController extends Controller
 {
-    public function __construct(private readonly OfflineActivationGuard $activationGuard)
-    {
-    }
+    public function __construct(private readonly OfflineActivationGuard $activationGuard) {}
 
     public function show(Request $request, string $examCode): JsonResponse
     {
@@ -48,6 +47,8 @@ class OfflineExamPackageController extends Controller
         if (in_array($exam->status, [Exam::STATUS_CANCELLED, Exam::STATUS_COMPLETED], true)) {
             return response()->json(['message' => 'Exam is not available for offline import.'], 409);
         }
+
+        app(AdaptiveRolloutService::class)->ensureDeliveryAllowed($exam);
 
         $candidates = $exam->candidates()->orderBy('candidate_number')->get();
 

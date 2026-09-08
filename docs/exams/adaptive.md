@@ -2,6 +2,10 @@
 
 Reviewed: 8 September 2026. Status: configuration and isolated selection prototype; a complete adaptive candidate workflow is not implemented in the inspected delivery path.
 
+## Phase 1 implementation status
+
+Phase 1 containment and regression reconciliation are implemented. Adaptive drafts remain configurable for valid owners, but publication, new candidate starts, paper generation and offline export are blocked until the runtime is ready. Started legacy attempts retain their existing fixed-paper behavior. The expanded baseline passes 92 tests with 1,073 assertions. See [Phase 1 implementation and handoff](adaptive-phase-1.md) for rollout settings, inventory and detailed evidence.
+
 ## Meaning and present behavior
 
 An adaptive examination should use committed candidate responses to influence which eligible question is issued next, under server-controlled coverage, length, timing and scoring rules.

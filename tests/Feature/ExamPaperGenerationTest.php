@@ -128,6 +128,9 @@ class ExamPaperGenerationTest extends TestCase
             'subject_id' => $subject->id,
         ]);
 
+        $exam->update(['question_bank_id' => $bank->id]);
+        $exam->examSubjects()->update(['question_bank_id' => $bank->id]);
+
         foreach ([
             'easy' => Question::STATUS_DRAFT,
             'medium' => Question::STATUS_REVIEW,

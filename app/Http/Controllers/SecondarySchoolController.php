@@ -29,9 +29,7 @@ use Inertia\Response as InertiaResponse;
 
 class SecondarySchoolController extends Controller
 {
-    public function __construct(private readonly SecondarySchoolService $secondary)
-    {
-    }
+    public function __construct(private readonly SecondarySchoolService $secondary) {}
 
     public function list(Request $request): InertiaResponse
     {
@@ -1902,6 +1900,7 @@ class SecondarySchoolController extends Controller
             ]),
             'students' => $school->students()->create([
                 'school_class_id' => $context['school_class_id'] ?? null,
+                'class_arm_id' => $context['class_arm_id'] ?? null,
                 'admission_number' => trim($row['admission_number'] ?? ''),
                 'first_name' => $this->splitFullName(trim($row['full_name'] ?? ''))[0],
                 'last_name' => $this->splitFullName(trim($row['full_name'] ?? ''))[1],

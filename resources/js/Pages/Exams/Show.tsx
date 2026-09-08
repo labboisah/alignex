@@ -12,6 +12,7 @@ export default function ShowExam({ exam, can, supervisors = [], supervisorOption
     const isAssessmentRole = auth.user?.role === 'teacher' || auth.user?.role === 'facilitator';
     const noun = isAssessmentRole ? 'Assessment' : 'Exam';
     const record = exam.data;
+    const adaptiveNotice = usePage().props.adaptive_notice as string | null;
     const { data, setData, post, processing, reset } = useForm({ user_id: '', role: 'supervisor' });
     const isSecondary = record.owner_context === 'secondary_school' || record.secondary_school_id;
     const isProfessional = record.owner_context === 'professional_school' || record.professional_school_id;
@@ -41,6 +42,7 @@ export default function ShowExam({ exam, can, supervisors = [], supervisorOption
                         </>
                     }
                 />
+                {adaptiveNotice && <div role="status" className="mb-5 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{adaptiveNotice}</div>}
                 <div className="grid gap-4 md:grid-cols-4">
                     <Metric label="Status" value={record.status_label} badge={record.status} />
                     <Metric label="Owner Context" value={record.owner_context_label ?? 'Exam'} />

@@ -74,6 +74,10 @@ Each module should include:
 - Advanced analytics, exports, and audit dashboards.
 
 
+## Phase 1 progress
+
+Adaptive Phase 1 now includes default-off pilot controls, exact owner allowlist configuration, draft-only containment, preservation of started legacy attempts, a read-only inventory command and a reconciled 92-test regression baseline. The local inventory contains no adaptive-labelled exams. See [implementation evidence and Phase 2 handoff](exams/adaptive-phase-1.md). Adaptive selection and progressive recovery scoring are still planned.
+
 ## Adaptive delivery and progressive remediation plan
 
 Status: agreed design; not implemented. See the [adaptive knowledge base](exams/adaptive.md#agreed-extension-progressive-weakness-focused-levels) for behavior and scoring, and the [detailed implementation plan](adaptive-examination-audit-2026-09-08.md#progressive-remediation-implementation-plan-agreed-extension) for backend tasks and acceptance tests.

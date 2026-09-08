@@ -37,10 +37,24 @@ class CandidateExamSessionService
             throw ValidationException::withMessages(['token' => 'Exam token has expired.']);
         }
 
-        return CandidateExamAttempt::query()
+        $attempt = CandidateExamAttempt::query()
             ->with(['candidate', 'exam', 'papers.question.subject', 'papers.question.options'])
             ->whereKey($payload['attempt_id'] ?? null)
             ->firstOrFail();
+
+        $this->ensureRolloutAccess($request, $attempt);
+
+        return $attempt;
+    }
+
+    public function ensureRolloutAccess(Request $request, CandidateExamAttempt $attempt): void
+    {
+        try {
+            app(AdaptiveRolloutService::class)->ensureAttemptAccess($attempt);
+        } catch (ValidationException $exception) {
+            $this->log($request, 'adaptive_start_blocked', $attempt, [], AdaptiveRolloutService::MESSAGE);
+            throw $exception;
+        }
     }
 
     public function ensureWritable(CandidateExamAttempt $attempt): void

@@ -9,7 +9,6 @@ use App\Models\CandidateAnswer;
 use App\Models\CandidateExamAttempt;
 use App\Models\Exam;
 use App\Models\ProctoringEvent;
-use App\Models\Question;
 use App\Services\CandidateExamSessionService;
 use App\Services\CandidatePerformanceProfileService;
 use App\Services\ExamMonitorService;
@@ -28,9 +27,7 @@ use Illuminate\Validation\ValidationException;
 
 class CandidateExamController extends Controller
 {
-    public function __construct(private readonly CandidateExamSessionService $session)
-    {
-    }
+    public function __construct(private readonly CandidateExamSessionService $session) {}
 
     public function login(Request $request): JsonResponse
     {
@@ -85,6 +82,7 @@ class CandidateExamController extends Controller
         }
 
         $this->ensureProfessionalEligibility($request, $exam, $attempt);
+        $this->session->ensureRolloutAccess($request, $attempt);
 
         try {
             $this->bindDeviceIfRequired($exam, $attempt, $data['device_fingerprint']);
@@ -443,6 +441,7 @@ class CandidateExamController extends Controller
                 'device_fingerprint_hash' => Hash::make($fingerprint),
                 'device_fingerprint' => $fingerprint,
             ]);
+
             return;
         }
 
@@ -504,7 +503,7 @@ class CandidateExamController extends Controller
             $attempt = CandidateExamAttempt::query()
                 ->whereKey($attempt->id)
                 ->lockForUpdate()
-            ->with(['exam', 'papers.question.subject', 'papers.question.options', 'answers.question.options'])
+                ->with(['exam', 'papers.question.subject', 'papers.question.options', 'answers.question.options'])
                 ->firstOrFail();
 
             if (! $this->isOpenAttempt($attempt)) {
@@ -582,7 +581,7 @@ class CandidateExamController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $metadata
+     * @param  array<string, mixed>  $metadata
      * @return array<string, mixed>
      */
     private function prepareEventMetadata(CandidateExamAttempt $attempt, array $metadata): array
@@ -591,11 +590,13 @@ class CandidateExamController extends Controller
 
         if (! is_string($snapshot) || ! (bool) data_get($attempt->exam?->settings ?? [], 'require_webcam', false)) {
             unset($metadata['webcam_snapshot']);
+
             return $metadata;
         }
 
         if (! preg_match('/^data:image\/(jpeg|jpg|png);base64,/', $snapshot, $matches)) {
             unset($metadata['webcam_snapshot']);
+
             return $metadata;
         }
 
@@ -603,6 +604,7 @@ class CandidateExamController extends Controller
 
         if ($binary === false) {
             unset($metadata['webcam_snapshot']);
+
             return $metadata;
         }
 

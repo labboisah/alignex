@@ -10,8 +10,8 @@ use App\Models\AcademicSession;
 use App\Models\AcademicTerm;
 use App\Models\Candidate;
 use App\Models\CandidateGroup;
-use App\Models\Center;
 use App\Models\CbtCenter;
+use App\Models\Center;
 use App\Models\Course;
 use App\Models\Exam;
 use App\Models\ExamSupervisor;
@@ -25,6 +25,7 @@ use App\Models\SecondarySchool;
 use App\Models\StudentGroup;
 use App\Models\Subject;
 use App\Models\User;
+use App\Services\AdaptiveRolloutService;
 use App\Services\CurrentContextService;
 use App\Services\ExamParticipantAssignmentService;
 use App\Services\ExamStatusService;
@@ -79,6 +80,7 @@ class ExamController extends Controller
 
         return Inertia::render('Exams/Show', [
             'exam' => ExamResource::make($exam->load(['organization', 'institution', 'faculty', 'department', 'school', 'center', 'secondarySchool', 'professionalSchool', 'cbtCenter', 'examType', 'questionBank', 'examSubjects.subject', 'examSubjects.questionBank', 'candidates'])->loadCount(['participants', 'attempts', 'examSubjects'])),
+            'adaptive_notice' => app(AdaptiveRolloutService::class)->isAdaptive($exam) ? AdaptiveRolloutService::MESSAGE : null,
             'supervisors' => $this->supervisorRows($exam),
             'supervisorOptions' => $this->supervisorOptions($request->user(), $exam),
             'can' => [
@@ -383,6 +385,8 @@ class ExamController extends Controller
             'settings' => $data['settings'],
         ];
 
+        app(AdaptiveRolloutService::class)->ensureSaveAllowed(new Exam($payload), $exam);
+
         if ($tenant['exam_owner_type'] === Exam::OWNER_SECONDARY_SCHOOL) {
             $secondaryStudentIds = $this->secondaryStudentIdsForExam($tenant, $data);
             $payload['settings'] = [
@@ -528,7 +532,6 @@ class ExamController extends Controller
             'course_id' => $course->id,
         ];
     }
-
 
     private function professionalBatchCandidateIds(array $tenant, array $data): array
     {
@@ -874,6 +877,7 @@ class ExamController extends Controller
                 ['value' => Exam::CATEGORY_PRACTICE, 'label' => 'Practice'],
                 ['value' => Exam::CATEGORY_GENERAL, 'label' => 'General'],
             ],
+            'adaptive_notice' => AdaptiveRolloutService::MESSAGE,
             'modes' => [
                 ['value' => 'traditional', 'label' => 'Traditional'],
                 ['value' => 'adaptive', 'label' => 'Adaptive'],
@@ -972,7 +976,6 @@ class ExamController extends Controller
                     ->orWhere('organization_id', $request->user()?->organization_id)))
             ->value('id');
     }
-
 
     private function secondaryOptions(Request $request, $query, array $columns)
     {
@@ -1308,7 +1311,7 @@ class ExamController extends Controller
     }
 
     /**
-     * @param array<int, string> $candidateIds
+     * @param  array<int, string>  $candidateIds
      */
     private function syncCbtCandidates(Exam $exam, array $tenant, array $candidateIds): void
     {

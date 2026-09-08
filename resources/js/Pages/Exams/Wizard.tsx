@@ -66,6 +66,7 @@ const defaultSettings: ExamSettings = {
 
 export function ExamWizard({ exam, subjects, organizations = [], schools = [], centers = [], secondarySchools = [], professionalSchools = [], cbtCenters = [], academicSessions = [], academicTerms = [], studentGroups = [], programmes = [], courses = [], modules = [], trainingBatches = [], participantCandidates = [], cbtCandidates = [], questionGroups = [], candidateGroups = [], questionBanks = [], examTypes, examCategories = [], modes, deliveryModes, statuses, submitLabel }: { exam?: Exam; subjects: { data: SubjectOption[] }; organizations?: TenantOption[]; schools?: TenantOption[]; centers?: TenantOption[]; secondarySchools?: TenantOption[]; professionalSchools?: TenantOption[]; cbtCenters?: TenantOption[]; academicSessions?: TenantOption[]; academicTerms?: TenantOption[]; studentGroups?: TenantOption[]; programmes?: TenantOption[]; courses?: TenantOption[]; modules?: TenantOption[]; trainingBatches?: TenantOption[]; participantCandidates?: TenantOption[]; cbtCandidates?: TenantOption[]; questionGroups?: TenantOption[]; candidateGroups?: TenantOption[]; questionBanks?: TenantOption[]; examTypes: SelectOption[]; examCategories?: SelectOption[]; modes: SelectOption[]; deliveryModes: SelectOption[]; statuses: SelectOption[]; submitLabel: string }) {
     const [step, setStep] = useState(1);
+    const adaptiveNotice = usePage().props.adaptive_notice as string | undefined;
     const auth = usePage().props.auth as { user?: { role?: string } };
     const isAssessmentRole = auth.user?.role === 'teacher' || auth.user?.role === 'facilitator';
     const currentContext = (usePage().props.current_context ?? null) as CurrentContext | null;
@@ -174,6 +175,8 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
                     </div>
                 </div>
             )}
+
+            {data.mode === 'adaptive' && adaptiveNotice && <div role="status" className="mb-5 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{adaptiveNotice}</div>}
 
             <div className="mb-5 grid gap-2 md:grid-cols-4">
                 {['Basic Information', paperStepLabel, 'Settings', 'Review'].map((label, index) => (

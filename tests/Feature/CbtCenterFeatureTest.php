@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Candidate;
+use App\Models\CandidateGroup;
 use App\Models\CbtCenter;
 use App\Models\Exam;
 use App\Models\Organization;
@@ -68,9 +69,11 @@ class CbtCenterFeatureTest extends TestCase
     {
         $center = $this->center();
         $admin = $this->cbtAdmin($center);
+        $group = CandidateGroup::factory()->create(['organization_id' => $center->organization_id, 'cbt_center_id' => $center->id]);
 
         $this->actingAs($admin)
             ->post("/cbt-centers/{$center->id}/candidates", [
+                'candidate_group_id' => $group->id,
                 'registration_number' => 'CBT-001',
                 'full_name' => 'Ada Candidate',
                 'email' => 'ada@example.test',
@@ -88,6 +91,7 @@ class CbtCenterFeatureTest extends TestCase
 
         $this->actingAs($admin)
             ->post("/cbt-centers/{$center->id}/candidates", [
+                'candidate_group_id' => $group->id,
                 'registration_number' => 'CBT-001',
                 'full_name' => 'Duplicate Candidate',
                 'status' => Candidate::STATUS_ACTIVE,
@@ -97,7 +101,7 @@ class CbtCenterFeatureTest extends TestCase
         $file = UploadedFile::fake()->createWithContent('candidates.csv', "registration_number,full_name,email,phone,nin,status\nCBT-002,Grace Hopper,grace@example.test,08030000002,22222222222,active\nCBT-002,Grace Duplicate,dup@example.test,08030000003,33333333333,active\n");
 
         $this->actingAs($admin)
-            ->post("/cbt-centers/{$center->id}/candidates/import", ['file' => $file])
+            ->post("/cbt-centers/{$center->id}/candidates/import", ['file' => $file, 'candidate_group_id' => $group->id])
             ->assertRedirect()
             ->assertSessionHas('import_summary');
 
@@ -107,13 +111,15 @@ class CbtCenterFeatureTest extends TestCase
         ]);
     }
 
-    public function test_cbt_center_can_create_question_bank_without_academic_or_professional_structure(): void
+    public function test_cbt_center_can_create_subject_bank_without_school_or_training_hierarchy(): void
     {
         $center = $this->center();
         $admin = $this->cbtAdmin($center);
+        $subject = Subject::factory()->create(['organization_id' => $center->organization_id, 'cbt_center_id' => $center->id]);
 
         $this->actingAs($admin)
             ->post("/cbt-centers/{$center->id}/question-banks", [
+                'subject_id' => $subject->id,
                 'name' => 'General CBT Bank',
                 'code' => 'GCBT',
                 'description' => 'General center questions.',
@@ -125,7 +131,7 @@ class CbtCenterFeatureTest extends TestCase
             'owner_type' => Exam::OWNER_CBT_CENTER,
             'owner_id' => $center->id,
             'cbt_center_id' => $center->id,
-            'subject_id' => null,
+            'subject_id' => $subject->id,
             'code' => 'GCBT',
         ]);
     }
@@ -151,7 +157,7 @@ class CbtCenterFeatureTest extends TestCase
 
         $this->actingAs($admin)
             ->post('/exams', $this->examPayload($subject->id, $bank->id, [], ['exam_code' => 'CBT-NO-CAN']))
-            ->assertSessionHasErrors('candidate_ids');
+            ->assertSessionHasErrors('candidate_group_ids');
 
         $this->actingAs($admin)
             ->post('/exams', $this->examPayload($subject->id, $bank->id, [$candidate->id], [
@@ -174,6 +180,7 @@ class CbtCenterFeatureTest extends TestCase
                 'exam_category' => Exam::CATEGORY_RECRUITMENT,
                 'mode' => Exam::MODE_ADAPTIVE,
                 'exam_mode' => Exam::MODE_ADAPTIVE,
+                'status' => Exam::STATUS_DRAFT,
             ]))
             ->assertRedirect();
 
@@ -206,8 +213,8 @@ class CbtCenterFeatureTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Dashboard/Index')
                 ->where('auth.navigation.1.label', 'Candidates')
-                ->where('auth.navigation.3.label', 'Exams')
-                ->where('auth.navigation.4.label', 'Traditional CBT Exams')
+                ->where('auth.navigation.2.children.3.label', 'Exams')
+                ->where('auth.navigation.2.children.4.label', 'Traditional CBT Exams')
             );
 
         $orgAdmin = User::factory()->create(['role' => User::ROLE_ORGANIZATION_ADMIN, 'organization_id' => $organization->id]);
@@ -264,6 +271,7 @@ class CbtCenterFeatureTest extends TestCase
             'organization_id' => $center->organization_id,
             'cbt_center_id' => $center->id,
             'created_by' => $admin->id,
+            'subject_id' => $subject->id,
             'name' => 'CBT Bank',
             'code' => fake()->unique()->bothify('CBT-BANK-###'),
             'status' => QuestionBank::STATUS_ACTIVE,
@@ -281,6 +289,14 @@ class CbtCenterFeatureTest extends TestCase
 
     private function examPayload(string $subjectId, string $questionBankId, array $candidateIds, array $overrides = []): array
     {
+        $groupIds = [];
+        if ($candidateIds !== []) {
+            $candidate = Candidate::findOrFail($candidateIds[0]);
+            $group = CandidateGroup::factory()->create(['organization_id' => $candidate->organization_id, 'cbt_center_id' => $candidate->cbt_center_id]);
+            $group->candidates()->sync($candidateIds);
+            $groupIds = [$group->id];
+        }
+
         return array_replace_recursive([
             'title' => 'CBT General Exam',
             'exam_code' => 'CBT-GEN',
@@ -295,7 +311,8 @@ class CbtCenterFeatureTest extends TestCase
             'pass_mark' => 10,
             'status' => Exam::STATUS_SCHEDULED,
             'question_bank_id' => $questionBankId,
-            'candidate_ids' => $candidateIds,
+            'candidate_ids' => [],
+            'candidate_group_ids' => $groupIds,
             'subjects' => [
                 [
                     'subject_id' => $subjectId,

@@ -17,6 +17,7 @@ use App\Models\TrainingBatch;
 use App\Models\User;
 use Database\Seeders\RolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -124,7 +125,7 @@ class ProfessionalExamFeatureTest extends TestCase
         $this->assertDatabaseHas('candidates', [
             'professional_school_id' => $school->id,
             'programme_id' => $programme->id,
-            'course_id' => $course->id,
+            'course_id' => null,
             'training_batch_id' => $batch->id,
             'candidate_number' => 'PRO-TRA-001',
         ]);
@@ -216,6 +217,7 @@ class ProfessionalExamFeatureTest extends TestCase
     public function test_organization_admin_can_manage_professional_certificates_and_verification(): void
     {
         [$exam, $attempt] = $this->professionalExam();
+        $this->grantPlanFeatures($exam->organization, ['certificate_generation']);
         $admin = User::factory()->create([
             'role' => User::ROLE_ORGANIZATION_ADMIN,
             'organization_id' => $exam->organization_id,
@@ -378,7 +380,21 @@ class ProfessionalExamFeatureTest extends TestCase
 
     private function examPayload(Subject $subject, array $overrides = []): array
     {
+        $batch = TrainingBatch::query()->create([
+            'professional_school_id' => $subject->professional_school_id,
+            'programme_id' => $overrides['programme_id'] ?? null,
+            'name' => 'Exam cohort', 'code' => 'COHORT-'.Str::random(8), 'status' => 'active',
+        ]);
+        $bank = QuestionBank::factory()->create([
+            'organization_id' => null, 'professional_school_id' => $subject->professional_school_id,
+            'owner_type' => Exam::OWNER_PROFESSIONAL_SCHOOL, 'owner_id' => $subject->professional_school_id,
+            'subject_id' => $subject->id, 'programme_id' => $overrides['programme_id'] ?? null,
+            'course_id' => $overrides['course_id'] ?? null, 'module_id' => $overrides['module_id'] ?? null,
+        ]);
+
         return [
+            'training_batch_id' => $batch->id,
+            'question_bank_id' => $bank->id,
             'exam_owner_type' => Exam::OWNER_PROFESSIONAL_SCHOOL,
             'exam_category' => Exam::CATEGORY_PROFESSIONAL,
             'title' => 'Cloud Architecture Certification',
@@ -391,7 +407,7 @@ class ProfessionalExamFeatureTest extends TestCase
             'end_at' => now()->addDays(2)->toDateTimeString(),
             'duration_minutes' => 90,
             'pass_mark' => 50,
-            'status' => Exam::STATUS_SCHEDULED,
+            'status' => ($overrides['mode'] ?? Exam::MODE_ADAPTIVE) === Exam::MODE_ADAPTIVE ? Exam::STATUS_DRAFT : Exam::STATUS_SCHEDULED,
             'subjects' => [
                 [
                     'subject_id' => (string) $subject->id,

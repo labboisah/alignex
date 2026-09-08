@@ -8,12 +8,12 @@ use App\Models\Exam;
 use App\Models\ExamParticipant;
 use App\Models\Question;
 use App\Models\Student;
+use App\Services\Notifications\ExamNotificationService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use App\Services\Notifications\ExamNotificationService;
 
 class ExamPaperGeneratorService
 {
@@ -79,6 +79,8 @@ class ExamPaperGeneratorService
      */
     public function generate(Exam $exam): array
     {
+        app(AdaptiveRolloutService::class)->ensureDeliveryAllowed($exam);
+
         if (! $this->canGenerate($exam)) {
             throw ValidationException::withMessages(['exam' => 'Papers cannot be regenerated after the exam or a candidate attempt has started.']);
         }
@@ -112,6 +114,7 @@ class ExamPaperGeneratorService
 
                 if ($attempt->papers()->exists()) {
                     $skipped++;
+
                     continue;
                 }
 
@@ -171,7 +174,7 @@ class ExamPaperGeneratorService
     }
 
     /**
-     * @param array<int, string> $candidateIds
+     * @param  array<int, string>  $candidateIds
      * @return array{details_sent: int, reminders_scheduled: int}
      */
     private function notifyGeneratedCandidates(Exam $exam, array $candidateIds): array

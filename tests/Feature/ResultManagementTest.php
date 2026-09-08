@@ -13,8 +13,8 @@ use App\Models\ExamSubject;
 use App\Models\Faculty;
 use App\Models\Institution;
 use App\Models\Organization;
-use App\Models\Programme;
 use App\Models\ProctoringEvent;
+use App\Models\Programme;
 use App\Models\Question;
 use App\Models\QuestionBank;
 use App\Models\QuestionOption;
@@ -33,6 +33,7 @@ class ResultManagementTest extends TestCase
     public function test_organization_admin_can_view_exam_results_and_exports(): void
     {
         [$exam, $attempt] = $this->submittedAttempt();
+        $this->grantPlanFeatures($exam->organization, ['csv_export', 'pdf_export']);
         $admin = User::factory()->create([
             'role' => User::ROLE_ORGANIZATION_ADMIN,
             'organization_id' => $exam->organization_id,

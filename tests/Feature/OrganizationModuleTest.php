@@ -2,14 +2,15 @@
 
 namespace Tests\Feature;
 
-use App\Models\Organization;
 use App\Models\Candidate;
 use App\Models\Exam;
+use App\Models\Organization;
 use App\Models\QuestionBank;
 use App\Models\Subject;
 use App\Models\User;
 use Database\Seeders\RolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -169,7 +170,7 @@ class OrganizationModuleTest extends TestCase
             'code' => 'NCB',
             'organization_type' => Organization::TYPE_CERTIFICATION_BODY,
         ]);
-        $this->assertFalse(\Illuminate\Support\Facades\Schema::hasColumn('organizations', 'school_type'));
+        $this->assertFalse(Schema::hasColumn('organizations', 'school_type'));
     }
 
     public function test_organization_admin_can_create_direct_candidate(): void
@@ -234,6 +235,7 @@ class OrganizationModuleTest extends TestCase
                 ->post('/exams', $this->examPayload($subject->id, $row['code'], $row['category'], $row['mode'], [
                     'question_bank_id' => $bank->id,
                     'candidate_ids' => [$candidate->id],
+                    'status' => $row['mode'] === Exam::MODE_ADAPTIVE ? Exam::STATUS_DRAFT : Exam::STATUS_SCHEDULED,
                 ]))
                 ->assertRedirect();
         }
@@ -277,7 +279,7 @@ class OrganizationModuleTest extends TestCase
 
         $this->actingAs($admin)
             ->post('/exams', $this->examPayload($subject->id, 'ORG-NO-PARTS', Exam::CATEGORY_RECRUITMENT))
-            ->assertSessionHasErrors(['question_bank_id', 'candidate_ids']);
+            ->assertSessionHasErrors(['subjects.0.question_bank_id', 'candidate_ids']);
     }
 
     public function test_organization_dashboard_returns_organization_metrics(): void
@@ -314,9 +316,9 @@ class OrganizationModuleTest extends TestCase
                 ->has('auth.navigation', fn (Assert $navigation) => $navigation
                     ->where('0.label', 'Dashboard')
                     ->where('1.label', 'Candidates')
-                    ->where('2.label', 'Question Bank')
+                    ->where('2.label', 'Questions')
                     ->where('3.label', 'Exams')
-                    ->where('4.label', 'Recruitment Exams')
+                    ->where('3.children.1.label', 'Recruitment Exams')
                     ->etc()
                 )
             );
