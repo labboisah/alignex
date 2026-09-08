@@ -81,7 +81,8 @@ class AdaptiveRolloutTest extends TestCase
         $this->withToken($token)->postJson('/api/candidate/answer', [
             'question_id' => $paper->question_id, 'selected_option_ids' => [$option->id],
         ])->assertOk();
-        $this->withToken($token)->postJson('/api/candidate/submit')->assertOk()->assertJsonPath('score', '2.00');
+        $this->withToken($token)->postJson('/api/candidate/submit')->assertOk()->assertJsonMissingPath('score');
+        $this->assertSame('2.00', $attempt->fresh()->score);
         $this->assertSame($due, $attempt->fresh()->server_due_at->toISOString());
         $this->assertSame('adaptive', $exam->fresh()->effectiveMode());
         $this->assertSame(1, $attempt->papers()->count());

@@ -1,15 +1,15 @@
 <?php
 
+use App\Models\OfflineActivationCode;
+use App\Services\ExamStatusService;
+use App\Services\Notifications\NotificationDispatcher;
+use Database\Seeders\NotificationTemplateSeeder;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Str;
-use App\Models\OfflineActivationCode;
-use App\Services\ExamStatusService;
-use App\Services\Notifications\NotificationDispatcher;
-use Database\Seeders\NotificationTemplateSeeder;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -55,3 +55,5 @@ Artisan::command('offline:activation-code {--organization_id=} {--cbt_center_id=
     $this->line("Code: {$plainCode}");
     $this->line("License days: {$days}");
 })->purpose('Create an offline server activation code for an organization or CBT center');
+
+Schedule::command('adaptive:expire')->everyMinute()->withoutOverlapping();

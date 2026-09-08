@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\CandidateExamAttempt;
+use App\Services\AdaptiveLifecycleService;
 use App\Services\CandidateExamSessionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -22,6 +23,9 @@ class CandidateExamPayloadResource extends JsonResource
     {
         /** @var CandidateExamAttempt $attempt */
         $attempt = $this->resource;
+        if (app(AdaptiveLifecycleService::class)->handles($attempt)) {
+            return app(AdaptiveLifecycleService::class)->execute($attempt, 'read', $request->only('device_fingerprint')) + ['exam_token' => $this->token];
+        }
         $session = app(CandidateExamSessionService::class);
         $startsInSeconds = $attempt->exam?->starts_at
             ? max(0, (int) ceil(now()->diffInSeconds($attempt->exam->starts_at, false)))
@@ -66,7 +70,7 @@ class CandidateExamPayloadResource extends JsonResource
             'starts_in_seconds' => $startsInSeconds,
             'exam_token' => $this->token,
             'questions' => CandidatePaperResource::collection(
-                $attempt->papers
+                ($attempt->started_at && $attempt->status === CandidateExamAttempt::STATUS_IN_PROGRESS ? $attempt->papers : collect())
                     ->sortBy('question_order')
                     ->values()
             )->resolve($request),

@@ -6,9 +6,12 @@ use App\Models\CandidateExamAttempt;
 use App\Models\CandidatePerformanceProfile;
 use App\Models\Exam;
 use App\Models\User;
+use App\Services\AdaptiveLifecycleService;
+use App\Services\CandidatePerformanceProfileService;
 use App\Services\ResultManagementService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -16,9 +19,7 @@ use Inertia\Response as InertiaResponse;
 
 class ResultController extends Controller
 {
-    public function __construct(private readonly ResultManagementService $results)
-    {
-    }
+    public function __construct(private readonly ResultManagementService $results) {}
 
     public function index(Request $request): InertiaResponse
     {
@@ -257,6 +258,15 @@ class ResultController extends Controller
             throw ValidationException::withMessages(['registration_number' => 'Candidate result was not found.']);
         }
 
+        if (app(AdaptiveLifecycleService::class)->handles($attempt)) {
+            $result = app(AdaptiveLifecycleService::class)->releasedResult($attempt);
+            if (! $result) {
+                throw ValidationException::withMessages(['exam' => 'The aggregate result is not available.']);
+            }
+
+            return response()->json(['result' => $result]);
+        }
+
         return response()->json(['result' => $this->results->row($attempt)]);
     }
 
@@ -339,7 +349,7 @@ class ResultController extends Controller
     }
 
     /**
-     * @param \Illuminate\Support\Collection<int, CandidatePerformanceProfile> $profiles
+     * @param  Collection<int, CandidatePerformanceProfile>  $profiles
      * @return array<int, array<string, mixed>>
      */
     private function aggregateProfiles($profiles, array $keys): array
@@ -357,7 +367,7 @@ class ResultController extends Controller
                     'total_questions' => $group->sum('total_questions'),
                     'correct_answers' => $group->sum('correct_answers'),
                     'score_percentage' => $percentage,
-                    'mastery_level' => app(\App\Services\CandidatePerformanceProfileService::class)->masteryLevel($percentage),
+                    'mastery_level' => app(CandidatePerformanceProfileService::class)->masteryLevel($percentage),
                 ];
             })
             ->sortBy('score_percentage')
@@ -366,7 +376,7 @@ class ResultController extends Controller
     }
 
     /**
-     * @param \Illuminate\Support\Collection<int, CandidatePerformanceProfile> $profiles
+     * @param  Collection<int, CandidatePerformanceProfile>  $profiles
      * @return array<int, array<string, mixed>>
      */
     private function difficultyPerformance($profiles): array
@@ -383,7 +393,7 @@ class ResultController extends Controller
     }
 
     /**
-     * @param \Illuminate\Support\Collection<int, CandidatePerformanceProfile> $profiles
+     * @param  Collection<int, CandidatePerformanceProfile>  $profiles
      * @return array<int, array<string, mixed>>
      */
     private function recommendations($profiles): array
@@ -420,7 +430,7 @@ class ResultController extends Controller
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     * @return Collection<int, array<string, mixed>>
      */
     private function markedPaperRows(CandidateExamAttempt $attempt, ?User $user = null)
     {

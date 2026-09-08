@@ -7,7 +7,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class AdaptiveCandidateItemResource extends JsonResource
 {
-    // Contract only: no candidate endpoint issues pool items until the Phase 3 state machine exists.
+    // Only the lifecycle-issued current item may be passed to this resource.
     public function toArray(Request $request): array
     {
         $content = $this->resource->content;
@@ -15,6 +15,7 @@ class AdaptiveCandidateItemResource extends JsonResource
         return [
             'question_id' => $content['question_id'],
             'question_text' => $content['stem'],
+            'question_type' => $content['question_type'],
             'options' => array_map(fn ($option) => [
                 'id' => $option['id'], 'label' => $option['label'], 'option_text' => $option['option_text'],
             ], $content['options']),

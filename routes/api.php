@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AdaptiveCandidateController;
 use App\Http\Controllers\Api\CandidateExamController;
 use App\Http\Controllers\Api\OfflineExamPackageController;
 use App\Http\Controllers\Api\OfflineServerActivationController;
@@ -12,6 +13,7 @@ Route::prefix('candidate')->group(function (): void {
     Route::post('/login', [CandidateExamController::class, 'login']);
     Route::post('/start', [CandidateExamController::class, 'start']);
     Route::get('/exam', [CandidateExamController::class, 'exam']);
+    Route::post('/next-level', [AdaptiveCandidateController::class, 'nextLevel'])->middleware('throttle:30,1');
     Route::post('/answer', [CandidateExamController::class, 'answer']);
     Route::post('/submit', [CandidateExamController::class, 'submit']);
     Route::post('/auto-submit', [CandidateExamController::class, 'autoSubmit']);

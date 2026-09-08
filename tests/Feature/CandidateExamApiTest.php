@@ -8,15 +8,14 @@ use App\Models\CandidateAnswer;
 use App\Models\CandidateExamAttempt;
 use App\Models\CandidatePerformanceProfile;
 use App\Models\Exam;
-use App\Models\ExamAuditLog;
 use App\Models\ExamSubject;
 use App\Models\Organization;
 use App\Models\Question;
 use App\Models\QuestionBank;
 use App\Models\QuestionOption;
 use App\Models\Subject;
-use App\Services\ExamPaperGeneratorService;
 use App\Services\ExamMonitorService;
+use App\Services\ExamPaperGeneratorService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
@@ -74,7 +73,7 @@ class CandidateExamApiTest extends TestCase
         $this->postJson('/api/candidate/submit', [], ['Authorization' => "Bearer {$token}"])
             ->assertOk()
             ->assertJsonPath('submitted', true)
-            ->assertJsonPath('score', '1.00');
+            ->assertJsonMissingPath('score')->assertJsonMissingPath('total_marks');
 
         $this->assertDatabaseHas('candidate_exam_attempts', [
             'id' => $login->json('attempt.id'),
@@ -190,6 +189,8 @@ class CandidateExamApiTest extends TestCase
             ->assertJsonPath('can_start', false)
             ->assertJsonPath('attempt.status', CandidateExamAttempt::STATUS_NOT_STARTED);
 
+        $login->assertJsonPath('questions', []);
+        $paper = CandidateExamAttempt::findOrFail($login->json('attempt.id'))->papers()->with('question.options')->firstOrFail();
         $token = $login->json('exam_token');
 
         $this->postJson('/api/candidate/start', [
@@ -199,8 +200,8 @@ class CandidateExamApiTest extends TestCase
             ->assertJsonValidationErrors('exam');
 
         $this->postJson('/api/candidate/answer', [
-            'question_id' => $login->json('questions.0.question_id'),
-            'selected_option_ids' => [$login->json('questions.0.options.0.id')],
+            'question_id' => $paper->question_id,
+            'selected_option_ids' => [$paper->question->options->first()->id],
         ], ['Authorization' => "Bearer {$token}"])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('exam');
@@ -259,7 +260,7 @@ class CandidateExamApiTest extends TestCase
     {
         [$exam, $candidate] = $this->activeExamWithPaper([
             'negative_marking' => true,
-            'negative_mark_value' => 0.25,
+            'negative_mark_value' => 0.25, 'show_result_immediately' => true,
         ]);
 
         $login = $this->postJson('/api/candidate/login', [

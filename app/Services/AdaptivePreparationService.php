@@ -24,6 +24,9 @@ class AdaptivePreparationService
         $progressive = (bool) $settings['progressive_remediation_enabled'];
         $levels = $progressive ? (int) $settings['max_scored_levels'] : 1;
         $warnings = [];
+        if ($exam->settings['negative_marking'] ?? false) {
+            $warnings[] = 'The initial adaptive engine supports non-negative objective scoring only.';
+        }
         $areas = [];
         $items = [];
         $seen = [];
@@ -50,6 +53,7 @@ class AdaptivePreparationService
                     ->whereIn('difficulty', ['easy', 'medium', 'hard'])
                     ->whereIn('question_type', [Question::TYPE_SINGLE_CHOICE, Question::TYPE_MULTIPLE_CHOICE, Question::TYPE_TRUE_FALSE])
                     ->where('marks', '>', 0)
+                    ->where(fn ($query) => $query->whereNull('image_path')->orWhere('image_path', ''))
                     ->when($exam->effectiveOwnerType() !== Exam::OWNER_INSTITUTION, fn ($query) => $query->where('subject_id', $row->subject_id))
                     ->when($topics->isNotEmpty(), fn ($query) => $query->whereIn('topic_id', $topics))
                     ->with('options')->orderBy('id')->get()->filter(function (Question $question): bool {
@@ -58,7 +62,9 @@ class AdaptivePreparationService
                         return $question->options->count() >= 2 && ($question->question_type === Question::TYPE_MULTIPLE_CHOICE ? $correct >= 1 : $correct === 1);
                     })->values();
             }
-            $required = (int) $row->question_count * $levels;
+            $extra = max(0, (int) $settings['adaptive_min_questions'] - $quota);
+            $rowCount = $exam->examSubjects->count();
+            $required = ((int) $row->question_count + intdiv($extra, $rowCount) + ($index < $extra % $rowCount ? 1 : 0)) * $levels;
             if ($questions->count() < $required) {
                 $warnings[] = $area.": needs {$required} fresh approved questions for {$levels} level(s); found ".$questions->count().'.';
             }

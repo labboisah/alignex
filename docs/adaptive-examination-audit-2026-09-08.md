@@ -12,6 +12,12 @@ The findings and initial test results below are the historical audit baseline. P
 
 Phase 2 configuration, preparation and additive persistence are implemented. The shared regression selection now passes **109 tests with 1,182 assertions**, including 17 adaptive contract tests. The local additive migration and frontend build succeeded. See [Phase 2 evidence and Phase 3 handoff](exams/adaptive-phase-2.md). Adaptive candidate delivery, penalty posting and recovery scoring remain disabled/unimplemented; the audit findings below describe the original baseline.
 
+## Phase 3 implementation update
+
+The isolated adaptive server lifecycle and progressive scoring are implemented. Current-item issuance, draft/commit, deterministic difficulty and coverage, idempotent advancement, recovery starts/penalties, exact area ledgers, deadlines, disqualification, practice isolation and release-aware aggregates are covered by tests. The shared pre-start content, answer/submission race and submit-score release findings were also addressed.
+
+The final regression selection passes **132 tests / 1,327 assertions**. Separate MySQL worker tests pass **3 tests / 42 assertions**, including a repeatable-read race found and fixed during implementation. The local runtime migration and frontend build pass. See [Phase 3 evidence and Phase 4 handoff](exams/adaptive-phase-3.md). Live rollout remains disabled. The Phase 1/2 notes and audit findings below are historical and are superseded by this update where indicated.
+
 ## Assessment
 
 **Adaptive examination is at foundation/prototype level, not a completed adaptive candidate workflow.** Administrators can select adaptive mode in several contexts, a standalone service can move between difficulty bands, and results include topic/difficulty summaries. However, paper generation and candidate delivery still use the fixed-paper workflow regardless of mode. Selecting “adaptive” does not currently establish response-dependent question delivery.

@@ -14,6 +14,10 @@ class ExamResultService
 {
     public function calculate(CandidateExamAttempt $attempt, bool $force = false): CandidateExamAttempt
     {
+        if (app(AdaptiveLifecycleService::class)->handles($attempt)) {
+            return $attempt->fresh(); // Adaptive scores are posted only by the conserving ledger lifecycle.
+        }
+
         return DB::transaction(function () use ($attempt, $force): CandidateExamAttempt {
             $attempt = CandidateExamAttempt::query()
                 ->whereKey($attempt->id)

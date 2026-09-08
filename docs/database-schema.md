@@ -10,6 +10,10 @@ Migration `2026_09_08_150000_create_adaptive_contract_tables.php` adds `adaptive
 
 These tables preserve configuration/item versions, attempt identity, per-area budgets and an append-only posting history. Marks are integer hundredths, answer-bearing pool content is encrypted, unique keys constrain versions/levels/decisions/ledger retries, and restrictive foreign keys preserve referenced history. See [Phase 2 contracts and limitations](exams/adaptive-phase-2.md) for implemented invariants and pending lifecycle enforcement. Adaptive delivery is still disabled.
 
+## Implemented adaptive runtime (Phase 3)
+
+Migration `2026_09_08_170000_create_adaptive_runtime_tables.php` adds `adaptive_level_runs` and `adaptive_responses`. Runs freeze level quotas, weights and practice/start identity. Responses encrypt draft options, become immutable on commitment and constrain decision/commit identities. The lifecycle serializes mutations through the progression lock and reconciles the Phase 2 area/global ledgers. See [Phase 3 persistence, concurrency and API contracts](exams/adaptive-phase-3.md). Traditional tables are unchanged by this additive migration.
+
 ## Corrected Active Entity Model
 
 The active implementation separates:

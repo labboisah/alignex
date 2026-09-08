@@ -3,14 +3,20 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\CandidateAnswerRequest;
 use App\Http\Resources\CandidateExamPayloadResource;
+use App\Models\AdaptiveAttemptState;
 use App\Models\Candidate;
 use App\Models\CandidateAnswer;
 use App\Models\CandidateExamAttempt;
 use App\Models\Exam;
 use App\Models\ProctoringEvent;
+use App\Services\AdaptiveAttemptPreparationService;
+use App\Services\AdaptiveLifecycleService;
+use App\Services\AdaptiveRolloutService;
 use App\Services\CandidateExamSessionService;
 use App\Services\CandidatePerformanceProfileService;
+use App\Services\CandidateResultVisibilityService;
 use App\Services\ExamMonitorService;
 use App\Services\ExamResultService;
 use App\Services\ExamStatusService;
@@ -41,6 +47,26 @@ class CandidateExamController extends Controller
         ]);
 
         $exam = $this->examForLogin($data);
+
+        // Frozen adaptive attempts have their own progression window and explicit start.
+        // In particular, resuming Level 2 must not select the submitted Level 1 attempt.
+        if ($exam && ($adaptiveCandidate = $this->candidateForLogin($exam, $data))) {
+            if (app(AdaptiveRolloutService::class)->isAdaptive($exam)
+                && ! CandidateExamAttempt::where('exam_id', $exam->id)->where('candidate_id', $adaptiveCandidate->id)->exists()) {
+                app(AdaptiveAttemptPreparationService::class)->prepareAssignedCandidate($exam, $adaptiveCandidate);
+            }
+            $adaptiveAttempt = CandidateExamAttempt::where('exam_id', $exam->id)
+                ->where('candidate_id', $adaptiveCandidate->id)
+                ->whereIn('id', AdaptiveAttemptState::query()->select('attempt_id'))
+                ->orderByDesc('attempt_number')->first();
+            if ($adaptiveAttempt) {
+                $this->session->ensureRolloutAccess($request, $adaptiveAttempt);
+                $payload = app(AdaptiveLifecycleService::class)->execute($adaptiveAttempt, 'read', $data);
+                $this->session->log($request, 'login_success', $adaptiveAttempt);
+
+                return response()->json($payload + ['exam_token' => $this->session->makeToken($adaptiveAttempt)]);
+            }
+        }
 
         if ($exam && $this->examOverdue($exam)) {
             $exam = app(ExamStatusService::class)->sync($exam);
@@ -116,6 +142,9 @@ class CandidateExamController extends Controller
             'device_fingerprint' => ['required', 'string', 'max:255'],
         ]);
         $exam = $attempt->exam;
+        if (app(AdaptiveLifecycleService::class)->handles($attempt)) {
+            return response()->json(app(AdaptiveLifecycleService::class)->execute($attempt, 'start', $data));
+        }
 
         if (! $exam || $exam->status !== Exam::STATUS_ACTIVE) {
             throw ValidationException::withMessages(['exam' => 'Exam not found or not active.']);
@@ -150,6 +179,9 @@ class CandidateExamController extends Controller
     public function exam(Request $request): JsonResponse
     {
         $attempt = $this->session->attemptFromRequest($request);
+        if (app(AdaptiveLifecycleService::class)->handles($attempt)) {
+            return response()->json(app(AdaptiveLifecycleService::class)->execute($attempt, 'read', $request->only('device_fingerprint')));
+        }
 
         if ($attempt->status === CandidateExamAttempt::STATUS_IN_PROGRESS && $this->session->remainingSeconds($attempt) <= 0 && $this->isOpenAttempt($attempt)) {
             $attempt = $this->finalizeAttempt($request, $attempt, CandidateExamAttempt::STATUS_AUTO_SUBMITTED);
@@ -158,9 +190,12 @@ class CandidateExamController extends Controller
         return response()->json((new CandidateExamPayloadResource($attempt))->resolve($request));
     }
 
-    public function answer(Request $request): JsonResponse
+    public function answer(CandidateAnswerRequest $request): JsonResponse
     {
-        $attempt = $this->session->attemptFromRequest($request);
+        $attempt = $request->attributes->get('candidate_attempt');
+        if (app(AdaptiveLifecycleService::class)->handles($attempt)) {
+            return response()->json(app(AdaptiveLifecycleService::class)->execute($attempt, $request->boolean('commit') ? 'commit' : 'draft', $request->validated()));
+        }
         $this->session->ensureWritable($attempt);
 
         if ($this->session->remainingSeconds($attempt) <= 0) {
@@ -168,14 +203,7 @@ class CandidateExamController extends Controller
             throw ValidationException::withMessages(['exam' => 'Exam time has elapsed and the attempt has been submitted.']);
         }
 
-        $data = $request->validate([
-            'question_id' => ['required', 'string', 'exists:questions,id'],
-            'selected_option_ids' => ['array'],
-            'selected_option_ids.*' => ['string', 'exists:question_options,id'],
-            'is_flagged' => ['boolean'],
-            'time_spent_seconds' => ['nullable', 'integer', 'min:0', 'max:86400'],
-            'device_fingerprint' => ['nullable', 'string', 'max:255'],
-        ]);
+        $data = $request->validated();
 
         $paper = $attempt->papers
             ->loadMissing('question.options')
@@ -197,6 +225,11 @@ class CandidateExamController extends Controller
             ->all();
 
         [$answer, $attempt] = DB::transaction(function () use ($request, $attempt, $paper, $selectedOptionIds, $data): array {
+            $attempt = CandidateExamAttempt::whereKey($attempt->id)->lockForUpdate()->firstOrFail();
+            $this->session->ensureWritable($attempt);
+            if ($this->session->remainingSeconds($attempt) <= 0) {
+                return [null, $this->finalizeAttempt($request, $attempt, CandidateExamAttempt::STATUS_AUTO_SUBMITTED)];
+            }
             $answer = CandidateAnswer::query()->updateOrCreate(
                 [
                     'candidate_exam_attempt_id' => $attempt->id,
@@ -220,6 +253,9 @@ class CandidateExamController extends Controller
             return [$answer, $attempt];
         });
 
+        if (! $answer) {
+            throw ValidationException::withMessages(['exam' => 'Exam time has elapsed and the attempt has been submitted.']);
+        }
         $answeredQuestions = $this->answeredQuestions($attempt);
 
         try {
@@ -271,6 +307,9 @@ class CandidateExamController extends Controller
     public function submit(Request $request): JsonResponse
     {
         $attempt = $this->session->attemptFromRequest($request);
+        if (app(AdaptiveLifecycleService::class)->handles($attempt)) {
+            return response()->json(app(AdaptiveLifecycleService::class)->execute($attempt, 'submit', $request->only('device_fingerprint')));
+        }
         $this->session->ensureWritable($attempt);
 
         $status = $this->session->remainingSeconds($attempt) <= 0
@@ -282,14 +321,16 @@ class CandidateExamController extends Controller
         return response()->json([
             'submitted' => true,
             'status' => $attempt->status,
-            'score' => $attempt->score,
-            'total_marks' => $attempt->total_marks,
+            ...(app(CandidateResultVisibilityService::class)->allows($attempt->exam) ? ['score' => $attempt->score, 'total_marks' => $attempt->total_marks] : []),
         ]);
     }
 
     public function autoSubmit(Request $request): JsonResponse
     {
         $attempt = $this->session->attemptFromRequest($request);
+        if (app(AdaptiveLifecycleService::class)->handles($attempt)) {
+            return response()->json(app(AdaptiveLifecycleService::class)->execute($attempt, 'auto-submit', $request->only('device_fingerprint')));
+        }
         $this->session->ensureWritable($attempt);
 
         $attempt = $this->finalizeAttempt($request, $attempt, CandidateExamAttempt::STATUS_AUTO_SUBMITTED);
@@ -297,8 +338,7 @@ class CandidateExamController extends Controller
         return response()->json([
             'submitted' => true,
             'status' => $attempt->status,
-            'score' => $attempt->score,
-            'total_marks' => $attempt->total_marks,
+            ...(app(CandidateResultVisibilityService::class)->allows($attempt->exam) ? ['score' => $attempt->score, 'total_marks' => $attempt->total_marks] : []),
         ]);
     }
 
@@ -337,11 +377,15 @@ class CandidateExamController extends Controller
                 $maxTabSwitches = (int) data_get($attempt->exam?->settings ?? [], 'max_tab_switches', 0);
 
                 if ($maxTabSwitches > 0 && $tabSwitchCount > $maxTabSwitches && $this->isOpenAttempt($attempt)) {
-                    $attempt->update([
-                        'status' => CandidateExamAttempt::STATUS_DISQUALIFIED,
-                        'disqualified_at' => now(),
-                        'disqualification_reason' => 'Maximum tab switches exceeded.',
-                    ]);
+                    if (app(AdaptiveLifecycleService::class)->handles($attempt)) {
+                        app(AdaptiveLifecycleService::class)->disqualify($attempt, 'Maximum tab switches exceeded.');
+                    } else {
+                        $attempt->update([
+                            'status' => CandidateExamAttempt::STATUS_DISQUALIFIED,
+                            'disqualified_at' => now(),
+                            'disqualification_reason' => 'Maximum tab switches exceeded.',
+                        ]);
+                    }
                     $disqualified = true;
                     $this->session->log($request, 'disqualified', $attempt, [
                         'reason' => 'Maximum tab switches exceeded.',

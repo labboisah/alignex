@@ -148,7 +148,7 @@ class ExamMonitorService
     }
 
     /**
-     * @param array<string, mixed> $extra
+     * @param  array<string, mixed>  $extra
      */
     public function broadcast(Exam $exam, string $type, CandidateExamAttempt $attempt, array $extra = []): void
     {
@@ -171,6 +171,9 @@ class ExamMonitorService
 
     public function resetAttempt(Exam $exam, CandidateExamAttempt $attempt, User $actor, string $reason): CandidateExamAttempt
     {
+        if (app(AdaptiveLifecycleService::class)->handles($attempt)) {
+            throw ValidationException::withMessages(['exam' => 'Adaptive history cannot be reset. Use its progression lifecycle.']);
+        }
         if ($exam->ends_at && $exam->ends_at->isPast()) {
             throw ValidationException::withMessages(['exam' => 'This exam has ended. Candidate attempts can no longer be reset.']);
         }

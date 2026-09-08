@@ -1,6 +1,12 @@
 # Adaptive examination knowledge base
 
-Reviewed: 8 September 2026. Status: Phase 2 configuration, preparation and persistence contracts implemented; adaptive candidate delivery remains disabled.
+Reviewed: 8 September 2026. Status: Phase 3 server lifecycle and percentage recovery scoring implemented; live adaptive rollout remains disabled pending the candidate/supervisor experience and acceptance gates.
+
+## Phase 3 implementation status
+
+Bound adaptive attempts now use an isolated server lifecycle: explicit start, one issued item, draft/committed responses, deterministic difficulty changes, coverage, resume, deadlines, submission and disqualification. Recovery levels target weak paper-row areas, use fresh questions and post percentage penalties atomically. Exact ledgers reconcile earned, penalty, recoverable and closed marks. Unscored practice cannot add credit. Candidate results expose only a released closed aggregate.
+
+The regression selection passes 132 tests with 1,327 assertions; three separate MySQL concurrency tests pass with 42 assertions. See [Phase 3 implementation and Phase 4 handoff](adaptive-phase-3.md) for the API contract, supported scoring, limitations and operational checks.
 
 ## Phase 2 implementation status
 
@@ -14,22 +20,23 @@ Phase 1 containment and regression reconciliation are implemented. Adaptive draf
 
 An adaptive examination should use committed candidate responses to influence which eligible question is issued next, under server-controlled coverage, length, timing and scoring rules.
 
-AlignEx supports adaptive draft preparation and an isolated difficulty helper. Candidate delivery remains the [traditional fixed-paper workflow](traditional.md), with new adaptive starts blocked by Phase 1 containment. A prepared adaptive draft cannot yet deliver an adaptive exam.
+AlignEx supports adaptive preparation and a separate server lifecycle for frozen adaptive attempts. The [traditional fixed-paper workflow](traditional.md) remains the live candidate experience; ordinary adaptive publication/new starts are still blocked while Phase 4 builds the mode-specific interface.
 
 ## Implemented pieces
 
 | Piece | Implementation | Limit |
 | --- | --- | --- |
-| Mode storage | `mode`, `exam_mode`, `Exam::effectiveMode()` | Not connected to mode-specific candidate delivery |
+| Mode storage | Exam mode plus frozen adaptive attempt state | Bound attempts dispatch separately; legacy started papers retain traditional behavior |
 | Owner eligibility | Central ownership rules and exam request validation | Permission to configure is not runtime readiness |
 | Setup UI | Validated difficulty, policy, length and optional progressive settings | Preparation only; the runtime is not enabled |
-| Preparation and persistence | Readiness preview, frozen settings/items, progression/ledger schema and internal attempt binding | No committed answers, penalty posting or recovery results yet |
+| Preparation and persistence | Readiness, frozen settings/items, progression/ledger state and attempt binding | Text-based objective items; immutable media support remains future work |
+| Server lifecycle and recovery | Draft/commit, persisted selection, deadlines, weak-area levels, exact penalties, practice isolation and aggregate release | Public rollout disabled; UI and richer reports remain later phases |
 | Difficulty helper | Start medium; correct moves up, incorrect moves down, clamped at easy/hard | Simple rule-based stepping only |
-| Next-question query | Find unused question in exam bank and chosen difficulty | Standalone; no production caller found during audit |
+| Next-question selection | Scoped immutable pool, required coverage, nearest difficulty fallback and persisted decisions | Simple rule-based objective engine, not calibrated ability estimation |
 | Performance profiles | Subject/topic/difficulty counts and percentage-based mastery | Descriptive post-exam analysis, not ability estimation |
 | Menus and pricing | Adaptive entries/feature flags in selected contexts | Menu visibility does not prove server-side rollout enforcement |
 
-## How the current selector works
+## How the legacy selector works
 
 [AdaptiveQuestionSelectorService](../../app/Services/AdaptiveQuestionSelectorService.php) has three public methods:
 
@@ -39,7 +46,7 @@ AlignEx supports adaptive draft preparation and an isolated difficulty helper. C
 
 The query uses the exam-level bank and accepts draft, review and approved questions. It does not reproduce the fixed generator's subject-level bank lists or topic/subject rules. A missing eligible item yields null. The service does not reserve a question, append it to a paper, persist adaptive state, calculate an ability estimate, or stop/finalize an attempt.
 
-The answer endpoint never calls this helper in the inspected implementation.
+The answer endpoint does not call this helper. Frozen adaptive attempts use the scoped, persistent `AdaptiveLifecycleService` introduced in Phase 3.
 
 ## Availability in five contexts
 
@@ -55,16 +62,11 @@ Changing secondary policy requires category-aware validation, permissions, UI, d
 
 ## Missing runtime capabilities
 
-- Server-issued current item and answer-to-next-item transition.
-- Runtime integration of prepared settings, frozen mode and eligible versioned pools.
-- Durable selection issuance and response commitment using the Phase 2 decision/state schema.
-- Idempotent requests, concurrency protection and deterministic reconnect recovery.
-- Minimum/maximum length, coverage-based stopping, exhaustion behavior and explicit stop reason.
 - Adaptive-specific candidate instructions, navigation and progress display.
 - An approved scoring/reporting interpretation for unequal question paths.
 - Integrated Python FastAPI engine, calibration workflow and validated ability/uncertainty estimates.
-- Adaptive lifecycle tests across all enabled contexts and deployment acceptance.
-- Progressive weakness-focused delivery, percentage penalty posting, recovery ledger transactions, aggregate results and mastery updates (configuration/schema implemented in Phase 2; runtime remains planned).
+- Browser acceptance across all enabled contexts, offline integration and controlled deployment.
+- Full adaptive administrative reports/exports, richer practice mastery reporting, immutable media and validated aggregate certification policy.
 
 No Python engine implementation was found in the audited repository. The architecture in the older system-design document describes future intent.
 
@@ -88,7 +90,7 @@ A future adaptive report needs attempt identity, item path, coverage, evidence c
 
 ## Agreed extension: progressive weakness-focused levels
 
-This is an approved product direction and a planned implementation, not existing runtime behavior. An exam can optionally enable progressive remediation: Level 1 covers the full blueprint; subsequent levels use fresh questions from unresolved modules/topics. Within a level, the adaptive engine can adjust question difficulty.
+The Phase 3 backend implements this direction behind rollout containment. An exam can optionally enable progressive remediation: Level 1 covers the full blueprint; subsequent levels use fresh questions from unresolved paper-row areas. Selected topics constrain coverage; independently budgeted topic-level recovery is not yet implemented. Within a level, the engine adjusts question difficulty.
 
 A progression belongs to one candidate and one exam. Each level is a separate linked attempt with its own question path, timer and result. Reconnecting resumes that level. A normal full-exam retake is a different operation and must not silently reset the progression's score or penalties.
 

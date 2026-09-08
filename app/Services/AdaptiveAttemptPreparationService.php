@@ -8,14 +8,51 @@ use App\Models\AdaptiveLevel;
 use App\Models\AdaptiveMarkEntry;
 use App\Models\AdaptiveProgression;
 use App\Models\AdaptiveSnapshot;
+use App\Models\Candidate;
 use App\Models\CandidateExamAttempt;
 use App\Models\Exam;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AdaptiveAttemptPreparationService
 {
-    // Internal Phase 2 contract: bind a prepared attempt, never start or issue questions.
+    public function prepareAssignedCandidate(Exam $exam, Candidate $candidate): CandidateExamAttempt
+    {
+        return DB::transaction(function () use ($exam, $candidate): CandidateExamAttempt {
+            $exam = Exam::whereKey($exam->id)->lockForUpdate()->firstOrFail();
+            app(AdaptiveRolloutService::class)->ensureDeliveryAllowed($exam);
+            if ($exam->effectiveMode() !== Exam::MODE_ADAPTIVE || $exam->status !== Exam::STATUS_ACTIVE
+                || ($exam->ends_at && $exam->ends_at->lessThanOrEqualTo(now()))
+                || ! $exam->candidates()->where('candidates.id', $candidate->id)->exists()) {
+                throw ValidationException::withMessages(['exam' => 'This candidate cannot prepare an initial adaptive attempt.']);
+            }
+            $existing = CandidateExamAttempt::where('exam_id', $exam->id)->where('candidate_id', $candidate->id)
+                ->orderByDesc('attempt_number')->first();
+            if ($existing) {
+                if (! AdaptiveAttemptState::where('attempt_id', $existing->id)->exists()) {
+                    throw ValidationException::withMessages(['exam' => 'Existing traditional attempt history must be preserved.']);
+                }
+
+                return $existing;
+            }
+            $snapshot = AdaptiveSnapshot::where('exam_id', $exam->id)->latest('version')->first();
+            if (! $snapshot || ! $snapshot->ready) {
+                throw ValidationException::withMessages(['exam' => 'Prepare a ready adaptive snapshot before candidate access.']);
+            }
+            $attempt = CandidateExamAttempt::create([
+                'exam_id' => $exam->id, 'candidate_id' => $candidate->id, 'attempt_number' => 1,
+                'status' => CandidateExamAttempt::STATUS_NOT_STARTED, 'payment_status' => CandidateExamAttempt::PAYMENT_PENDING,
+                'access_code_hash' => Hash::make(Str::random(40)),
+            ]);
+            $this->bind($attempt, $snapshot);
+
+            return $attempt;
+        }, 3);
+    }
+
+    // Bind a prepared attempt without starting its timer or issuing questions.
     public function bind(CandidateExamAttempt $attempt, AdaptiveSnapshot $snapshot): AdaptiveAttemptState
     {
         return DB::transaction(function () use ($attempt, $snapshot): AdaptiveAttemptState {

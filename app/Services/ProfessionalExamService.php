@@ -79,6 +79,9 @@ class ProfessionalExamService
 
     public function generateForAttempt(CandidateExamAttempt $attempt): ?Certificate
     {
+        if (app(AdaptiveLifecycleService::class)->handles($attempt)) {
+            return null; // Aggregate adaptive certification requires the later approved result policy.
+        }
         $attempt->loadMissing(['exam.examType', 'candidate']);
 
         if (! $this->supports($attempt->exam)) {
