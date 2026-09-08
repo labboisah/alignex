@@ -72,3 +72,22 @@ Each module should include:
 - Offline center app packaging, encrypted sync, and replay protection.
 - Adaptive engine API contract, item selection rules, and psychometric reporting.
 - Advanced analytics, exports, and audit dashboards.
+
+
+## Adaptive delivery and progressive remediation plan
+
+Status: agreed design; not implemented. See the [adaptive knowledge base](exams/adaptive.md#agreed-extension-progressive-weakness-focused-levels) for behavior and scoring, and the [detailed implementation plan](adaptive-examination-audit-2026-09-08.md#progressive-remediation-implementation-plan-agreed-extension) for backend tasks and acceptance tests.
+
+Adaptive work includes two independently controlled capabilities: response-dependent question selection within a level, and optional weakness-focused progression across levels.
+
+1. Establish a passing traditional CBT regression baseline and owner/category policy for all five contexts.
+2. Add validated per-exam percentage penalties, level/budget/access limits, mastery/evidence settings, frozen configuration and a progression/level/area mark ledger.
+3. Implement full-blueprint Level 1, fresh questions from unresolved areas in subsequent levels, atomic level starts, once-only penalties, exact scoring and server-authoritative recovery/closure.
+4. Add administrative configuration, candidate level navigation/resume and supervision states while keeping traditional candidate behavior unchanged.
+5. Report first-level and cumulative recovered scores separately from mastery; pilot online practice/diagnostics with result-release controls and optional unscored remediation.
+6. Integrate and validate the future FastAPI engine and consequential scoring policies.
+7. Extend offline delivery only after progression-ledger synchronization, duplicate protection and existing fixed-paper compatibility pass.
+
+The penalty is a configured percentage of remaining recoverable marks. For example, 60 remaining marks with a 10% penalty yields 54 available marks, not 50. Penalties do not remove already earned marks. Explicit maximum levels and minimum budgets are required because percentage deductions alone may never exhaust the balance.
+
+Scored closure does not imply mastery. Practice after closure cannot increase the final score. Progressive settings default off, must not change active/historical attempts, and must not affect traditional terminal exams or ordinary CBT scoring.
