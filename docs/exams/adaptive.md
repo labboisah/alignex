@@ -1,6 +1,10 @@
 # Adaptive examination knowledge base
 
-Reviewed: 8 September 2026. Status: configuration and isolated selection prototype; a complete adaptive candidate workflow is not implemented in the inspected delivery path.
+Reviewed: 8 September 2026. Status: Phase 2 configuration, preparation and persistence contracts implemented; adaptive candidate delivery remains disabled.
+
+## Phase 2 implementation status
+
+The wizard now validates adaptive and optional progressive settings, including the per-exam penalty percentage. The preparation page checks owner-scoped approved pools and saves encrypted immutable question/configuration versions. Additive progression, level, area-balance, decision, attempt-state and ledger tables are available. Internal attempt binding opens a frozen budget without starting an exam or charging a penalty. See [Phase 2 implementation and handoff](adaptive-phase-2.md) for usage, exact scope and verification.
 
 ## Phase 1 implementation status
 
@@ -10,7 +14,7 @@ Phase 1 containment and regression reconciliation are implemented. Adaptive draf
 
 An adaptive examination should use committed candidate responses to influence which eligible question is issued next, under server-controlled coverage, length, timing and scoring rules.
 
-AlignEx currently permits an adaptive mode label, exposes two adaptive settings and includes a difficulty helper. The actual generator, candidate API and writing UI still use the [traditional fixed-paper workflow](traditional.md). Therefore an exam saved as adaptive does not currently deliver a proven adaptive experience.
+AlignEx supports adaptive draft preparation and an isolated difficulty helper. Candidate delivery remains the [traditional fixed-paper workflow](traditional.md), with new adaptive starts blocked by Phase 1 containment. A prepared adaptive draft cannot yet deliver an adaptive exam.
 
 ## Implemented pieces
 
@@ -18,7 +22,8 @@ AlignEx currently permits an adaptive mode label, exposes two adaptive settings 
 | --- | --- | --- |
 | Mode storage | `mode`, `exam_mode`, `Exam::effectiveMode()` | Not connected to mode-specific candidate delivery |
 | Owner eligibility | Central ownership rules and exam request validation | Permission to configure is not runtime readiness |
-| Setup UI | Start difficulty and policy input in exam wizard | No explicit request rules for those adaptive settings; selector ignores them |
+| Setup UI | Validated difficulty, policy, length and optional progressive settings | Preparation only; the runtime is not enabled |
+| Preparation and persistence | Readiness preview, frozen settings/items, progression/ledger schema and internal attempt binding | No committed answers, penalty posting or recovery results yet |
 | Difficulty helper | Start medium; correct moves up, incorrect moves down, clamped at easy/hard | Simple rule-based stepping only |
 | Next-question query | Find unused question in exam bank and chosen difficulty | Standalone; no production caller found during audit |
 | Performance profiles | Subject/topic/difficulty counts and percentage-based mastery | Descriptive post-exam analysis, not ability estimation |
@@ -51,16 +56,15 @@ Changing secondary policy requires category-aware validation, permissions, UI, d
 ## Missing runtime capabilities
 
 - Server-issued current item and answer-to-next-item transition.
-- Validated, frozen adaptive settings and engine version per attempt.
-- Eligible item pool with content approval, owner scope, topic coverage and versioning.
-- Durable selection history, response commitment and state version.
+- Runtime integration of prepared settings, frozen mode and eligible versioned pools.
+- Durable selection issuance and response commitment using the Phase 2 decision/state schema.
 - Idempotent requests, concurrency protection and deterministic reconnect recovery.
 - Minimum/maximum length, coverage-based stopping, exhaustion behavior and explicit stop reason.
 - Adaptive-specific candidate instructions, navigation and progress display.
 - An approved scoring/reporting interpretation for unequal question paths.
 - Integrated Python FastAPI engine, calibration workflow and validated ability/uncertainty estimates.
 - Adaptive lifecycle tests across all enabled contexts and deployment acceptance.
-- Progressive weakness-focused levels, per-exam percentage penalties, per-area recovery ledger, aggregate results and separate mastery tracking (agreed design below; not implemented).
+- Progressive weakness-focused delivery, percentage penalty posting, recovery ledger transactions, aggregate results and mastery updates (configuration/schema implemented in Phase 2; runtime remains planned).
 
 No Python engine implementation was found in the audited repository. The architecture in the older system-design document describes future intent.
 

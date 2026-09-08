@@ -4,6 +4,12 @@ This document defines the planned normalized database schema for AlignEx. It is 
 
 Laravel and MySQL remain the source of truth for identity, exam configuration, candidate eligibility, timing, answer state, scoring inputs, proctoring evidence, and audit history. The candidate frontend must never receive answer keys, correctness flags, scoring rubrics, or internal proctoring risk calculations.
 
+## Implemented adaptive contracts (Phase 2)
+
+Migration `2026_09_08_150000_create_adaptive_contract_tables.php` adds `adaptive_snapshots`, `adaptive_pool_items`, `adaptive_progressions`, `adaptive_levels`, `adaptive_area_balances`, `adaptive_attempt_states`, `adaptive_decisions` and `adaptive_mark_entries`. Existing traditional exam, paper, answer and result tables are not altered.
+
+These tables preserve configuration/item versions, attempt identity, per-area budgets and an append-only posting history. Marks are integer hundredths, answer-bearing pool content is encrypted, unique keys constrain versions/levels/decisions/ledger retries, and restrictive foreign keys preserve referenced history. See [Phase 2 contracts and limitations](exams/adaptive-phase-2.md) for implemented invariants and pending lifecycle enforcement. Adaptive delivery is still disabled.
+
 ## Corrected Active Entity Model
 
 The active implementation separates:

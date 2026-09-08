@@ -42,6 +42,7 @@ export default function ShowExam({ exam, can, supervisors = [], supervisorOption
                         </>
                     }
                 />
+                {(record.exam_mode ?? record.mode) === 'adaptive' && can.update && <div className="mb-4"><Button asChild variant="secondary"><Link href={'/exams/' + record.id + '/adaptive'}>Check adaptive pool and snapshots</Link></Button></div>}
                 {adaptiveNotice && <div role="status" className="mb-5 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{adaptiveNotice}</div>}
                 <div className="grid gap-4 md:grid-cols-4">
                     <Metric label="Status" value={record.status_label} badge={record.status} />

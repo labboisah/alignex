@@ -43,6 +43,7 @@ export type ExamSubject = {
     marks_per_question: number | string;
     duration_minutes?: number | string | null;
     difficulty_distribution?: Record<string, number> | null;
+    topic_ids?: string[];
     total_marks?: string | number;
 };
 
@@ -63,6 +64,18 @@ export type ExamSettings = {
     attempt_limit?: number | string;
     adaptive_start_difficulty?: string;
     adaptive_step_policy?: string;
+    adaptive_min_questions?: number | string;
+    adaptive_max_questions?: number | string;
+    progressive_remediation_enabled?: boolean;
+    recovery_penalty_percent?: number | string;
+    max_scored_levels?: number | string;
+    min_level_budget?: number | string;
+    mastery_threshold_percent?: number | string;
+    min_evidence_per_area?: number | string;
+    level_duration_minutes?: number | string;
+    progression_closes_at?: string;
+    level_cooldown_minutes?: number | string;
+    allow_unscored_remediation?: boolean;
 };
 
 export type Exam = Record<string, unknown> & {

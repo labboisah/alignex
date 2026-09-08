@@ -2,17 +2,28 @@
 
 namespace App\Http\Requests;
 
-use App\Models\Exam;
 use App\Models\Course;
+use App\Models\Exam;
 use App\Models\StudentGroup;
 use App\Models\TrainingBatch;
 use App\Services\CurrentContextService;
+use App\Support\AdaptiveSettings;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Validator;
 
 class StoreExamRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if (($this->input('exam_mode') ?? $this->input('mode')) === Exam::MODE_ADAPTIVE && is_array($this->input('settings', []))) {
+            $questions = collect(is_array($this->input('subjects')) ? $this->input('subjects') : [])
+                ->sum(fn ($row) => is_array($row) && is_numeric($row['number_of_questions'] ?? null) ? (int) $row['number_of_questions'] : 0);
+            $this->merge(['settings' => array_replace(AdaptiveSettings::defaults($questions), $this->input('settings', []))]);
+        }
+    }
+
     public function authorize(): bool
     {
         $exam = $this->route('exam');
@@ -27,6 +38,10 @@ class StoreExamRequest extends FormRequest
         $exam = $this->route('exam');
 
         return [
+            ...array_fill_keys(array_map(fn ($key) => 'settings.'.$key, array_keys(AdaptiveSettings::rules(false))), ['sometimes']),
+            'subjects.*.topic_ids' => ['nullable', 'array'],
+            'subjects.*.topic_ids.*' => ['string', 'exists:topics,id', 'distinct'],
+            'subjects.*.module_id' => ['nullable', 'integer', 'exists:modules,id'],
             'organization_id' => ['nullable', 'integer', 'exists:organizations,id'],
             'institution_id' => ['nullable', 'integer', 'exists:institutions,id'],
             'center_id' => ['nullable', 'integer', 'exists:centers,id'],
@@ -116,6 +131,22 @@ class StoreExamRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
+            if ($this->filled('exam_mode') && $this->input('mode') !== $this->input('exam_mode')) {
+                $validator->errors()->add('exam_mode', 'Legacy mode and exam mode must agree.');
+            }
+            if (! $validator->errors()->any() && ($this->input('exam_mode') ?? $this->input('mode')) === Exam::MODE_ADAPTIVE) {
+                try {
+                    AdaptiveSettings::validate($this->input('settings', []), (int) collect($this->input('subjects', []))->sum('number_of_questions'), $this->input('start_at'));
+                } catch (ValidationException $exception) {
+                    foreach ($exception->errors() as $field => $messages) {
+                        foreach ($messages as $message) {
+                            $validator->errors()->add('settings.'.$field, $message);
+                        }
+                    }
+                }
+            } elseif (($this->input('exam_mode') ?? $this->input('mode')) !== Exam::MODE_ADAPTIVE && $this->boolean('settings.progressive_remediation_enabled')) {
+                $validator->errors()->add('settings.progressive_remediation_enabled', 'Progressive recovery requires adaptive mode.');
+            }
             if (($this->user()?->isTeacher() || $this->user()?->isFacilitator()) && $this->input('exam_category') !== Exam::CATEGORY_ASSESSMENT) {
                 $validator->errors()->add('exam_category', 'This account can only create and update assessments.');
             }

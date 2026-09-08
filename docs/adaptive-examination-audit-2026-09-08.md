@@ -8,6 +8,10 @@ Scope: Laravel backend, Inertia administration, candidate React Router app, data
 
 The findings and initial test results below are the historical audit baseline. Phase 1 containment, local inventory and regression reconciliation have now been implemented: the expanded selection passes 92 tests with 1,073 assertions. Adaptive live delivery remains disabled. See [Phase 1 implementation evidence](exams/adaptive-phase-1.md) for the complete disposition of the original 22 non-passing outcomes and the Phase 2 handoff.
 
+## Phase 2 implementation update
+
+Phase 2 configuration, preparation and additive persistence are implemented. The shared regression selection now passes **109 tests with 1,182 assertions**, including 17 adaptive contract tests. The local additive migration and frontend build succeeded. See [Phase 2 evidence and Phase 3 handoff](exams/adaptive-phase-2.md). Adaptive candidate delivery, penalty posting and recovery scoring remain disabled/unimplemented; the audit findings below describe the original baseline.
+
 ## Assessment
 
 **Adaptive examination is at foundation/prototype level, not a completed adaptive candidate workflow.** Administrators can select adaptive mode in several contexts, a standalone service can move between difficulty bands, and results include topic/difficulty summaries. However, paper generation and candidate delivery still use the fixed-paper workflow regardless of mode. Selecting “adaptive” does not currently establish response-dependent question delivery.

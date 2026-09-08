@@ -1,13 +1,14 @@
 <?php
 
 use App\Http\Controllers\AccessControlController;
+use App\Http\Controllers\AdaptivePreparationController;
 use App\Http\Controllers\AdminRegistrationController;
 use App\Http\Controllers\AppReleaseController;
-use App\Http\Controllers\CandidateController;
 use App\Http\Controllers\CandidateClientDownloadController;
+use App\Http\Controllers\CandidateController;
 use App\Http\Controllers\CandidateGroupController;
-use App\Http\Controllers\CenterController;
 use App\Http\Controllers\CbtCenterController;
+use App\Http\Controllers\CenterController;
 use App\Http\Controllers\CurrentContextController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExamController;
@@ -19,11 +20,11 @@ use App\Http\Controllers\OfflineActivationCodeController;
 use App\Http\Controllers\OfflineServerDownloadController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\PricingPlanController;
+use App\Http\Controllers\ProfessionalExamController;
+use App\Http\Controllers\ProfessionalSchoolController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicPricingController;
 use App\Http\Controllers\PublicWelcomeController;
-use App\Http\Controllers\ProfessionalExamController;
-use App\Http\Controllers\ProfessionalSchoolController;
 use App\Http\Controllers\QuestionBankController;
 use App\Http\Controllers\QuestionController;
 use App\Http\Controllers\RecruitmentController;
@@ -369,6 +370,8 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
             Route::post('/exams/{exam}/supervisors', [ExamController::class, 'storeSupervisor'])->name('exams.supervisors.store');
             Route::delete('/exams/{exam}/supervisors/{supervisor}', [ExamController::class, 'destroySupervisor'])->name('exams.supervisors.destroy');
             Route::post('/exams/{exam}/participants/refresh', [ExamController::class, 'refreshParticipants'])->name('exams.participants.refresh');
+            Route::get('/exams/{exam}/adaptive', [AdaptivePreparationController::class, 'show'])->name('exams.adaptive.show');
+            Route::post('/exams/{exam}/adaptive/prepare', [AdaptivePreparationController::class, 'store'])->name('exams.adaptive.prepare');
             Route::get('/exams/{exam}/papers', [ExamPaperController::class, 'show'])->name('exams.papers.show');
             Route::post('/exams/{exam}/papers/generate', [ExamPaperController::class, 'generate'])->name('exams.papers.generate');
             Route::get('/exams/{exam}/recruitment', [RecruitmentController::class, 'show'])->name('exams.recruitment.show');

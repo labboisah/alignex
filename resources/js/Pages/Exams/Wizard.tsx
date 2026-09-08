@@ -1,3 +1,4 @@
+import { AdaptiveSettingsFields } from './AdaptiveSettingsFields';
 import { Link, useForm, usePage } from '@inertiajs/react';
 import { ArrowLeft, ArrowRight, Plus, Save, Trash2, TriangleAlert } from 'lucide-react';
 import { FormEvent, ReactNode, useMemo, useState } from 'react';
@@ -391,12 +392,7 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
                                 <input type="checkbox" checked={Boolean(data.settings.certificate_auto_generate)} onChange={(event) => setData('settings', { ...data.settings, certificate_auto_generate: event.target.checked })} />
                             </label>
                         )}
-                        {data.mode === 'adaptive' && (
-                            <>
-                                <Field label="Adaptive Start Difficulty"><select className={inputClass} value={data.settings.adaptive_start_difficulty ?? 'medium'} onChange={(event) => setData('settings', { ...data.settings, adaptive_start_difficulty: event.target.value })}><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option></select></Field>
-                                <Field label="Adaptive Policy"><input className={inputClass} value={data.settings.adaptive_step_policy ?? 'simple'} onChange={(event) => setData('settings', { ...data.settings, adaptive_step_policy: event.target.value })} /></Field>
-                            </>
-                        )}
+                        {data.mode === 'adaptive' && <AdaptiveSettingsFields settings={data.settings} onChange={(settings) => setData('settings', settings)} questions={totals.questions} closesAt={data.end_at} duration={data.duration_minutes} />}
                     </div>
                 </FormSection>
             )}

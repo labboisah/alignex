@@ -459,7 +459,7 @@ class ExamController extends Controller
                 'total_marks' => (float) $subject['number_of_questions'] * (float) $subject['marks_per_question'],
                 'duration_minutes' => $subject['duration_minutes'] ?? null,
                 'difficulty_distribution' => $subject['difficulty_distribution'] ?? null,
-                'selection_rules' => ['question_bank_ids' => $bankIds],
+                'selection_rules' => ['question_bank_ids' => $bankIds, ...($examMode === Exam::MODE_ADAPTIVE ? ['topic_ids' => $subject['topic_ids'] ?? [], 'course_id' => $subject['course_id'] ?? $payload['course_id'], 'module_id' => $subject['module_id'] ?? $payload['module_id']] : [])],
             ]);
         }
 
