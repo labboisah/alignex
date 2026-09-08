@@ -1,3 +1,4 @@
+import AdaptiveExam, { initializeAdaptiveSession, clearAdaptiveSession, type AdaptivePayload } from './AdaptiveExam';
 import { Head } from '@inertiajs/react';
 import { AlertTriangle, Camera, CheckCircle2, Clock, Flag, Loader2, Maximize2, Wifi, WifiOff } from 'lucide-react';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
@@ -91,15 +92,20 @@ export default function CandidateExamApp() {
             <Head title="Candidate Exam" />
             <Routes>
                 <Route path="/exam/login" element={<CandidateLoginPage />} />
-                <Route path="/exam/instructions" element={<ExamInstructionsPage />} />
-                <Route path="/exam/write" element={<ExamScreenPage />} />
-                <Route path="/exam/submitted" element={<SubmitSuccessPage />} />
+                <Route path="/exam/instructions" element={<ExamModePage><ExamInstructionsPage /></ExamModePage>} />
+                <Route path="/exam/write" element={<ExamModePage><ExamScreenPage /></ExamModePage>} />
+                <Route path="/exam/submitted" element={<ExamModePage><SubmitSuccessPage /></ExamModePage>} />
                 <Route path="/exam/error" element={<ExamErrorPage />} />
-                <Route path="/exam/disqualified" element={<DisqualifiedPage />} />
+                <Route path="/exam/disqualified" element={<ExamModePage><DisqualifiedPage /></ExamModePage>} />
                 <Route path="*" element={<Navigate to="/exam/login" replace />} />
             </Routes>
         </BrowserRouter>
     );
+}
+
+function ExamModePage({ children }: { children: React.ReactNode }) {
+    const payload = storedPayload() as ExamPayload & { delivery_mode?: string };
+    return payload?.delivery_mode === 'adaptive' ? <AdaptiveExam /> : <>{children}</>;
 }
 
 function CandidateLoginPage() {
@@ -126,6 +132,8 @@ function CandidateLoginPage() {
 
             localStorage.setItem(tokenKey, payload.exam_token ?? '');
             localStorage.setItem(payloadKey, JSON.stringify(payload));
+            if ((payload as unknown as AdaptivePayload).delivery_mode === 'adaptive') initializeAdaptiveSession(payload as unknown as AdaptivePayload);
+            else clearAdaptiveSession();
             navigate('/exam/instructions');
         } catch (exception) {
             setError(exception instanceof Error ? exception.message : 'Unable to login.');

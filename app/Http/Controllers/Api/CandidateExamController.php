@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\CandidateAnswerRequest;
 use App\Http\Resources\CandidateExamPayloadResource;
 use App\Models\AdaptiveAttemptState;
+use App\Models\AdaptiveSnapshot;
 use App\Models\Candidate;
 use App\Models\CandidateAnswer;
 use App\Models\CandidateExamAttempt;
@@ -374,7 +375,7 @@ class CandidateExamController extends Controller
                 $tabSwitchCount = $attempt->proctoringEvents()
                     ->whereIn('event_type', ['tab_switch', 'window_blur'])
                     ->count();
-                $maxTabSwitches = (int) data_get($attempt->exam?->settings ?? [], 'max_tab_switches', 0);
+                $maxTabSwitches = (int) data_get($this->proctorSettings($attempt), 'max_tab_switches', 0);
 
                 if ($maxTabSwitches > 0 && $tabSwitchCount > $maxTabSwitches && $this->isOpenAttempt($attempt)) {
                     if (app(AdaptiveLifecycleService::class)->handles($attempt)) {
@@ -624,6 +625,16 @@ class CandidateExamController extends Controller
         };
     }
 
+    /** @return array<string, mixed> */
+    private function proctorSettings(CandidateExamAttempt $attempt): array
+    {
+        $state = AdaptiveAttemptState::where('attempt_id', $attempt->id)->first();
+
+        return $state
+            ? AdaptiveSnapshot::findOrFail($state->snapshot_id)->blueprint['exam_settings']
+            : ($attempt->exam?->settings ?? []);
+    }
+
     /**
      * @param  array<string, mixed>  $metadata
      * @return array<string, mixed>
@@ -632,7 +643,7 @@ class CandidateExamController extends Controller
     {
         $snapshot = data_get($metadata, 'webcam_snapshot');
 
-        if (! is_string($snapshot) || ! (bool) data_get($attempt->exam?->settings ?? [], 'require_webcam', false)) {
+        if (! is_string($snapshot) || ! (bool) data_get($this->proctorSettings($attempt), 'require_webcam', false)) {
             unset($metadata['webcam_snapshot']);
 
             return $metadata;

@@ -14,6 +14,7 @@ use App\Models\AdaptiveResponse;
 use App\Models\AdaptiveSnapshot;
 use App\Models\CandidateExamAttempt;
 use App\Models\Exam;
+use App\Models\User;
 use App\Support\AdaptiveSettings;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -37,6 +38,25 @@ class AdaptiveLifecycleService
             }
             $attempt->update(['status' => CandidateExamAttempt::STATUS_DISQUALIFIED, 'disqualified_at' => now(), 'disqualification_reason' => $reason]);
             $this->execute($attempt, 'expire');
+        }, 3);
+    }
+
+    public function endBySupervisor(CandidateExamAttempt $attempt, User $actor): void
+    {
+        $identity = AdaptiveLevel::where('attempt_id', $attempt->id)->firstOrFail();
+        DB::transaction(function () use ($identity, $actor): void {
+            $progression = AdaptiveProgression::whereKey($identity->progression_id)->lockForUpdate()->firstOrFail();
+            $level = AdaptiveLevel::where('progression_id', $progression->id)->orderByDesc('number')->firstOrFail();
+            $attempt = CandidateExamAttempt::whereKey($level->attempt_id)->lockForUpdate()->firstOrFail();
+            $snapshot = AdaptiveSnapshot::findOrFail($progression->snapshot_id);
+            $run = AdaptiveLevelRun::where('level_id', $level->id)->first();
+            $this->finish($attempt, $level, $progression, $snapshot, $run, 'supervisor_end');
+            $this->close($progression, $level, 'supervisor_end');
+            if (! in_array($progression->fresh()->stop_reason, ['disqualified', 'supervisor_end'], true)) {
+                $progression->update(['stop_reason' => 'supervisor_end', 'state_version' => $progression->state_version + 1]);
+            }
+            $this->ledger->reconcile($progression);
+            $this->audit($attempt, 'adaptive_supervisor_end', ['actor_user_id' => $actor->id]);
         }, 3);
     }
 
@@ -346,7 +366,7 @@ class AdaptiveLifecycleService
         $level->update(['status' => $disqualified ? 'closed' : 'submitted', 'submitted_at' => now()]);
         $state = AdaptiveAttemptState::where('attempt_id', $attempt->id)->firstOrFail();
         $state->update(['stop_reason' => $reason, 'state_version' => $state->state_version + 1]);
-        $auto = in_array($reason, ['timeout', 'auto_submit'], true);
+        $auto = in_array($reason, ['timeout', 'auto_submit', 'supervisor_end'], true);
         $attempt->update([
             'status' => $disqualified ? CandidateExamAttempt::STATUS_DISQUALIFIED
                 : ($auto ? CandidateExamAttempt::STATUS_AUTO_SUBMITTED : CandidateExamAttempt::STATUS_SUBMITTED),
@@ -372,7 +392,7 @@ class AdaptiveLifecycleService
             }
         }
         $settings = $snapshot->settings;
-        if ($disqualified || $reason === 'pool_exhausted') {
+        if ($disqualified || in_array($reason, ['pool_exhausted', 'supervisor_end'], true)) {
             $this->close($progression, $level, $reason);
         } elseif (! $run?->is_practice) {
             $progression->refresh();
@@ -419,7 +439,7 @@ class AdaptiveLifecycleService
             return $this->payload($attempt, $level, $progression, AdaptiveAttemptState::where('attempt_id', $attempt->id)->firstOrFail(), $snapshot)
                 + ['exam_token' => app(CandidateExamSessionService::class)->makeToken($attempt)];
         }
-        if ($previousLevel->status !== 'submitted' || $previous->status === CandidateExamAttempt::STATUS_DISQUALIFIED
+        if ($progression->stop_reason === 'supervisor_end' || $previousLevel->status !== 'submitted' || $previous->status === CandidateExamAttempt::STATUS_DISQUALIFIED
             || AdaptiveLevel::where('progression_id', $progression->id)->where('number', '>', $previousLevel->number)->exists()
             || CandidateExamAttempt::whereIn('id', AdaptiveLevel::where('progression_id', $progression->id)->select('attempt_id'))->where('status', 'disqualified')->exists()) {
             $this->reject('exam', 'Only the latest finalized eligible level can start a recovery level.');
@@ -528,8 +548,17 @@ class AdaptiveLifecycleService
 
     private function audit(CandidateExamAttempt $attempt, string $event, array $metadata): void
     {
+        $id = $attempt->id;
+        DB::afterCommit(function () use ($id, $event): void {
+            $fresh = CandidateExamAttempt::find($id);
+            if ($fresh) {
+                app(ExamMonitorService::class)->broadcast($fresh->exam, $event, $fresh, ['event_type' => $event]);
+            }
+        });
         $attempt->exam->auditLogs()->create([
-            'candidate_exam_attempt_id' => $attempt->id, 'actor_type' => 'candidate',
+            'candidate_exam_attempt_id' => $attempt->id,
+            'actor_type' => isset($metadata['actor_user_id']) ? 'supervisor' : 'candidate',
+            'actor_user_id' => $metadata['actor_user_id'] ?? null,
             'event_type' => $event, 'description' => str($event)->replace('_', ' ')->toString(),
             'metadata' => $metadata, 'occurred_at' => now(),
         ]);

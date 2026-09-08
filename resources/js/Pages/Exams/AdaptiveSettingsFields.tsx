@@ -9,6 +9,8 @@ export function AdaptiveSettingsFields({ settings, onChange, questions, closesAt
             <input className={input} type="number" min={min} max={max} step={step} value={String(settings[key] ?? fallback)} onChange={event => onChange({ ...settings, [key]: event.target.value })} />
         </label>
     );
+    const percent = Math.min(100, Math.max(0, Number(settings.recovery_penalty_percent ?? 10) || 0));
+    const examplePenalty = Math.round(6000 * Math.round(percent * 100) / 10000) / 100;
     return (
         <div className="col-span-full space-y-4 rounded-md border border-border p-4">
             <p className="text-sm text-slate-600">Prepare adaptive settings here. Live delivery remains disabled until the adaptive workflow is ready.</p>
@@ -58,6 +60,7 @@ export function AdaptiveSettingsFields({ settings, onChange, questions, closesAt
                         <input className={input} type="datetime-local" value={settings.progression_closes_at ?? ''} onChange={event => onChange({ ...settings, progression_closes_at: event.target.value })} />
                     </label>
                 </div>
+                <p role="status" className="rounded-md bg-slate-50 p-3 text-sm">Example: with 60 marks remaining, a {percent}% penalty deducts {examplePenalty.toFixed(2)} marks and leaves {(60 - examplePenalty).toFixed(2)} for recovery. Previously earned marks remain. No deduction occurs until an eligible scored level starts.</p>
                 <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={settings.allow_unscored_remediation ?? false} onChange={event => onChange({ ...settings, allow_unscored_remediation: event.target.checked })} />Allow unscored practice after scored progression closes</label>
             </>}
         </div>

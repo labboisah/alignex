@@ -15,6 +15,7 @@ type Summary = {
 };
 
 type CandidateRow = {
+    adaptive?: { progression_id: number; level: number; practice: boolean; stop_reason: string | null; history: { level: number; status: string; practice: boolean; committed: number; issued: number; stop_reason: string | null }[] } | null;
     attempt_id: string;
     candidate_name: string;
     registration_number: string;
@@ -108,6 +109,7 @@ export default function ExamMonitorShow({ exam, summary: initialSummary, rows: i
     const [resetting, setResetting] = useState<string | null>(null);
     const [ending, setEnding] = useState(false);
 
+    const [error, setError] = useState('');
     const refresh = async () => {
         setLoading(true);
         try {
@@ -121,6 +123,9 @@ export default function ExamMonitorShow({ exam, summary: initialSummary, rows: i
             setRows(rowsPayload.rows);
             setFeed(feedPayload.feed);
             setEvents(eventsPayload.events);
+            setError('');
+        } catch (failure) {
+            setError(failure instanceof Error ? failure.message : 'Monitor refresh failed. Please retry.');
         } finally {
             setLoading(false);
         }
@@ -186,6 +191,9 @@ export default function ExamMonitorShow({ exam, summary: initialSummary, rows: i
             setRows((current) => upsertRow(current, payload.row));
             setSummary(payload.summary);
             setFeed(payload.feed);
+            setError('');
+        } catch (failure) {
+            setError(failure instanceof Error ? failure.message : 'The action failed. Please retry.');
         } finally {
             setResetting(null);
         }
@@ -203,6 +211,9 @@ export default function ExamMonitorShow({ exam, summary: initialSummary, rows: i
             setSummary(payload.summary);
             setRows(payload.rows);
             setFeed(payload.feed);
+            setError('');
+        } catch (failure) {
+            setError(failure instanceof Error ? failure.message : 'The action failed. Please retry.');
         } finally {
             setEnding(false);
         }
@@ -212,6 +223,7 @@ export default function ExamMonitorShow({ exam, summary: initialSummary, rows: i
         <PortalAppShell title="Exam Monitor">
             <Head title={`${exam.title} Monitor`} />
             <section className="mx-auto max-w-7xl">
+                {error && <p role="alert" className="mb-4 rounded border border-red-300 bg-red-50 p-4">{error}</p>}
                 <PageHeader
                     eyebrow="Supervisor Dashboard"
                     title={exam.title}
@@ -258,7 +270,7 @@ export default function ExamMonitorShow({ exam, summary: initialSummary, rows: i
                             <tbody className="divide-y divide-border">
                                 {visibleRows.map((row) => (
                                     <tr key={row.attempt_id}>
-                                        <td className="py-3 font-semibold">{row.candidate_name}</td>
+                                        <td className="py-3 font-semibold">{row.candidate_name}{row.adaptive && <details className="mt-2 text-sm font-normal"><summary className="cursor-pointer text-primary">Adaptive level {row.adaptive.level}{row.adaptive.practice ? ' · Practice' : ''} · History</summary><ul className="mt-2 space-y-2">{row.adaptive.history.map(level => <li key={level.level}>Level {level.level}{level.practice ? ' (practice)' : ''}: {level.status} · {level.committed} confirmed / {level.issued} issued{level.stop_reason ? ' · ' + level.stop_reason.replaceAll('_', ' ') : ''}</li>)}</ul></details>}</td>
                                         <td>{row.registration_number}</td>
                                         <td><StatusBadge label={row.status.replaceAll('_', ' ')} tone={statusTone(row.status)} /></td>
                                         <td><Progress value={row.progress} /></td>
@@ -269,9 +281,9 @@ export default function ExamMonitorShow({ exam, summary: initialSummary, rows: i
                                         <td>{row.suspicious_event_count}</td>
                                         <td>{row.ip_address ?? 'N/A'}</td>
                                         <td>
-                                            <Button type="button" size="sm" variant="secondary" disabled={resetting === row.attempt_id} onClick={() => resetCandidate(row)}>
+                                            <Button type="button" size="sm" variant="secondary" disabled={Boolean(row.adaptive) || resetting === row.attempt_id} onClick={() => resetCandidate(row)}>
                                                 <RotateCcw className={`h-4 w-4 ${resetting === row.attempt_id ? 'animate-spin' : ''}`} />
-                                                Reset
+                                                {row.adaptive ? 'History retained' : 'Reset'}
                                             </Button>
                                         </td>
                                     </tr>
@@ -438,6 +450,11 @@ function formatClockTime(value: string | null | undefined, timezone: string): st
 }
 
 function upsertRow(rows: CandidateRow[], row: CandidateRow) {
+    if (row.adaptive) {
+        const previous = rows.find(item => item.adaptive?.progression_id === row.adaptive!.progression_id);
+        if (previous?.adaptive && previous.adaptive.level > row.adaptive.level) return rows;
+        return [...rows.filter(item => item.adaptive?.progression_id !== row.adaptive!.progression_id), row];
+    }
     const exists = rows.some((item) => item.attempt_id === row.attempt_id);
 
     return exists ? rows.map((item) => item.attempt_id === row.attempt_id ? row : item) : [...rows, row];

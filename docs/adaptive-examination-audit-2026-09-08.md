@@ -2,7 +2,7 @@
 
 Date: 8 September 2026  
 Repository baseline: `e8050a7b`  
-Scope: Laravel backend, Inertia administration, candidate React Router app, database foundations, result reporting, offline package boundary, and existing tests. This is an implementation audit and completion plan; application behavior has not been changed.
+Scope: Laravel backend, Inertia administration, candidate React Router app, database foundations, result reporting, offline package boundary, and existing tests. This records the original audit baseline and completion plan; subsequent implementation updates are documented below.
 
 ## Phase 1 follow-up
 
@@ -17,6 +17,12 @@ Phase 2 configuration, preparation and additive persistence are implemented. The
 The isolated adaptive server lifecycle and progressive scoring are implemented. Current-item issuance, draft/commit, deterministic difficulty and coverage, idempotent advancement, recovery starts/penalties, exact area ledgers, deadlines, disqualification, practice isolation and release-aware aggregates are covered by tests. The shared pre-start content, answer/submission race and submit-score release findings were also addressed.
 
 The final regression selection passes **132 tests / 1,327 assertions**. Separate MySQL worker tests pass **3 tests / 42 assertions**, including a repeatable-read race found and fixed during implementation. The local runtime migration and frontend build pass. See [Phase 3 evidence and Phase 4 handoff](exams/adaptive-phase-3.md). Live rollout remains disabled. The Phase 1/2 notes and audit findings below are historical and are superseded by this update where indicated.
+
+## Phase 4 implementation update
+
+The candidate and supervisor experience is implemented behind the existing rollout controls. The adaptive router branch supports explicit start, final confirmation, drafts, durable retries, next-level token replacement, reconnect/multi-tab recovery, server-derived completion and release-aware results. Frozen proctor requirements are used, supervisors see retained level history, and End Exam now finalizes/closes adaptive ledgers safely.
+
+Verification: **140 backend tests / 1,392 assertions**, **3 MySQL contention tests / 42 assertions**, and **15 browser scenarios verified** (including the corrected-case rerun). See [Phase 4 verification and Phase 5 handoff](exams/adaptive-phase-4.md). Traditional CBT retains its existing writing flow, and secondary-school adaptive remains blocked. The next phase is reporting and controlled practice pilots; runtime readiness has not been enabled.
 
 ## Assessment
 
@@ -204,6 +210,8 @@ Address the shared answer/submission race, result-release response, and early co
 **Gate:** two candidates with different committed responses can receive different eligible next items; retries/reloads preserve each path; concurrent requests cannot advance twice; no future items/keys/correctness fields reach candidates; expiry/submission wins over late writes.
 
 ### Phase 4 — Candidate and supervisor experience
+
+Status: implemented behind rollout containment. See [Phase 4 delivery notes and verification](exams/adaptive-phase-4.md).
 
 Add mode-specific instructions and an adaptive writing view inside the existing router island. Provide “confirm and continue,” no editing of committed items, server-derived progress/stopping messages, accessible keyboard behavior, saving/retry/error states, reconnect recovery, and monitored selection/stop incidents. Use wording that explains variable length without exposing scoring internals.
 

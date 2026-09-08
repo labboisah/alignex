@@ -2,23 +2,21 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Exam;
 use App\Models\CandidateExamAttempt;
+use App\Models\Exam;
 use App\Models\ExamSupervisor;
 use App\Models\User;
 use App\Services\ExamMonitorService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class ExamMonitorController extends Controller
 {
-    public function __construct(private readonly ExamMonitorService $monitor)
-    {
-    }
+    public function __construct(private readonly ExamMonitorService $monitor) {}
 
     public function show(Request $request, Exam $exam): Response
     {
@@ -107,7 +105,6 @@ class ExamMonitorController extends Controller
             : (str($exam->course->name)->squish()->toString() ?: null);
     }
 
-
     public function summary(Request $request, Exam $exam): JsonResponse
     {
         $this->authorizeExam($request->user(), $exam);
@@ -178,12 +175,16 @@ class ExamMonitorController extends Controller
             'reason' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $attempt = $this->monitor->resetAttempt(
-            $exam,
-            $attempt,
-            $request->user(),
-            $data['reason'] ?? 'Candidate device issue during exam.'
-        );
+        try {
+            $attempt = $this->monitor->resetAttempt(
+                $exam,
+                $attempt,
+                $request->user(),
+                $data['reason'] ?? 'Candidate device issue during exam.'
+            );
+        } catch (ValidationException $exception) {
+            return response()->json(['message' => $exception->getMessage(), 'errors' => $exception->errors()], 422);
+        }
 
         return response()->json([
             'reset' => true,
@@ -198,24 +199,7 @@ class ExamMonitorController extends Controller
         $this->authorizeExam($request->user(), $exam);
         abort_unless($request->user()->hasPermission('manageExams'), 403);
 
-        DB::transaction(function () use ($exam): void {
-            $exam->forceFill([
-                'status' => Exam::STATUS_COMPLETED,
-                'ends_at' => now(),
-            ])->save();
-
-            $exam->attempts()
-                ->whereIn('status', [
-                    CandidateExamAttempt::STATUS_NOT_STARTED,
-                    CandidateExamAttempt::STATUS_IN_PROGRESS,
-                ])
-                ->update([
-                    'status' => CandidateExamAttempt::STATUS_AUTO_SUBMITTED,
-                    'auto_submitted_at' => now(),
-                    'submitted_at' => now(),
-                    'updated_at' => now(),
-                ]);
-        });
+        $this->monitor->endExam($exam, $request->user());
 
         return response()->json([
             'ended' => true,

@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Events\ExamMonitorEvent;
+use App\Models\AdaptiveAttemptState;
+use App\Models\AdaptiveLevel;
 use App\Models\CandidateExamAttempt;
 use App\Models\Exam;
 use App\Models\ExamAuditLog;
@@ -40,6 +42,11 @@ class ExamMonitorService
         return CandidateExamAttempt::query()
             ->where('exam_id', $exam->id)
             ->with(['candidate', 'answers', 'auditLogs', 'proctoringEvents'])
+            ->whereNotIn('id', AdaptiveLevel::query()->select('attempt_id')->whereExists(function ($query): void {
+                $query->selectRaw('1')->from('adaptive_levels as later')
+                    ->whereColumn('later.progression_id', 'adaptive_levels.progression_id')
+                    ->whereColumn('later.number', '>', 'adaptive_levels.number');
+            }))
             ->get();
     }
 
@@ -60,10 +67,12 @@ class ExamMonitorService
     public function row(CandidateExamAttempt $attempt): array
     {
         $attempt->loadMissing(['candidate', 'answers', 'auditLogs', 'proctoringEvents']);
-        $answered = $attempt->answers->filter(fn ($answer) => ! empty($answer->selected_option_ids))->count();
+        $adaptive = app(AdaptiveMonitorService::class)->row($attempt);
+        $answered = $adaptive['committed'] ?? $attempt->answers->filter(fn ($answer) => ! empty($answer->selected_option_ids))->count();
 
         return [
             'attempt_id' => $attempt->id,
+            'adaptive' => $adaptive,
             'candidate_name' => trim(($attempt->candidate?->first_name ?? '').' '.($attempt->candidate?->last_name ?? '')),
             'registration_number' => $attempt->candidate?->candidate_number,
             'status' => $this->statusFor($attempt),
@@ -167,6 +176,35 @@ class ExamMonitorService
                 'message' => $exception->getMessage(),
             ]);
         }
+    }
+
+    public function endExam(Exam $exam, User $actor): void
+    {
+        DB::transaction(function () use ($exam, $actor): void {
+            $exam->forceFill([
+                'status' => Exam::STATUS_COMPLETED,
+                'ends_at' => now(),
+            ])->save();
+
+            foreach ($this->attempts($exam) as $attempt) {
+                if (app(AdaptiveLifecycleService::class)->handles($attempt)) {
+                    app(AdaptiveLifecycleService::class)->endBySupervisor($attempt, $actor);
+                }
+            }
+
+            $exam->attempts()
+                ->whereNotIn('id', AdaptiveAttemptState::select('attempt_id'))
+                ->whereIn('status', [
+                    CandidateExamAttempt::STATUS_NOT_STARTED,
+                    CandidateExamAttempt::STATUS_IN_PROGRESS,
+                ])
+                ->update([
+                    'status' => CandidateExamAttempt::STATUS_AUTO_SUBMITTED,
+                    'auto_submitted_at' => now(),
+                    'submitted_at' => now(),
+                    'updated_at' => now(),
+                ]);
+        }, 3);
     }
 
     public function resetAttempt(Exam $exam, CandidateExamAttempt $attempt, User $actor, string $reason): CandidateExamAttempt

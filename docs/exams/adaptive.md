@@ -1,6 +1,12 @@
 # Adaptive examination knowledge base
 
-Reviewed: 8 September 2026. Status: Phase 3 server lifecycle and percentage recovery scoring implemented; live adaptive rollout remains disabled pending the candidate/supervisor experience and acceptance gates.
+Reviewed: 8 September 2026. Status: Phase 4 candidate and supervisor experience implemented behind rollout containment; live adaptive starts remain disabled pending reporting and controlled-pilot acceptance.
+
+## Phase 4 implementation status
+
+The candidate router now branches into a dedicated adaptive interface for explicit start, current-item drafts and confirmations, server-driven completion, recovery/practice requests, durable retries, reconnects and multi-tab recovery. Safe instructions and frozen camera/fullscreen controls come from the server. Authorized supervisors see current-level progress and retained level history; adaptive resets are blocked and End Exam closes the progression through its ledger lifecycle.
+
+See [Phase 4 experience, verification and Phase 5 handoff](adaptive-phase-4.md). The server still withholds answer keys, correctness and unreleased scores. Secondary-school adaptive policy and traditional CBT behavior remain unchanged.
 
 ## Phase 3 implementation status
 
@@ -20,7 +26,7 @@ Phase 1 containment and regression reconciliation are implemented. Adaptive draf
 
 An adaptive examination should use committed candidate responses to influence which eligible question is issued next, under server-controlled coverage, length, timing and scoring rules.
 
-AlignEx supports adaptive preparation and a separate server lifecycle for frozen adaptive attempts. The [traditional fixed-paper workflow](traditional.md) remains the live candidate experience; ordinary adaptive publication/new starts are still blocked while Phase 4 builds the mode-specific interface.
+AlignEx supports adaptive preparation and a separate server lifecycle for frozen adaptive attempts. The [traditional fixed-paper workflow](traditional.md) remains the live candidate experience; ordinary adaptive publication/new starts remain blocked until the later reporting and controlled-pilot gates pass.
 
 ## Implemented pieces
 
@@ -30,7 +36,8 @@ AlignEx supports adaptive preparation and a separate server lifecycle for frozen
 | Owner eligibility | Central ownership rules and exam request validation | Permission to configure is not runtime readiness |
 | Setup UI | Validated difficulty, policy, length and optional progressive settings | Preparation only; the runtime is not enabled |
 | Preparation and persistence | Readiness, frozen settings/items, progression/ledger state and attempt binding | Text-based objective items; immutable media support remains future work |
-| Server lifecycle and recovery | Draft/commit, persisted selection, deadlines, weak-area levels, exact penalties, practice isolation and aggregate release | Public rollout disabled; UI and richer reports remain later phases |
+| Candidate and supervisor UI | Explicit start, current-item confirmation, durable retries, recovery messages, proctor controls and retained level history | Online only; live starts remain disabled |
+| Server lifecycle and recovery | Draft/commit, persisted selection, deadlines, weak-area levels, exact penalties, practice isolation and aggregate release | Public rollout disabled; richer reports remain Phase 5 |
 | Difficulty helper | Start medium; correct moves up, incorrect moves down, clamped at easy/hard | Simple rule-based stepping only |
 | Next-question selection | Scoped immutable pool, required coverage, nearest difficulty fallback and persisted decisions | Simple rule-based objective engine, not calibrated ability estimation |
 | Performance profiles | Subject/topic/difficulty counts and percentage-based mastery | Descriptive post-exam analysis, not ability estimation |

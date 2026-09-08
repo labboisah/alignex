@@ -9,8 +9,10 @@ use App\Models\AdaptiveLevelRun;
 use App\Models\AdaptivePoolItem;
 use App\Models\AdaptiveProgression;
 use App\Models\AdaptiveResponse;
+use App\Models\AdaptiveSnapshot;
 use App\Models\CandidateExamAttempt;
 use App\Services\AdaptiveLifecycleService;
+use App\Services\AdaptivePresentationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -43,7 +45,7 @@ class AdaptiveAttemptResource extends JsonResource
             }
         }
 
-        return [
+        return app(AdaptivePresentationService::class)->candidate($attempt, $level, $progression, AdaptiveSnapshot::findOrFail($state->snapshot_id)) + [
             'delivery_mode' => 'adaptive', 'attempt' => ['id' => $attempt->id, 'status' => $attempt->fresh()->status,
                 'started_at' => $level->started_at?->toISOString(), 'server_due_at' => $level->due_at?->toISOString()],
             'level' => (int) $level->number, 'is_practice' => $run?->is_practice ?? false,
