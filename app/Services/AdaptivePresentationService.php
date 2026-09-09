@@ -74,8 +74,10 @@ class AdaptivePresentationService
             } elseif ($availableAt->isFuture()) {
                 $recovery['message'] = 'Wait until the recovery cooldown ends.';
             } elseif ($progression->status === 'active' && $level->number < $settings['max_scored_levels']) {
-                $penalty = app(AdaptiveLedgerService::class)->penalty((int) $progression->recoverable_units, AdaptiveSettings::units((string) $settings['recovery_penalty_percent']));
-                $recovery['can_start'] = $progression->recoverable_units - $penalty >= AdaptiveSettings::units((string) $settings['min_level_budget']);
+                $nextPlan = app(AdaptiveRecoveryPlanService::class)->build($level, $progression, $snapshot);
+                $recovery['next_question_count'] = $nextPlan['question_count'];
+                $recovery['next_available_marks'] = number_format($nextPlan['available'] / 100, 2, '.', '');
+                $recovery['can_start'] = $nextPlan['question_count'] > 0 && $nextPlan['available'] >= AdaptiveSettings::units((string) $settings['min_level_budget']);
                 $recovery['message'] = $recovery['can_start'] ? 'You may request a recovery level on unresolved areas. Fresh-question availability is checked when you continue.' : 'There are insufficient recoverable marks for another scored level.';
             } elseif ($progression->status === 'closed' && $settings['allow_unscored_remediation']) {
                 $recovery['can_practice'] = true;

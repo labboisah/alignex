@@ -41,7 +41,7 @@ trait AdaptiveFixtures
             'state_version' => $state['state_version'], 'idempotency_key' => $key];
     }
 
-    private function fixture(bool $permit = true, int $areas = 1, array $settings = [], int $poolPerBand = 3): array
+    private function fixture(bool $permit = true, int $areas = 1, array $settings = [], int $poolPerBand = 3, int $questionsPerArea = 3): array
     {
         $this->freezeTime();
         if ($permit) {
@@ -53,7 +53,7 @@ trait AdaptiveFixtures
             'organization_id' => $organization->id, 'exam_owner_type' => 'organization', 'exam_owner_id' => $organization->id,
             'mode' => 'adaptive', 'exam_mode' => 'adaptive', 'exam_category' => 'assessment', 'delivery_mode' => 'online',
             'status' => 'draft', 'starts_at' => now()->subMinute(), 'ends_at' => now()->addHour(),
-            'duration_minutes' => 30, 'total_marks' => 6 * $areas, 'pass_mark' => 3 * $areas,
+            'duration_minutes' => 30, 'total_marks' => 2 * $questionsPerArea * $areas, 'pass_mark' => $questionsPerArea * $areas,
             'settings' => ['progressive_remediation_enabled' => true, 'recovery_penalty_percent' => 10,
                 'max_scored_levels' => 3, 'min_level_budget' => '0.01', 'mastery_threshold_percent' => 70,
                 'min_evidence_per_area' => 1, 'level_duration_minutes' => 30,
@@ -65,7 +65,7 @@ trait AdaptiveFixtures
             $bank = QuestionBank::factory()->create(['organization_id' => $organization->id, 'subject_id' => $subject->id,
                 'owner_type' => 'organization', 'owner_id' => $organization->id, 'status' => 'active']);
             ExamSubject::factory()->create(['exam_id' => $exam->id, 'subject_id' => $subject->id, 'question_bank_id' => $bank->id,
-                'question_count' => 3, 'marks_per_question' => 2, 'total_marks' => 6, 'display_order' => $area,
+                'question_count' => $questionsPerArea, 'marks_per_question' => 2, 'total_marks' => 2 * $questionsPerArea, 'display_order' => $area,
                 'selection_rules' => ['question_bank_ids' => [$bank->id]]]);
             foreach (['easy', 'medium', 'hard'] as $band) {
                 for ($i = 0; $i < $poolPerBand; $i++) {

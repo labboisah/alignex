@@ -158,49 +158,45 @@ For the first implementation, use non-negative objective scoring in progressive 
 
 ### Percentage penalty and cumulative score
 
-The configured percentage is deducted once from the previous level's remaining recoverable marks when a new scored level successfully starts. Level 1 has no recovery penalty.
+The next level's question count equals the previous level's **incorrect plus unanswered questions** in eligible unresolved areas. The configured percentage reduces **marks per question only**. It never reduces the question count.
 
-Let `M` be the original exam total, `R` the unearned recoverable balance, `p` the configured penalty percentage, `P` the next-level penalty, `B` its available marks, and `E` marks earned in that level:
+For each eligible area:
 
 ```text
-Level 1 budget = M
-After Level 1: cumulative score = E1; R = M - E1
-
-Before each additional scored level:
-P = round_half_up(R * p / 100, 2)
-B = max(0, R - P)
-
-After that level:
-0 <= E <= B
-cumulative score = previous cumulative score + E
-R = B - E
-
-Final percentage = cumulative score / M * 100
+Q = previous planned question count - previous committed correct count
+W = round_half_up(previous area budget / previous question count * (1 - p / 100), 2)
+B = min(area recoverable marks, Q * W)
+P = area recoverable marks - B
 ```
 
-Use integer hundredths of a mark and integer basis points for percentages (or exact decimal arithmetic), not binary floating-point. Round penalties once at level creation; freeze item/area weights so their sum equals the level budget exactly. Keep each ledger entry immutable and reproducible.
+Unanswered includes uncommitted and unissued questions. Mastered areas remain excluded under the configured mastery rule. Select fresh questions from the unresolved areas, rather than repeating the original items. Counts are already integers and receive no percentage adjustment or rounding.
 
-Example: original paper has 50 questions at 2 marks each; the exam's recovery penalty is **10%**:
+Use integer cents and basis points for mark calculations. Where previous item weights differ by a rounding cent, use the previous area's average mark as W's basis and cap B at its recoverable balance. Freeze the next level's weights at start. Previously earned marks do not change.
 
-| Level | Incoming balance | Penalty | Available marks | Earned | Remaining balance | Cumulative score |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 1 | 100.00 | 0.00 | 100.00 | 40.00 | 60.00 | 40.00 |
-| 2 | 60.00 | 6.00 | 54.00 | 20.00 | 34.00 | 60.00 |
-| 3 | 34.00 | 3.40 | 30.60 | 10.00 | 20.60 | 70.00 |
+For 28 questions worth 2 marks each, a **10% mark penalty**, and 7, 10, then 5 correct answers:
 
-If another level is permitted, its penalty is 2.06 and its available marks are 18.54. If `max_scored_levels = 3`, the progression closes at 70/100 with 9.40 in penalties and 20.60 unrecovered marks.
+| Level | Questions | Marks per question | Available marks | Correct | Earned |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1 | 28 | 2.00 | 56.00 | 7 | 14.00 |
+| 2 | 21 | 1.80 | 37.80 | 10 | 18.00 |
+| 3 | 11 | 1.62 | 17.82 | 5 | 8.10 |
+| 4, if allowed | 6 | 1.46 | 8.76 | — | — |
 
-This percentage example supersedes the earlier fixed 10-mark illustration. A percentage below 100 does not reliably exhaust all marks after a finite number of levels, especially with rounding; explicit level/budget/time limits are mandatory. A 0% penalty still obeys those limits. A 100% penalty leaves no additional scored budget, so no scored level is opened.
+The question sequence remains **28 → 21 → 11 → 6**, regardless of the percentage, provided the areas stay eligible and sufficient marks remain. With 0%, each question stays worth 2 marks.
+
+A 100% penalty, zero mark weight or below-minimum budget prevents a new scored level; it does not discard unresolved questions through a count penalty. Maximum levels, deadlines and mastery rules still apply. No penalty is charged for previews, retries or failed readiness checks. Cumulative earned marks are divided by the original exam total for the final percentage.
+
+This rule supersedes the earlier two-part count-and-mark penalty. Already-started levels retain their frozen plan; subsequently created levels use this corrected rule. Unscored practice, when enabled, uses unresolved counts and cannot add earned marks.
 
 ### Weakness selection and fair allocation
 
 1. Level 1 must cover every required blueprint area with sufficient evidence. An area not tested enough is marked `insufficient_evidence`, not mastered.
 2. Finalize and score the level on the server before generating its weakness snapshot.
 3. Determine each area's status from unpenalized, objective performance and evidence count. For the initial rule-based policy, use the latest completed level's evidence for the area; if that level has too few questions, keep the area unresolved. Do not average historic failures into every future mastery decision.
-4. Track per-area original allocation, earned marks, penalty share and remaining recoverable balance. Apply the recovery penalty proportionally to eligible area balances, distributing rounding remainders deterministically.
+4. Track per-area original allocation, earned marks, penalty share and remaining recoverable balance. Calculate each area budget from its unresolved count and reduced per-question marks; record the removed marks as its penalty.
 5. Generate fresh, approved questions only for unresolved areas with recoverable budgets, preserving tenant, subject/course/module and topic scope. Exclude previously administered questions across the entire progression, not just the current level.
 6. Freeze area budgets before the level starts. Marks earned in one area cannot recover another area's marks or exceed that area's remaining allocation. A weighted question's full score is its frozen allocation; unsupported weighting/question combinations must fail readiness checks.
-7. For the initial progressive scoring policy, use a fixed question count per targeted area, with difficulty adapting within that quota. Variable-length ability-based delivery remains a later engine policy and must not silently replace this marks ledger.
+7. Freeze the unresolved-question quota for each targeted area at level start, with difficulty adapting within that quota. Do not refill it to the original paper count or adaptive minimum.
 
 A mastered area's remaining unearned marks become closed/unrecovered rather than being transferred to another topic or automatically awarded. The formula above gives the balance before these closures: subtract any newly closed area balances from R before calculating the next penalty. The worked example assumes all remaining balances are still eligible weak areas. Areas with insufficient evidence remain unresolved; budgetless areas can be offered unscored practice if configured. Record these closures so the ledger remains balanced.
 

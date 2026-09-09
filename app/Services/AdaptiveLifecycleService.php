@@ -467,32 +467,16 @@ class AdaptiveLifecycleService
         if (! $practice && ($progression->status !== 'active' || $previousLevel->number >= $settings['max_scored_levels'])) {
             $this->reject('exam', 'Scored recovery is closed.');
         }
-        $balances = AdaptiveAreaBalance::where('progression_id', $progression->id)->whereIn('mastery', ['weak', 'untested', 'insufficient_evidence'])->orderBy('area_key')->get();
-        if (! $practice) {
-            $balances = $balances->where('recoverable_units', '>', 0);
-        }
-        if ($balances->isEmpty()) {
-            $this->reject('exam', 'No eligible weak areas remain.');
-        }
-        $incoming = $practice ? 0 : (int) $balances->sum('recoverable_units');
-        $rate = $practice ? 0 : AdaptiveSettings::units((string) $settings['recovery_penalty_percent']);
-        $penalty = $this->ledger->penalty($incoming, $rate);
-        $available = $incoming - $penalty;
-        if (! $practice && $available < AdaptiveSettings::units((string) $settings['min_level_budget'])) {
+        $recoveryPlan = app(AdaptiveRecoveryPlanService::class)->build($previousLevel, $progression, $snapshot, $practice);
+        ['plan' => $plan, 'shares' => $shares, 'weakness' => $weakness,
+            'incoming' => $incoming, 'available' => $available, 'penalty' => $penalty, 'rate' => $rate] = $recoveryPlan;
+        if (! $practice && ($plan === [] || $available < AdaptiveSettings::units((string) $settings['min_level_budget']))) {
             $this->close($progression, $previousLevel, 'minimum_budget');
 
             return $this->payload($previous, $previousLevel, $progression, AdaptiveAttemptState::where('attempt_id', $previous->id)->firstOrFail(), $snapshot);
         }
-        $shares = $practice ? [] : $this->ledger->allocate($penalty, $balances->pluck('recoverable_units', 'area_key')->all());
-        $plan = $weakness = [];
-        foreach ($balances as $balance) {
-            $blueprint = collect($snapshot->blueprint['areas'])->firstWhere('area_key', $balance->area_key);
-            $budget = $practice ? 0 : $balance->recoverable_units - $shares[$balance->area_key];
-            $weakness[$balance->area_key] = ['mastery' => $balance->mastery, 'evidence_count' => $balance->evidence_count,
-                'remaining_units' => $balance->recoverable_units];
-            if ($practice || $budget > 0) {
-                $plan[$balance->area_key] = ['question_count' => $blueprint['question_count'], 'budget_units' => $budget, 'topic_ids' => $blueprint['topic_ids']];
-            }
+        if ($plan === []) {
+            $this->reject('exam', 'No unresolved questions remain for another level.');
         }
         // All readiness checks precede both attempt creation and penalty posting.
         $this->checkPool($snapshot, $progression, $plan);

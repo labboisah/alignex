@@ -115,21 +115,21 @@ class AdaptiveLifecycleTest extends TestCase
         $this->assertSame($next['attempt']['id'], $repeat['attempt']['id']);
         $this->assertSame(40, (int) AdaptiveProgression::firstOrFail()->penalty_units);
         $second = CandidateExamAttempt::findOrFail($next['attempt']['id']);
-        for ($i = 0; $i < 3; $i++) {
+        for ($i = 0; $i < 2; $i++) {
             $next = $this->commit($second, $next, $i === 0, 'l2-'.$i);
         }
         $thirdState = app(AdaptiveLifecycleService::class)->execute($second, 'next-level', ['idempotency_key' => 'level-three']);
         $third = CandidateExamAttempt::findOrFail($thirdState['attempt']['id']);
-        for ($i = 0; $i < 3; $i++) {
+        for ($i = 0; $i < 1; $i++) {
             $thirdState = $this->commit($third, $thirdState, $i === 0, 'l3-'.$i);
         }
         $p = AdaptiveProgression::firstOrFail();
-        $this->assertSame(392, (int) $p->earned_units);
-        $this->assertSame(64, (int) $p->penalty_units);
-        $this->assertSame(144, (int) $p->closed_units);
+        $this->assertSame(542, (int) $p->earned_units);
+        $this->assertSame(58, (int) $p->penalty_units);
+        $this->assertSame(0, (int) $p->closed_units);
         $this->assertSame(0, (int) $p->recoverable_units);
         $this->assertSame('level_cap', $p->stop_reason);
-        $this->assertSame(9, AdaptiveDecision::distinct()->count('question_id'));
+        $this->assertSame(6, AdaptiveDecision::distinct()->count('question_id'));
         app(AdaptiveLedgerService::class)->reconcile($p);
     }
 
@@ -208,7 +208,7 @@ class AdaptiveLifecycleTest extends TestCase
         $practice = app(AdaptiveLifecycleService::class)->execute($attempt, 'next-level', ['idempotency_key' => 'practice', 'practice' => true]);
         $practiceAttempt = CandidateExamAttempt::findOrFail($practice['attempt']['id']);
         $this->assertTrue($practice['is_practice']);
-        for ($i = 0; $i < 3; $i++) {
+        for ($i = 0; $i < 2; $i++) {
             $practice = $this->commit($practiceAttempt, $practice, true, 'practice-'.$i);
         }
         $this->assertSame(200, (int) AdaptiveProgression::firstOrFail()->earned_units);

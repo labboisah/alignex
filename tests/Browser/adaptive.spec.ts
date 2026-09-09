@@ -352,14 +352,15 @@ test('learning progress shows level marks and weaknesses before the next level',
     await expect(page.getByRole('table', { name: 'Total marks earned after each level' })).toContainText('2.00');
     await expect(page.getByRole('heading', { name: 'Your improvement', exact: true })).toBeVisible();
     await expect(page.getByText('Level 1 is your starting point.', { exact: false })).toBeVisible();
+    await expect(page.getByText('Next level: 2 questions, worth 3.60 marks in total.', { exact: true })).toBeVisible();
     await beginNextLevel(page);
     await expect(page.getByRole('radio')).toHaveCount(2);
     expect((await envelope(page)).payload.level).toBe(2);
     await expect(page.getByRole('heading',{name:'Your progress',exact:true})).toHaveCount(0);
     await answer(page, true);
     await finishRemaining(page);
-    await expect(page.getByText('+1.20 marks gained since Level 1.', { exact: true })).toBeVisible();
-    await expect(page.getByRole('table', { name: 'Total marks earned after each level' })).toContainText('3.20');
+    await expect(page.getByText('+1.80 marks gained since Level 1.', { exact: true })).toBeVisible();
+    await expect(page.getByRole('table', { name: 'Total marks earned after each level' })).toContainText('3.80');
 });
 test('simple adaptive settings save without technical approval or preparation steps', async ({page,request})=>{
     const data=await fixture(request);

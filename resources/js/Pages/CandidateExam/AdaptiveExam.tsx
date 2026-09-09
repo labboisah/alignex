@@ -11,7 +11,7 @@ export type AdaptivePayload = {
     attempt: { id: string; status: string }; level: number; is_practice: boolean; state_version: number;
     current_item: Item | null; selected_option_ids: string[]; remaining_time: number; committed_questions: number; total_questions: number; is_last_question: boolean;
     submitted: boolean; stop_reason: string | null; can_start: boolean; starts_in_seconds: number; exam_token?: string;
-    recovery: { can_start: boolean; can_practice: boolean; penalty_percent: number; message: string; available_at: string | null };
+    recovery: { can_start: boolean; can_practice: boolean; penalty_percent: number; next_question_count?: number; next_available_marks?: string; message: string; available_at: string | null };
     learning_progress?: {earned_marks:string;original_marks:string;remaining_marks:string;levels:{number:number;score:string;available_marks:string;penalty_marks:string}[];areas:{name:string;status:string}[]} | null;
     result: { score: string; total_marks: string } | null;
 };
@@ -294,11 +294,12 @@ export default function AdaptiveExam() {
                     </div>}
                     {payload.result ? <p className="text-lg font-semibold">Released aggregate result: {payload.result.score} / {payload.result.total_marks}</p> : <p>{payload.learning_progress ? 'Your final result will be available when the organizer releases it.' : 'Scores remain hidden until the aggregate result is ready and released.'}</p>}
                     <p>{payload.recovery.message}</p>
+                    {payload.recovery.can_start && <p>Next level: {payload.recovery.next_question_count} questions, worth {payload.recovery.next_available_marks} marks in total.</p>}
                     {payload.recovery.available_at && <p className="text-sm">Recovery available from {new Date(payload.recovery.available_at).toLocaleString()}.</p>}
                     {payload.recovery.can_start && <ConfirmDialog
                         trigger={<Button disabled={disabled}>{busy ? 'Starting next level…' : 'Start next level'}</Button>}
                         title="Start your next level?"
-                        description={`This level focuses on areas to improve. It deducts ${payload.recovery.penalty_percent}% from the remaining available marks. Marks already earned are kept. The timer starts when you continue.`}
+                        description={`This level focuses on areas to improve. The question count equals incorrect plus unanswered questions in unresolved areas. Marks per question reduce by ${payload.recovery.penalty_percent}%. Marks already earned are kept. The timer starts when you continue.`}
                         confirmLabel="Begin next level"
                         onConfirm={() => nextLevel(false)}
                     />}
