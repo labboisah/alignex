@@ -1,3 +1,4 @@
+import OwnerStatusButton from '@/Components/Platform/OwnerStatusButton';
 import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft, Building2, BookOpen, GraduationCap, MapPin } from 'lucide-react';
 import { PageHeader, PortalAppShell, StatusBadge } from '@/Components/Platform';
@@ -7,6 +8,7 @@ export default function InstitutionShow({ institution, can }: { institution: any
     return (
         <PortalAppShell title={institution.name}>
             <Head title={institution.name} />
+            {can.update && <div className="mb-4"><OwnerStatusButton path={'/institutions/'+institution.id+'/status'} status={institution.status} /></div>}
             <PageHeader
                 eyebrow="Institution"
                 title={institution.name}

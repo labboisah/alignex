@@ -8,6 +8,7 @@ use App\Models\Faculty;
 use App\Models\Institution;
 use App\Models\Programme;
 use App\Models\User;
+use App\Services\RecordDeletionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -54,7 +55,7 @@ class InstitutionStructureController extends Controller
         $this->authorizeInstitution($request->user(), $institution);
         $this->authorizeBelongsToInstitution($faculty, $institution);
 
-        $faculty->delete();
+        app(RecordDeletionService::class)->delete($faculty);
 
         return back()->with('success', 'Faculty deleted.');
     }
@@ -101,7 +102,7 @@ class InstitutionStructureController extends Controller
         $this->authorizeInstitution($request->user(), $institution);
         $this->authorizeBelongsToInstitution($department, $institution);
 
-        $department->delete();
+        app(RecordDeletionService::class)->delete($department);
 
         return back()->with('success', 'Department deleted.');
     }
@@ -159,7 +160,7 @@ class InstitutionStructureController extends Controller
         $this->authorizeInstitution($request->user(), $institution);
         $this->authorizeBelongsToInstitution($programme, $institution);
 
-        $programme->delete();
+        app(RecordDeletionService::class)->delete($programme);
 
         return back()->with('success', 'Programme deleted.');
     }
@@ -224,7 +225,7 @@ class InstitutionStructureController extends Controller
         $this->authorizeInstitution($request->user(), $institution);
         $this->authorizeBelongsToInstitution($course, $institution);
 
-        $course->delete();
+        app(RecordDeletionService::class)->delete($course);
 
         return back()->with('success', 'Course deleted.');
     }
@@ -348,7 +349,7 @@ class InstitutionStructureController extends Controller
         $this->authorizeBelongsToInstitution($department, $institution);
         $this->authorizeLecturerRecord($institution, $department, $lecturer);
 
-        $lecturer->delete();
+        app(RecordDeletionService::class)->delete($lecturer);
 
         return back()->with('success', 'Lecturer deleted.');
     }

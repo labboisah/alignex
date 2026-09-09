@@ -1,3 +1,5 @@
+import { useState as useEditState } from 'react';
+import { RecordEditor, statusField } from '@/Components/Platform/RecordEditor';
 import { Head, router, useForm } from '@inertiajs/react';
 import { FormEvent, ReactNode } from 'react';
 import { DataTable, PageHeader, PortalAppShell, StatusBadge } from '@/Components/Platform';
@@ -12,18 +14,8 @@ export default function AcademicSessions({ secondarySchool, sessions, basePath }
         event.preventDefault();
         post(path, { preserveScroll: true, onSuccess: () => reset() });
     };
-    const edit = (row: Record<string, string | number | boolean>) => {
-        const name = window.prompt('Academic session name', String(row.name ?? ''));
-        if (name === null) return;
-        router.patch(`${path}/${row.id}`, {
-            name,
-            code: String(row.code ?? ''),
-            start_date: String(row.starts_on ?? row.start_date ?? ''),
-            end_date: String(row.ends_on ?? row.end_date ?? ''),
-            status: String(row.status ?? 'active'),
-            is_active: Boolean(row.is_active),
-        }, { preserveScroll: true });
-    };
+    const [editing, setEditing] = useEditState<Record<string, any> | null>(null);
+    const edit = (row: any) => setEditing(row);
     const destroy = (row: Record<string, string | number | boolean>) => {
         if (window.confirm(`Delete ${String(row.name)}?`)) {
             router.delete(`${path}/${row.id}`, { preserveScroll: true });
@@ -32,6 +24,7 @@ export default function AcademicSessions({ secondarySchool, sessions, basePath }
 
     return (
         <PortalAppShell title="Academic Sessions">
+            {editing && <RecordEditor key={String(editing.id)} title="Edit AcademicSessions" path={path + '/' + editing.id} values={{...editing,start_date:String(editing.starts_on ?? editing.start_date ?? '').slice(0,10),end_date:String(editing.ends_on ?? editing.end_date ?? '').slice(0,10)}} fields={[{name:'name',label:'Name',required:true},{name:'code',label:'Code'},{name:'start_date',label:'Start date',type:'date'},{name:'end_date',label:'End date',type:'date'},statusField,{name:'is_active',label:'Active session',type:'checkbox'}]} onCancel={() => setEditing(null)} />}
             <Head title="Academic Sessions" />
             <PageHeader eyebrow={secondarySchool.name} title="Academic Sessions" description="Add school years such as 2026/2027. Download the sample file if you want to upload many at once." />
             <ImportBox secondarySchoolId={secondarySchool.id} section="academic-sessions" form={importForm} basePath={basePath ? structureBase : undefined} />

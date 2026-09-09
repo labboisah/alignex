@@ -15,6 +15,7 @@ use App\Models\QuestionBank;
 use App\Models\School;
 use App\Models\Subject;
 use App\Services\CurrentContextService;
+use App\Services\RecordDeletionService;
 use App\Support\ReferenceCode;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -126,7 +127,7 @@ class QuestionBankController extends Controller
     {
         Gate::authorize('delete', $questionBank);
 
-        $questionBank->delete();
+        app(RecordDeletionService::class)->delete($questionBank);
 
         return back()->with('success', 'Question bank deleted.');
     }
@@ -166,7 +167,7 @@ class QuestionBankController extends Controller
                     'created_by' => $request->user()->id,
                 ];
 
-                validator($data, (new StoreQuestionBankRequest())->rules())->validate();
+                validator($data, StoreQuestionBankRequest::createFrom($request)->rules())->validate();
                 $this->ensureUniqueCode($data['code'], $tenant, null, $index + 2);
 
                 QuestionBank::create($data);
@@ -263,11 +264,11 @@ class QuestionBankController extends Controller
                 ->where('institution_id', $tenant['institution_id'])
                 ->where('course_id', $tenant['course_id'] ?? null))
             ->when(! ($tenant['institution_id'] ?? null), fn ($query) => $query
-            ->where('organization_id', $tenant['organization_id'])
-            ->where('school_id', $tenant['school_id'])
-            ->where('center_id', $tenant['center_id'])
-            ->where('secondary_school_id', $tenant['secondary_school_id'] ?? null)
-            ->where('professional_school_id', $tenant['professional_school_id'] ?? null)
+                ->where('organization_id', $tenant['organization_id'])
+                ->where('school_id', $tenant['school_id'])
+                ->where('center_id', $tenant['center_id'])
+                ->where('secondary_school_id', $tenant['secondary_school_id'] ?? null)
+                ->where('professional_school_id', $tenant['professional_school_id'] ?? null)
                 ->where('cbt_center_id', $tenant['cbt_center_id'] ?? null))
             ->when($ignore, fn ($query) => $query->whereKeyNot($ignore->id))
             ->exists();
@@ -289,11 +290,11 @@ class QuestionBankController extends Controller
                 ->where('institution_id', $tenant['institution_id'])
                 ->where('course_id', $tenant['course_id'] ?? null))
             ->when(! ($tenant['institution_id'] ?? null), fn ($query) => $query
-            ->where('organization_id', $tenant['organization_id'])
-            ->where('school_id', $tenant['school_id'])
-            ->where('center_id', $tenant['center_id'])
-            ->where('secondary_school_id', $tenant['secondary_school_id'] ?? null)
-            ->where('professional_school_id', $tenant['professional_school_id'] ?? null)
+                ->where('organization_id', $tenant['organization_id'])
+                ->where('school_id', $tenant['school_id'])
+                ->where('center_id', $tenant['center_id'])
+                ->where('secondary_school_id', $tenant['secondary_school_id'] ?? null)
+                ->where('professional_school_id', $tenant['professional_school_id'] ?? null)
                 ->where('cbt_center_id', $tenant['cbt_center_id'] ?? null)), $ignore);
     }
 

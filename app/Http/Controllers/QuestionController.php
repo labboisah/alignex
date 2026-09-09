@@ -13,6 +13,7 @@ use App\Models\QuestionBank;
 use App\Models\Subject;
 use App\Models\Topic;
 use App\Services\CurrentContextService;
+use App\Services\RecordDeletionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -151,15 +152,10 @@ class QuestionController extends Controller
     {
         Gate::authorize('delete', $question);
 
-        DB::transaction(function () use ($question): void {
-            if ($question->image_path) {
-                Storage::disk('public')->delete($question->image_path);
-            }
+        app(RecordDeletionService::class)->delete($question);
+        // Retain image files with the soft-deleted question for historical recovery.
 
-            $question->delete();
-        });
-
-        return back()->with('success', 'Question deleted.');
+        return redirect()->route('questions.index')->with('success', 'Question deleted.');
     }
 
     public function template()
@@ -217,7 +213,7 @@ class QuestionController extends Controller
                 ];
 
                 try {
-                    validator($data, (new StoreQuestionRequest())->rules())
+                    validator($data, (new StoreQuestionRequest)->rules())
                         ->after(function ($validator) use ($data): void {
                             $filledOptions = collect($data['options'])
                                 ->filter(fn (array $option) => filled($option['option_text'] ?? null));

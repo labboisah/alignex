@@ -54,7 +54,7 @@ class QuestionModuleTest extends TestCase
                     ['label' => 'E', 'option_text' => '', 'is_correct' => false],
                 ],
             ])
-            ->assertRedirect('/questions');
+            ->assertRedirect(route('questions.edit', Question::query()->where('stem', 'What is 2 + 2?')->firstOrFail(), absolute: false));
 
         $question = Question::query()->where('stem', 'What is 2 + 2?')->firstOrFail();
         $question->load('options');

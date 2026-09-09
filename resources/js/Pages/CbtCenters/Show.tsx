@@ -1,3 +1,4 @@
+import OwnerStatusButton from '@/Components/Platform/OwnerStatusButton';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { BookOpen, ClipboardList, Pencil, Plus, Upload, Users } from 'lucide-react';
 import { FormEvent } from 'react';
@@ -17,6 +18,7 @@ export default function Show({ center, candidates, questionBanks, recentExams, a
     return (
         <PortalAppShell title={center.name}>
             <Head title={center.name} />
+            {can.update && <div className="mb-4"><OwnerStatusButton path={'/cbt-centers/'+center.id+'/status'} status={center.status} /></div>}
             <PageHeader
                 eyebrow="CBT Center"
                 title={center.name}

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\PricingPlanResource;
 use App\Models\PricingPlan;
+use App\Services\RecordDeletionService;
 use App\Support\PlanFeatures;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -51,7 +52,7 @@ class PricingPlanController extends Controller
                 ->with('error', 'This plan is linked to registrations and cannot be deleted. Deactivate it instead.');
         }
 
-        $pricingPlan->delete();
+        app(RecordDeletionService::class)->delete($pricingPlan);
 
         return redirect()
             ->route('pricing-plans.index')

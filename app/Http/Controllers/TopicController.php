@@ -9,6 +9,7 @@ use App\Http\Resources\TopicResource;
 use App\Models\Subject;
 use App\Models\Topic;
 use App\Services\CurrentContextService;
+use App\Services\RecordDeletionService;
 use App\Support\ReferenceCode;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -93,7 +94,7 @@ class TopicController extends Controller
         $this->abortForSecondarySchool($request);
         Gate::authorize('delete', $topic);
 
-        $topic->delete();
+        app(RecordDeletionService::class)->delete($topic);
 
         return back()->with('success', 'Topic deleted.');
     }
@@ -134,7 +135,7 @@ class TopicController extends Controller
                     'status' => trim($row['status'] ?? Topic::STATUS_ACTIVE) ?: Topic::STATUS_ACTIVE,
                 ];
 
-                validator($data, (new StoreTopicRequest())->rules())->validate();
+                validator($data, (new StoreTopicRequest)->rules())->validate();
                 $this->ensureUniqueCode($data['code'], $subject, null, $index + 2);
 
                 Topic::create($data);

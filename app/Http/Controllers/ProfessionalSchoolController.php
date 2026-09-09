@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UpdateProfessionalStructureRequest;
 use App\Models\Candidate;
 use App\Models\Certificate;
 use App\Models\Course;
@@ -15,6 +16,7 @@ use App\Models\QuestionBank;
 use App\Models\Subject;
 use App\Models\TrainingBatch;
 use App\Models\User;
+use App\Services\RecordDeletionService;
 use App\Support\ReferenceCode;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -22,6 +24,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -77,6 +80,7 @@ class ProfessionalSchoolController extends Controller
         ])->loadCount(['programmes', 'courses', 'modules', 'trainingBatches', 'candidates', 'questionBanks', 'exams', 'certificates']);
 
         return Inertia::render('ProfessionalSchools/Show', [
+            'canUpdate' => $request->user()->isSuperAdmin() || $request->user()->can('update', $professionalSchool),
             'professionalSchool' => $this->detail($professionalSchool),
             'dashboard' => $this->dashboard($professionalSchool),
         ]);
@@ -112,6 +116,7 @@ class ProfessionalSchoolController extends Controller
 
         return Inertia::render('ProfessionalSchools/Programmes', [
             'professionalSchool' => $this->row($professionalSchool),
+            'canManageStructure' => $request->user()->isSuperAdmin() || $request->user()->hasPermission('manageSchools'),
             'programmes' => $professionalSchool->programmes()->withCount(['courses', 'trainingBatches', 'candidates', 'exams'])->orderBy('name')->get(),
         ]);
     }
@@ -196,12 +201,103 @@ class ProfessionalSchoolController extends Controller
             'description' => ['nullable', 'string', 'max:2000'],
             'status' => ['required', Rule::in([ProfessionalModule::STATUS_ACTIVE, ProfessionalModule::STATUS_INACTIVE])],
         ]);
-        abort_unless($professionalSchool->courses()->whereKey($data['course_id'])->exists(), 422);
+        $course = $professionalSchool->courses()->findOrFail($data['course_id']);
+        abort_if(! empty($data['programme_id']) && (string) $data['programme_id'] !== (string) $course->programme_id, 422, 'Choose the programme belonging to the selected course.');
+        $data['programme_id'] = $course->programme_id;
         $data['code'] = $this->referenceCode($data['code'] ?? null, $data['name'], ProfessionalModule::query()->where('professional_school_id', $professionalSchool->id));
 
         $professionalSchool->modules()->create($data);
 
         return back()->with('success', 'Module created.');
+    }
+
+    public function updateProgramme(UpdateProfessionalStructureRequest $request, ProfessionalSchool $professionalSchool, Programme $programme): RedirectResponse
+    {
+        $this->authorizeRecord($request->user(), $professionalSchool, update: true);
+        abort_unless((string) $programme->professional_school_id === (string) $professionalSchool->id, 404);
+        $data = $request->validated();
+        $data['code'] = filled($data['code'] ?? null) ? strtoupper($data['code']) : $programme->code;
+        DB::transaction(function () use ($programme, $data): void {
+            $record = Programme::whereKey($programme->id)->lockForUpdate()->firstOrFail();
+
+            foreach (['programme_id', 'course_id'] as $parent) {
+                if (array_key_exists($parent, $data) && (string) $record->$parent !== (string) $data[$parent]) {
+                    app(RecordDeletionService::class)->assertUnused($record);
+                }
+            }
+            $record->update($data);
+        });
+
+        return back()->with('success', 'Programme updated.');
+    }
+
+    public function destroyProgramme(Request $request, ProfessionalSchool $professionalSchool, Programme $programme): RedirectResponse
+    {
+        $this->authorizeRecord($request->user(), $professionalSchool, update: true);
+        abort_unless((string) $programme->professional_school_id === (string) $professionalSchool->id, 404);
+        app(RecordDeletionService::class)->delete($programme);
+
+        return back()->with('success', 'Programme deleted.');
+    }
+
+    public function updateCourse(UpdateProfessionalStructureRequest $request, ProfessionalSchool $professionalSchool, Course $course): RedirectResponse
+    {
+        $this->authorizeRecord($request->user(), $professionalSchool, update: true);
+        abort_unless((string) $course->professional_school_id === (string) $professionalSchool->id, 404);
+        $data = $request->validated();
+        $data['code'] = filled($data['code'] ?? null) ? strtoupper($data['code']) : $course->code;
+        DB::transaction(function () use ($course, $data): void {
+            $record = Course::whereKey($course->id)->lockForUpdate()->firstOrFail();
+
+            foreach (['programme_id', 'course_id'] as $parent) {
+                if (array_key_exists($parent, $data) && (string) $record->$parent !== (string) $data[$parent]) {
+                    app(RecordDeletionService::class)->assertUnused($record);
+                }
+            }
+            $record->update($data);
+        });
+
+        return back()->with('success', 'Course updated.');
+    }
+
+    public function destroyCourse(Request $request, ProfessionalSchool $professionalSchool, Course $course): RedirectResponse
+    {
+        $this->authorizeRecord($request->user(), $professionalSchool, update: true);
+        abort_unless((string) $course->professional_school_id === (string) $professionalSchool->id, 404);
+        app(RecordDeletionService::class)->delete($course);
+
+        return back()->with('success', 'Course deleted.');
+    }
+
+    public function updateModule(UpdateProfessionalStructureRequest $request, ProfessionalSchool $professionalSchool, ProfessionalModule $module): RedirectResponse
+    {
+        $this->authorizeRecord($request->user(), $professionalSchool, update: true);
+        abort_unless((string) $module->professional_school_id === (string) $professionalSchool->id, 404);
+        $data = $request->validated();
+        $data['code'] = filled($data['code'] ?? null) ? strtoupper($data['code']) : $module->code;
+        DB::transaction(function () use ($module, $professionalSchool, $data): void {
+            $record = ProfessionalModule::whereKey($module->id)->lockForUpdate()->firstOrFail();
+            $course = $professionalSchool->courses()->findOrFail($data['course_id']);
+            abort_if(! empty($data['programme_id']) && (string) $data['programme_id'] !== (string) $course->programme_id, 422, 'Choose the programme belonging to the selected course.');
+            $data['programme_id'] = $course->programme_id;
+            foreach (['programme_id', 'course_id'] as $parent) {
+                if (array_key_exists($parent, $data) && (string) $record->$parent !== (string) $data[$parent]) {
+                    app(RecordDeletionService::class)->assertUnused($record);
+                }
+            }
+            $record->update($data);
+        });
+
+        return back()->with('success', 'Module updated.');
+    }
+
+    public function destroyModule(Request $request, ProfessionalSchool $professionalSchool, ProfessionalModule $module): RedirectResponse
+    {
+        $this->authorizeRecord($request->user(), $professionalSchool, update: true);
+        abort_unless((string) $module->professional_school_id === (string) $professionalSchool->id, 404);
+        app(RecordDeletionService::class)->delete($module);
+
+        return back()->with('success', 'Module deleted.');
     }
 
     public function batches(Request $request, ProfessionalSchool $professionalSchool): Response
@@ -271,7 +367,7 @@ class ProfessionalSchoolController extends Controller
         abort_unless((int) $trainingBatch->professional_school_id === (int) $professionalSchool->id, 403);
         abort_if($trainingBatch->candidates()->exists(), 422, 'Move candidates out of this batch before deleting it.');
 
-        $trainingBatch->delete();
+        app(RecordDeletionService::class)->delete($trainingBatch);
 
         return back()->with('success', 'Training batch deleted.');
     }
@@ -371,7 +467,7 @@ class ProfessionalSchoolController extends Controller
         $this->authorizeRecord($request->user(), $professionalSchool, update: true);
         $this->authorizeFacilitatorRecord($professionalSchool, $facilitator);
 
-        $facilitator->delete();
+        app(RecordDeletionService::class)->delete($facilitator);
 
         return back()->with('success', 'Facilitator deleted.');
     }
@@ -561,7 +657,7 @@ class ProfessionalSchoolController extends Controller
                     $failed[] = [
                         'row' => $line,
                         'question' => str((string) ($row['question_text'] ?? ''))->limit(80)->toString(),
-                        'reason' => $exception instanceof \Illuminate\Validation\ValidationException
+                        'reason' => $exception instanceof ValidationException
                             ? $exception->errors()[array_key_first($exception->errors())][0]
                             : $exception->getMessage(),
                     ];
@@ -698,6 +794,7 @@ class ProfessionalSchoolController extends Controller
 
                 if ($professionalSchool->candidates()->where('candidate_number', $registrationNumber)->exists()) {
                     $skipped++;
+
                     continue;
                 }
 
@@ -720,7 +817,7 @@ class ProfessionalSchoolController extends Controller
                 $failed[] = [
                     'row' => $line,
                     'registration_number' => $registrationNumber ?: 'N/A',
-                    'reason' => $exception instanceof \Illuminate\Validation\ValidationException
+                    'reason' => $exception instanceof ValidationException
                         ? $exception->errors()[array_key_first($exception->errors())][0]
                         : $exception->getMessage(),
                 ];

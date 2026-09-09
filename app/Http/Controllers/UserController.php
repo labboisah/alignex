@@ -8,6 +8,7 @@ use App\Models\Organization;
 use App\Models\ProfessionalSchool;
 use App\Models\SecondarySchool;
 use App\Models\User;
+use App\Services\RecordDeletionService;
 use App\Support\AccessControl;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -88,7 +89,7 @@ class UserController extends Controller
             return back()->withErrors(['user' => 'You cannot delete your own current account.']);
         }
 
-        $user->delete();
+        app(RecordDeletionService::class)->delete($user);
 
         return redirect()->route('users.index')->with('success', 'User deleted.');
     }
@@ -136,7 +137,7 @@ class UserController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      */
     private function validateOwnership(Request $request, array $validated): void
     {

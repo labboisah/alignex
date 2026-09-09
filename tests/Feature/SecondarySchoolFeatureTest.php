@@ -394,6 +394,7 @@ class SecondarySchoolFeatureTest extends TestCase
                         '/secondary-school/academic-sessions',
                         '/secondary-school/terms',
                         '/secondary-school/classes',
+                        '/secondary-school/arms',
                         '/secondary-school/students',
                         '/secondary-school/student-groups',
                     ], collect($administration['children'])->pluck('href')->values()->all());
@@ -529,8 +530,8 @@ class SecondarySchoolFeatureTest extends TestCase
             'school_class_id' => $class->id,
             'name' => 'Blue',
             'status' => 'inactive',
-        ])->assertNotFound();
-        $this->assertDatabaseHas('class_arms', ['id' => $arm->id, 'name' => 'Gold', 'status' => 'active']);
+        ])->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('class_arms', ['id' => $arm->id, 'name' => 'Blue', 'status' => 'inactive']);
 
         $group = StudentGroup::query()->create(['school_class_id' => $class->id, 'name' => 'Science', 'code' => 'SCI', 'status' => 'active']);
         $this->actingAs($admin)->patch("/secondary-schools/{$school->id}/student-groups/{$group->id}", [
@@ -552,17 +553,17 @@ class SecondarySchoolFeatureTest extends TestCase
 
         $this->actingAs($admin)->delete("/secondary-schools/{$school->id}/students/{$student->id}")->assertRedirect();
         $this->actingAs($admin)->delete("/secondary-schools/{$school->id}/student-groups/{$group->id}")->assertRedirect();
-        $this->actingAs($admin)->delete("/secondary-schools/{$school->id}/arms/{$arm->id}")->assertNotFound();
+        $this->actingAs($admin)->delete("/secondary-schools/{$school->id}/arms/{$arm->id}")->assertSessionHasNoErrors();
         $this->actingAs($admin)->delete("/secondary-schools/{$school->id}/classes/{$class->id}")->assertRedirect();
         $this->actingAs($admin)->delete("/secondary-schools/{$school->id}/terms/{$term->id}")->assertRedirect();
         $this->actingAs($admin)->delete("/secondary-schools/{$school->id}/academic-sessions/{$session->id}")->assertRedirect();
 
         $this->assertSoftDeleted('students', ['id' => $student->id]);
         $this->assertSoftDeleted('student_groups', ['id' => $group->id]);
-        $this->assertDatabaseHas('class_arms', ['id' => $arm->id]);
-        $this->assertSoftDeleted('school_classes', ['id' => $class->id]);
+        $this->assertDatabaseMissing('class_arms', ['id' => $arm->id]);
+        $this->assertDatabaseHas('school_classes', ['id' => $class->id, 'deleted_at' => null]);
         $this->assertSoftDeleted('academic_terms', ['id' => $term->id]);
-        $this->assertSoftDeleted('academic_sessions', ['id' => $session->id]);
+        $this->assertDatabaseHas('academic_sessions', ['id' => $session->id, 'deleted_at' => null]);
     }
 
     public function test_school_admin_can_manage_student_groups_and_batch_secondary_exam(): void

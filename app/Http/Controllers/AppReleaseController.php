@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\AppReleaseResource;
 use App\Models\AppRelease;
+use App\Services\RecordDeletionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -49,7 +50,7 @@ class AppReleaseController extends Controller
 
     public function destroy(AppRelease $appRelease): RedirectResponse
     {
-        $appRelease->delete();
+        app(RecordDeletionService::class)->delete($appRelease);
 
         return redirect()
             ->route('app-releases.index')
@@ -106,7 +107,7 @@ class AppReleaseController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      */
     private function applyUploadedFile(array &$validated, UploadedFile $file, string $artifact): void
     {
@@ -127,7 +128,7 @@ class AppReleaseController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      */
     private function applyExistingFilePath(array &$validated, string $filePath): void
     {

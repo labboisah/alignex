@@ -22,6 +22,7 @@ use App\Http\Controllers\InstitutionStructureController;
 use App\Http\Controllers\OfflineActivationCodeController;
 use App\Http\Controllers\OfflineServerDownloadController;
 use App\Http\Controllers\OrganizationController;
+use App\Http\Controllers\OwnerStatusController;
 use App\Http\Controllers\PricingPlanController;
 use App\Http\Controllers\ProfessionalExamController;
 use App\Http\Controllers\ProfessionalSchoolController;
@@ -162,6 +163,7 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
         Route::get('/institutions/create', [InstitutionController::class, 'create'])->name('institutions.create');
         Route::post('/institutions', [InstitutionController::class, 'store'])->name('institutions.store');
         Route::get('/institutions/{institution}', [InstitutionController::class, 'show'])->name('institutions.show');
+        Route::patch('/institutions/{institution}/status', OwnerStatusController::class)->name('institutions.status');
         Route::get('/institutions/{institution}/edit', [InstitutionController::class, 'edit'])->name('institutions.edit');
         Route::patch('/institutions/{institution}', [InstitutionController::class, 'update'])->name('institutions.update');
         Route::patch('/institutions/{institution}/deactivate', [InstitutionController::class, 'deactivate'])->name('institutions.deactivate');
@@ -194,6 +196,7 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
         Route::get('/secondary-schools/create', [SecondarySchoolController::class, 'create'])->name('secondary-schools.create');
         Route::post('/secondary-schools', [SecondarySchoolController::class, 'store'])->name('secondary-schools.store');
         Route::get('/secondary-schools/{secondarySchool}', [SecondarySchoolController::class, 'show'])->name('secondary-schools.show');
+        Route::patch('/secondary-schools/{secondarySchool}/status', OwnerStatusController::class)->name('secondary-schools.status');
         Route::get('/secondary-schools/{secondarySchool}/edit', [SecondarySchoolController::class, 'edit'])->name('secondary-schools.edit');
         Route::patch('/secondary-schools/{secondarySchool}', [SecondarySchoolController::class, 'update'])->name('secondary-schools.update');
         Route::get('/secondary-schools/{secondarySchool}/academic-sessions', [SecondarySchoolController::class, 'academicSessions'])->name('secondary-schools.academic-sessions.index');
@@ -205,6 +208,10 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
         Route::post('/secondary-schools/{secondarySchool}/terms', [SecondarySchoolController::class, 'storeTermForSchool'])->name('secondary-schools.terms.store');
         Route::patch('/secondary-schools/{secondarySchool}/terms/{academicTerm}', [SecondarySchoolController::class, 'updateTermForSchool'])->name('secondary-schools.terms.update');
         Route::delete('/secondary-schools/{secondarySchool}/terms/{academicTerm}', [SecondarySchoolController::class, 'destroyTermForSchool'])->name('secondary-schools.terms.destroy');
+        Route::get('/secondary-schools/{secondarySchool}/arms', [SecondarySchoolController::class, 'arms'])->name('secondary-schools.arms.index');
+        Route::post('/secondary-schools/{secondarySchool}/arms', [SecondarySchoolController::class, 'storeArmForSchool'])->name('secondary-schools.arms.store');
+        Route::patch('/secondary-schools/{secondarySchool}/arms/{classArm}', [SecondarySchoolController::class, 'updateArmForSchool'])->name('secondary-schools.arms.update');
+        Route::delete('/secondary-schools/{secondarySchool}/arms/{classArm}', [SecondarySchoolController::class, 'destroyArmForSchool'])->name('secondary-schools.arms.destroy');
         Route::get('/secondary-schools/{secondarySchool}/classes', [SecondarySchoolController::class, 'classes'])->name('secondary-schools.classes.index');
         Route::post('/secondary-schools/{secondarySchool}/classes', [SecondarySchoolController::class, 'storeClassForSchool'])->name('secondary-schools.classes.store');
         Route::patch('/secondary-schools/{secondarySchool}/classes/{schoolClass}', [SecondarySchoolController::class, 'updateClassForSchool'])->name('secondary-schools.classes.update');
@@ -231,8 +238,15 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
         Route::get('/professional-schools/create', [ProfessionalSchoolController::class, 'create'])->name('professional-schools.create');
         Route::post('/professional-schools', [ProfessionalSchoolController::class, 'store'])->name('professional-schools.store');
         Route::get('/professional-schools/{professionalSchool}', [ProfessionalSchoolController::class, 'show'])->name('professional-schools.show');
+        Route::patch('/professional-schools/{professionalSchool}/status', OwnerStatusController::class)->name('professional-schools.status');
         Route::get('/professional-schools/{professionalSchool}/edit', [ProfessionalSchoolController::class, 'edit'])->name('professional-schools.edit');
         Route::patch('/professional-schools/{professionalSchool}', [ProfessionalSchoolController::class, 'update'])->name('professional-schools.update');
+        Route::patch('/professional-schools/{professionalSchool}/programmes/{programme}', [ProfessionalSchoolController::class, 'updateProgramme'])->name('professional-schools.programmes.update');
+        Route::delete('/professional-schools/{professionalSchool}/programmes/{programme}', [ProfessionalSchoolController::class, 'destroyProgramme'])->name('professional-schools.programmes.destroy');
+        Route::patch('/professional-schools/{professionalSchool}/courses/{course}', [ProfessionalSchoolController::class, 'updateCourse'])->name('professional-schools.courses.update');
+        Route::delete('/professional-schools/{professionalSchool}/courses/{course}', [ProfessionalSchoolController::class, 'destroyCourse'])->name('professional-schools.courses.destroy');
+        Route::patch('/professional-schools/{professionalSchool}/modules/{module}', [ProfessionalSchoolController::class, 'updateModule'])->name('professional-schools.modules.update');
+        Route::delete('/professional-schools/{professionalSchool}/modules/{module}', [ProfessionalSchoolController::class, 'destroyModule'])->name('professional-schools.modules.destroy');
         Route::get('/professional-schools/{professionalSchool}/programmes', [ProfessionalSchoolController::class, 'programmes'])->name('professional-schools.programmes.index');
         Route::post('/professional-schools/{professionalSchool}/programmes', [ProfessionalSchoolController::class, 'storeProgramme'])->name('professional-schools.programmes.store');
         Route::get('/professional-schools/{professionalSchool}/courses', [ProfessionalSchoolController::class, 'courses'])->name('professional-schools.courses.index');
@@ -298,6 +312,7 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
         Route::get('/cbt-centers/create', [CbtCenterController::class, 'create'])->name('cbt-centers.create');
         Route::post('/cbt-centers', [CbtCenterController::class, 'store'])->name('cbt-centers.store');
         Route::get('/cbt-centers/{cbtCenter}', [CbtCenterController::class, 'show'])->name('cbt-centers.show');
+        Route::patch('/cbt-centers/{cbtCenter}/status', OwnerStatusController::class)->name('cbt-centers.status');
         Route::get('/cbt-centers/{cbtCenter}/edit', [CbtCenterController::class, 'edit'])->name('cbt-centers.edit');
         Route::patch('/cbt-centers/{cbtCenter}', [CbtCenterController::class, 'update'])->name('cbt-centers.update');
         Route::get('/cbt-centers/{cbtCenter}/candidates', [CbtCenterController::class, 'candidates'])->name('cbt-centers.candidates.index');

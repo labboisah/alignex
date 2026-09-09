@@ -17,6 +17,7 @@ use App\Models\Student;
 use App\Models\StudentGroup;
 use App\Services\CurrentContextService;
 use App\Services\ExamParticipantAssignmentService;
+use App\Services\RecordDeletionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -97,7 +98,7 @@ class CandidateController extends Controller
     {
         Gate::authorize('delete', $candidate);
 
-        $candidate->delete();
+        app(RecordDeletionService::class)->delete($candidate);
 
         return back()->with('success', 'Candidate deleted.');
     }
@@ -144,6 +145,7 @@ class CandidateController extends Controller
 
                 if (isset($seen[$duplicateKey])) {
                     $duplicates[] = ['row' => $line, 'registration_number' => $registrationNumber, 'reason' => 'Duplicate in uploaded file.'];
+
                     continue;
                 }
 
@@ -151,6 +153,7 @@ class CandidateController extends Controller
 
                 if ($this->candidateExists($tenant, $registrationNumber)) {
                     $duplicates[] = ['row' => $line, 'registration_number' => $registrationNumber, 'reason' => 'Candidate already exists.'];
+
                     continue;
                 }
 

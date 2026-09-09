@@ -1,3 +1,5 @@
+import { useState as useEditState } from 'react';
+import { RecordEditor, statusField } from '@/Components/Platform/RecordEditor';
 import { Head, router, useForm } from '@inertiajs/react';
 import { FormEvent } from 'react';
 import { DataTable, PageHeader, PortalAppShell, StatusBadge } from '@/Components/Platform';
@@ -14,19 +16,8 @@ export default function Terms({ secondarySchool, sessions, terms, basePath }: { 
         event.preventDefault();
         post(path, { preserveScroll: true, onSuccess: () => reset('code', 'start_date', 'end_date') });
     };
-    const edit = (row: Record<string, unknown>) => {
-        const name = window.prompt('Term name', String(row.name ?? 'First Term'));
-        if (name === null) return;
-        router.patch(`${path}/${row.id}`, {
-            academic_session_id: String(row.academic_session_id ?? sessions[0]?.id ?? ''),
-            name,
-            code: String(row.code ?? ''),
-            start_date: String(row.starts_on ?? row.start_date ?? ''),
-            end_date: String(row.ends_on ?? row.end_date ?? ''),
-            status: String(row.status ?? 'active'),
-            is_active: Boolean(row.is_active),
-        }, { preserveScroll: true });
-    };
+    const [editing, setEditing] = useEditState<Record<string, any> | null>(null);
+    const edit = (row: any) => setEditing(row);
     const destroy = (row: Record<string, unknown>) => {
         if (window.confirm(`Delete ${String(row.name)}?`)) {
             router.delete(`${path}/${row.id}`, { preserveScroll: true });
@@ -35,6 +26,7 @@ export default function Terms({ secondarySchool, sessions, terms, basePath }: { 
 
     return (
         <PortalAppShell title="Terms">
+            {editing && <RecordEditor key={String(editing.id)} title="Edit Terms" path={path + '/' + editing.id} values={{...editing,academic_session_id:String(editing.academic_session_id ?? ''),start_date:String(editing.starts_on ?? editing.start_date ?? '').slice(0,10),end_date:String(editing.ends_on ?? editing.end_date ?? '').slice(0,10)}} fields={[{name:'academic_session_id',label:'Academic session',required:true,options:sessions.map(r=>({value:String(r.id),label:r.name}))},{name:'name',label:'Name',required:true},{name:'code',label:'Code'},{name:'start_date',label:'Start date',type:'date'},{name:'end_date',label:'End date',type:'date'},statusField,{name:'is_active',label:'Active term',type:'checkbox'}]} onCancel={() => setEditing(null)} />}
             <Head title="Terms" />
             <PageHeader eyebrow={secondarySchool.name} title="Terms" description="Add First, Second, and Third Term under the correct academic session." />
             <ImportBox secondarySchoolId={secondarySchool.id} section="terms" form={importForm} basePath={basePath ? structureBase : undefined} />

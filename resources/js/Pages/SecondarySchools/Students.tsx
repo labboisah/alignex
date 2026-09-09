@@ -1,3 +1,5 @@
+import { useState as useEditState } from 'react';
+import { RecordEditor, statusField } from '@/Components/Platform/RecordEditor';
 import { Head, router, useForm } from '@inertiajs/react';
 import { FormEvent } from 'react';
 import { DataTable, PageHeader, PortalAppShell, StatusBadge } from '@/Components/Platform';
@@ -15,24 +17,8 @@ export default function Students({ secondarySchool, classes, students, basePath 
         event.preventDefault();
         post(path, { preserveScroll: true, onSuccess: () => reset('admission_number', 'full_name', 'email', 'phone', 'guardian_name', 'guardian_phone') });
     };
-    const edit = (row: Record<string, unknown>) => {
-        const fullName = window.prompt('Student full name', String(row.full_name ?? ''));
-        if (fullName === null) return;
-        const admissionNumber = window.prompt('Admission number', String(row.admission_number ?? ''));
-        if (admissionNumber === null) return;
-
-        router.patch(`${path}/${row.id}`, {
-            school_class_id: String(row.school_class_id ?? classes[0]?.id ?? ''),
-            admission_number: admissionNumber,
-            full_name: fullName,
-            gender: row.gender ?? '',
-            email: row.email ?? '',
-            phone: row.phone ?? '',
-            guardian_name: row.guardian_name ?? '',
-            guardian_phone: row.guardian_phone ?? '',
-            status: row.status ?? 'active',
-        }, { preserveScroll: true });
-    };
+    const [editing, setEditing] = useEditState<Record<string, any> | null>(null);
+    const edit = (row: any) => setEditing(row);
     const destroy = (row: Record<string, unknown>) => {
         if (window.confirm(`Delete ${String(row.full_name)}?`)) {
             router.delete(`${path}/${row.id}`, { preserveScroll: true });
@@ -41,6 +27,7 @@ export default function Students({ secondarySchool, classes, students, basePath 
 
     return (
         <PortalAppShell title="Students">
+            {editing && <RecordEditor key={String(editing.id)} title="Edit Students" path={path + '/' + editing.id} values={editing} fields={[{name:'full_name',label:'Full name',required:true},{name:'admission_number',label:'Admission number',required:true},{name:'school_class_id',label:'Class',required:true,options:classes.map(r=>({value:String(r.id),label:r.name}))},{name:'gender',label:'Gender',options:[{value:'male',label:'Male'},{value:'female',label:'Female'}]},{name:'email',label:'Email',type:'email'},{name:'phone',label:'Phone'},{name:'guardian_name',label:'Guardian name'},{name:'guardian_phone',label:'Guardian phone'},{...statusField,options:[...statusField.options!,{value:'suspended',label:'Suspended'}]}]} onCancel={() => setEditing(null)} />}
             <Head title="Students" />
             <PageHeader eyebrow={secondarySchool.name} title="Students" description="Register students directly under the secondary school academic structure." />
             <ImportBox secondarySchoolId={secondarySchool.id} section="students" form={importForm} classes={classes} basePath={basePath ? structureBase : undefined} />

@@ -40,7 +40,7 @@ export default function InstitutionDepartments({ institution, faculties, departm
     };
 
     const deleteDepartment = (department: any) => {
-        if (window.confirm(`Delete ${department.name}? Linked programmes and courses will remain but lose this department link.`)) {
+        if (window.confirm(`Delete ${department.name}? Linked records must be reassigned first.`)) {
             router.delete(`/institutions/${institution.id}/departments/${department.id}`, { preserveScroll: true });
         }
     };

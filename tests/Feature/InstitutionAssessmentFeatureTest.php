@@ -2,15 +2,15 @@
 
 namespace Tests\Feature;
 
-use App\Models\Course;
 use App\Models\Candidate;
 use App\Models\CandidateExamAttempt;
 use App\Models\CandidateGroup;
 use App\Models\CandidatePaper;
+use App\Models\Course;
 use App\Models\Department;
 use App\Models\Exam;
-use App\Models\ExamSubject;
 use App\Models\ExamParticipant;
+use App\Models\ExamSubject;
 use App\Models\Faculty;
 use App\Models\Institution;
 use App\Models\Organization;
@@ -354,11 +354,11 @@ class InstitutionAssessmentFeatureTest extends TestCase
 
         $this->actingAs($lecturer)
             ->delete(route('exams.destroy', $exam, absolute: false))
-            ->assertRedirect(route('exams.index', absolute: false));
+            ->assertSessionHasErrors('record');
 
-        $this->assertDatabaseMissing('candidate_papers', ['attempt_id' => $attempt->id]);
-        $this->assertDatabaseMissing('candidate_exam_attempts', ['id' => $attempt->id]);
-        $this->assertDatabaseMissing('exams', ['id' => $exam->id]);
+        $this->assertDatabaseHas('candidate_papers', ['attempt_id' => $attempt->id]);
+        $this->assertDatabaseHas('candidate_exam_attempts', ['id' => $attempt->id]);
+        $this->assertDatabaseHas('exams', ['id' => $exam->id]);
     }
 
     public function test_candidate_can_save_institution_course_answer_without_subject(): void

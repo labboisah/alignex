@@ -120,6 +120,7 @@ type SharedProps = {
         plan_features?: Record<string, boolean>;
         setup_guide?: SetupGuide | null;
     };
+    errors?: Record<string, string>;
     flash?: {
         success?: string;
         error?: string;
@@ -157,6 +158,7 @@ export function PortalAppShell({
                                 {flash.error && <AlertBanner tone="danger" title={flash.error} />}
                             </div>
                         )}
+                        {pageProps.errors?.record && <div className="mb-5"><AlertBanner tone="danger" title={pageProps.errors.record} /></div>}
                         {children}
                     </main>
                     <SetupGuideIndicator guide={setupGuide} />

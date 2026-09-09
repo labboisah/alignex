@@ -12,6 +12,7 @@ use App\Models\School;
 use App\Models\SchoolClass;
 use App\Models\Subject;
 use App\Services\CurrentContextService;
+use App\Services\RecordDeletionService;
 use App\Support\ReferenceCode;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -103,7 +104,7 @@ class SubjectController extends Controller
     {
         Gate::authorize('delete', $subject);
 
-        $subject->delete();
+        app(RecordDeletionService::class)->delete($subject);
 
         return back()->with('success', 'Subject deleted.');
     }
@@ -143,7 +144,7 @@ class SubjectController extends Controller
                     'scope_code' => $row['scope_code'] ?? null,
                 ];
 
-                validator($data, (new StoreSubjectRequest())->rules())->validate();
+                validator($data, (new StoreSubjectRequest)->rules())->validate();
 
                 $tenant = $this->tenantFor($request, $data, $index + 2);
                 $this->ensureUniqueCode($data['code'], $tenant, null, $index + 2);
@@ -174,12 +175,12 @@ class SubjectController extends Controller
             ->when(($context['type'] ?? null) === 'cbt_center', fn ($query) => $query->where('cbt_center_id', $context['id']))
             ->when($user->isTeacher(), fn ($query) => $query->whereIn('id', $user->assignedSubjects()->select('subjects.id')))
             ->when(! ($context['type'] ?? null), fn ($query) => $query
-            ->when(! $user->isSuperAdmin() && $user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
-            ->when(! $user->isSuperAdmin() && $user->school_id, fn ($query) => $query->where('school_id', $user->school_id))
-            ->when(! $user->isSuperAdmin() && $user->center_id, fn ($query) => $query->where('center_id', $user->center_id))
-            ->when(! $user->isSuperAdmin() && $user->secondary_school_id, fn ($query) => $query->where('secondary_school_id', $user->secondary_school_id))
-            ->when(! $user->isSuperAdmin() && $user->professional_school_id, fn ($query) => $query->where('professional_school_id', $user->professional_school_id))
-            ->when(! $user->isSuperAdmin() && $user->cbt_center_id, fn ($query) => $query->where('cbt_center_id', $user->cbt_center_id)));
+                ->when(! $user->isSuperAdmin() && $user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
+                ->when(! $user->isSuperAdmin() && $user->school_id, fn ($query) => $query->where('school_id', $user->school_id))
+                ->when(! $user->isSuperAdmin() && $user->center_id, fn ($query) => $query->where('center_id', $user->center_id))
+                ->when(! $user->isSuperAdmin() && $user->secondary_school_id, fn ($query) => $query->where('secondary_school_id', $user->secondary_school_id))
+                ->when(! $user->isSuperAdmin() && $user->professional_school_id, fn ($query) => $query->where('professional_school_id', $user->professional_school_id))
+                ->when(! $user->isSuperAdmin() && $user->cbt_center_id, fn ($query) => $query->where('cbt_center_id', $user->cbt_center_id)));
     }
 
     private function tenantFor(Request $request, array $data, ?int $row = null): array
@@ -187,7 +188,7 @@ class SubjectController extends Controller
         $user = $request->user();
         $context = app(CurrentContextService::class)->current($user);
 
-        if (($context['type'] ?? null) === 'cbt_center') {
+        if (($context['type'] ?? null) === 'cbt_center' && ($context['source'] ?? null) !== 'legacy_center') {
             return [
                 'owner_type' => Exam::OWNER_CBT_CENTER,
                 'owner_id' => $context['id'],

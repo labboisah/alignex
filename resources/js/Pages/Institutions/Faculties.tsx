@@ -39,7 +39,7 @@ export default function InstitutionFaculties({ institution, faculties }: { insti
     };
 
     const deleteFaculty = (faculty: any) => {
-        if (window.confirm(`Delete ${faculty.name}? Linked departments, programmes, and courses will remain but lose this faculty link.`)) {
+        if (window.confirm(`Delete ${faculty.name}? Linked records must be reassigned first.`)) {
             router.delete(`/institutions/${institution.id}/faculties/${faculty.id}`, { preserveScroll: true });
         }
     };

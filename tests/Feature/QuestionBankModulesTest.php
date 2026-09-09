@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Models\Organization;
 use App\Models\Center;
+use App\Models\Organization;
 use App\Models\QuestionBank;
 use App\Models\School;
 use App\Models\Subject;
@@ -158,8 +158,8 @@ class QuestionBankModulesTest extends TestCase
                         ->all();
 
                     return in_array('Question Bank', $labels, true)
-                        && ! in_array('Subjects', $labels, true)
-                        && ! in_array('Topics', $labels, true);
+                        && in_array('Subjects', $labels, true)
+                        && in_array('Topics', $labels, true);
                 })
             );
 

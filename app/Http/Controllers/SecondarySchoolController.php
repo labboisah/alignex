@@ -16,6 +16,7 @@ use App\Models\StudentGroup;
 use App\Models\Subject;
 use App\Models\Topic;
 use App\Models\User;
+use App\Services\RecordDeletionService;
 use App\Services\SecondarySchoolService;
 use App\Support\ReferenceCode;
 use Illuminate\Database\Eloquent\Builder;
@@ -80,6 +81,7 @@ class SecondarySchoolController extends Controller
         ])->loadCount(['students', 'schoolClasses', 'subjects', 'questionBanks', 'exams']);
 
         return Inertia::render('SecondarySchools/Show', [
+            'canUpdate' => $request->user()->isSuperAdmin() || $request->user()->can('update', $secondarySchool),
             'secondarySchool' => $this->secondarySchoolDetail($secondarySchool),
             'dashboard' => $this->secondaryDashboard($secondarySchool),
         ]);
@@ -193,7 +195,7 @@ class SecondarySchoolController extends Controller
         abort_unless((string) $academicSession->secondary_school_id === (string) $secondarySchool->id, 404);
         abort_if($academicSession->terms()->exists(), 422, 'Remove the terms under this session first.');
 
-        $academicSession->delete();
+        app(RecordDeletionService::class)->delete($academicSession);
 
         return back()->with('success', 'Academic session deleted.');
     }
@@ -275,7 +277,7 @@ class SecondarySchoolController extends Controller
         $this->authorizeSecondarySchoolRecord($request->user(), $secondarySchool, update: true);
         abort_unless((string) $academicTerm->secondary_school_id === (string) $secondarySchool->id, 404);
 
-        $academicTerm->delete();
+        app(RecordDeletionService::class)->delete($academicTerm);
 
         return back()->with('success', 'Term deleted.');
     }
@@ -346,7 +348,7 @@ class SecondarySchoolController extends Controller
         abort_unless((string) $schoolClass->secondary_school_id === (string) $secondarySchool->id, 404);
         abort_if($schoolClass->students()->exists(), 422, 'Remove students under this class first.');
 
-        $schoolClass->delete();
+        app(RecordDeletionService::class)->delete($schoolClass);
 
         return back()->with('success', 'Class deleted.');
     }
@@ -396,7 +398,7 @@ class SecondarySchoolController extends Controller
         abort_unless((string) $classArm->secondary_school_id === (string) $secondarySchool->id, 404);
         abort_if($classArm->students()->exists(), 422, 'Move or remove students in this arm first.');
 
-        $classArm->delete();
+        app(RecordDeletionService::class)->delete($classArm);
 
         return back()->with('success', 'Class arm deleted.');
     }
@@ -465,7 +467,7 @@ class SecondarySchoolController extends Controller
         $this->authorizeSecondarySchoolRecord($request->user(), $secondarySchool, update: true);
         $this->authorizeStudentGroupRecord($secondarySchool, $studentGroup);
 
-        $studentGroup->delete();
+        app(RecordDeletionService::class)->delete($studentGroup);
 
         return back()->with('success', 'Student group deleted.');
     }
@@ -531,7 +533,7 @@ class SecondarySchoolController extends Controller
         $this->authorizeSecondarySchoolRecord($request->user(), $secondarySchool, update: true);
         abort_unless((string) $student->secondary_school_id === (string) $secondarySchool->id, 404);
 
-        $student->delete();
+        app(RecordDeletionService::class)->delete($student);
 
         return back()->with('success', 'Student deleted.');
     }
@@ -608,7 +610,7 @@ class SecondarySchoolController extends Controller
         $this->authorizeSecondarySchoolRecord($request->user(), $secondarySchool, update: true);
         $this->authorizeTeacherRecord($secondarySchool, $teacher);
 
-        $teacher->delete();
+        app(RecordDeletionService::class)->delete($teacher);
 
         return back()->with('success', 'Teacher account deleted.');
     }
@@ -762,7 +764,7 @@ class SecondarySchoolController extends Controller
         abort_unless((string) $academicSession->school_id === (string) $school->id, 404);
         abort_if($academicSession->terms()->exists(), 422, 'Remove terms under this session first.');
 
-        $academicSession->delete();
+        app(RecordDeletionService::class)->delete($academicSession);
 
         return back()->with('success', 'Academic session deleted.');
     }
@@ -828,7 +830,7 @@ class SecondarySchoolController extends Controller
         $school = $this->legacySchool($request->user(), update: true);
         $this->authorizeLegacyTerm($school, $academicTerm);
 
-        $academicTerm->delete();
+        app(RecordDeletionService::class)->delete($academicTerm);
 
         return back()->with('success', 'Term deleted.');
     }
@@ -889,7 +891,7 @@ class SecondarySchoolController extends Controller
         abort_unless((string) $schoolClass->school_id === (string) $school->id, 404);
         abort_if($schoolClass->classArms()->exists() || $schoolClass->groups()->exists(), 422, 'Remove arms and student groups under this class first.');
 
-        $schoolClass->delete();
+        app(RecordDeletionService::class)->delete($schoolClass);
 
         return back()->with('success', 'Class deleted.');
     }
@@ -951,7 +953,7 @@ class SecondarySchoolController extends Controller
         $this->authorizeLegacyArm($school, $classArm);
         abort_if($classArm->students()->exists(), 422, 'Move or remove students in this arm first.');
 
-        $classArm->delete();
+        app(RecordDeletionService::class)->delete($classArm);
 
         return back()->with('success', 'Class arm deleted.');
     }
@@ -1024,7 +1026,7 @@ class SecondarySchoolController extends Controller
         $school = $this->legacySchool($request->user(), update: true);
         abort_unless((string) $student->school_id === (string) $school->id, 404);
 
-        $student->delete();
+        app(RecordDeletionService::class)->delete($student);
 
         return back()->with('success', 'Student deleted.');
     }
@@ -1099,7 +1101,7 @@ class SecondarySchoolController extends Controller
         $school = $this->legacySchool($request->user(), update: true);
         $this->authorizeLegacyTeacherRecord($school, $teacher);
 
-        $teacher->delete();
+        app(RecordDeletionService::class)->delete($teacher);
 
         return back()->with('success', 'Teacher account deleted.');
     }
@@ -1172,7 +1174,7 @@ class SecondarySchoolController extends Controller
         $school = $this->legacySchool($request->user(), update: true);
         $this->authorizeLegacyStudentGroup($school, $studentGroup);
 
-        $studentGroup->delete();
+        app(RecordDeletionService::class)->delete($studentGroup);
 
         return back()->with('success', 'Student group deleted.');
     }

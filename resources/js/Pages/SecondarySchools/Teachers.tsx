@@ -1,3 +1,5 @@
+import { useState as useEditState } from 'react';
+import { RecordEditor, statusField } from '@/Components/Platform/RecordEditor';
 import { Head, router, useForm } from '@inertiajs/react';
 import { FormEvent } from 'react';
 import { DataTable, PageHeader, PortalAppShell } from '@/Components/Platform';
@@ -32,30 +34,8 @@ export default function Teachers({ secondarySchool, classes, subjects, teachers,
         form.post(path, { preserveScroll: true, onSuccess: () => form.reset() });
     };
 
-    const edit = (teacher: Teacher) => {
-        const name = window.prompt('Teacher name', teacher.name);
-        if (name === null) return;
-        const email = window.prompt('Teacher email', teacher.email);
-        if (email === null) return;
-        const password = window.prompt('New password (leave blank to keep current password)', '');
-        if (password === null) return;
-        const classList = classes.map((schoolClass) => `${schoolClass.name}:${schoolClass.id}`).join(', ');
-        const schoolClassId = window.prompt(`Class ID. Available: ${classList}`, teacher.school_class_id ?? '');
-        if (schoolClassId === null) return;
-        const classSubjects = subjects.filter((subject) => subject.school_class_id === schoolClassId);
-        const subjectCodes = classSubjects.map((subject) => `${subject.code}:${subject.id}`).join(', ');
-        const current = teacher.subject_ids.join(',');
-        const subjectIds = window.prompt(`Subject IDs separated by commas. Available: ${subjectCodes}`, current);
-        if (subjectIds === null) return;
-
-        router.patch(`${path}/${teacher.id}`, {
-            name,
-            email,
-            password,
-            school_class_id: schoolClassId,
-            subject_ids: subjectIds.split(',').map((value) => value.trim()).filter(Boolean),
-        }, { preserveScroll: true });
-    };
+    const [editing, setEditing] = useEditState<Record<string, any> | null>(null);
+    const edit = (row: any) => setEditing(row);
 
     const destroy = (teacher: Teacher) => {
         if (window.confirm(`Delete ${teacher.name}?`)) {
@@ -65,6 +45,7 @@ export default function Teachers({ secondarySchool, classes, subjects, teachers,
 
     return (
         <PortalAppShell title="Teachers">
+            {editing && <RecordEditor key={String(editing.id)} title="Edit Teachers" path={path + '/' + editing.id} values={{...editing,password:'',subject_ids:editing.subject_ids ?? []}} fields={[{name:'name',label:'Name',required:true},{name:'email',label:'Email',type:'email',required:true},{name:'password',label:'New password (leave blank to keep current)',type:'password'},{name:'school_class_id',label:'Class',options:classes.map(r=>({value:String(r.id),label:r.name}))},{name:'subject_ids',label:'Subjects (select all applicable)',type:'multiple',options:subjects.map(r=>({value:String(r.id),label:r.name}))}]} onCancel={() => setEditing(null)} />}
             <Head title="Teachers" />
             <PageHeader eyebrow={secondarySchool.name} title="Teachers" description="Create school teacher logins and assign the subjects they can manage." />
 

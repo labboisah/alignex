@@ -1,3 +1,5 @@
+import { useState as useEditState } from 'react';
+import { RecordEditor, statusField } from '@/Components/Platform/RecordEditor';
 import { Head, router, useForm } from '@inertiajs/react';
 import { FormEvent } from 'react';
 import { ReactNode, useMemo, useState } from 'react';
@@ -49,17 +51,8 @@ export default function StudentGroups({ secondarySchool, classes, students = [],
             student_ids: assignmentForm.data.student_ids,
         }, { preserveScroll: true });
     };
-    const edit = (row: Record<string, any>) => {
-        const name = window.prompt('Group name', String(row.name ?? ''));
-        if (name === null) return;
-        router.patch(`${path}/${row.id}`, {
-            school_class_id: String(row.school_class_id ?? row.school_class?.id ?? classes[0]?.id ?? ''),
-            name,
-            code: row.code ?? '',
-            status: row.status ?? 'active',
-            student_ids: groupStudentIds(row),
-        }, { preserveScroll: true });
-    };
+    const [editing, setEditing] = useEditState<Record<string, any> | null>(null);
+    const edit = (row: any) => setEditing(row);
     const destroy = (row: Record<string, any>) => {
         if (window.confirm(`Delete ${String(row.name)}?`)) {
             router.delete(`${path}/${row.id}`, { preserveScroll: true });
@@ -68,6 +61,7 @@ export default function StudentGroups({ secondarySchool, classes, students = [],
 
     return (
         <PortalAppShell title="Student Groups">
+            {editing && <RecordEditor key={String(editing.id)} title="Edit StudentGroups" path={path + '/' + editing.id} values={{...editing,student_ids:groupStudentIds(editing),school_class_id:String(editing.school_class_id ?? editing.school_class?.id ?? '')}} fields={[{name:'name',label:'Name',required:true},{name:'code',label:'Code'},{name:'school_class_id',label:'Class',required:true,options:classes.map(r=>({value:String(r.id),label:r.name}))},statusField,{name:'student_ids',label:'Members (select all applicable)',type:'multiple',options:students.map(r=>({value:String(r.id),label:r.name+' — '+(r.class_name ?? '')}))}]} onCancel={() => setEditing(null)} />}
             <Head title="Student Groups" />
             <PageHeader eyebrow={secondarySchool.name} title="Student Groups" description="Create groups used to batch exams, such as Science, Arts, Commercial, or a special exam set." />
             <ImportBox secondarySchoolId={secondarySchool.id} section="student-groups" form={importForm} basePath={basePath ? structureBase : undefined} />

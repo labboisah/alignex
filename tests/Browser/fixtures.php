@@ -35,7 +35,7 @@ function browserFixture(array $input): array
         $ownerId = $entity->id;
         $ownerFields[$type.'_id'] = $ownerId;
     }
-    $actor = User::factory()->create(['organization_id' => $organization->id, 'role' => User::ROLE_ORGANIZATION_ADMIN,
+    $actor = User::factory()->create(['organization_id' => $organization->id, 'role' => ($input['management'] ?? false) ? User::ROLE_SUPER_ADMIN : User::ROLE_ORGANIZATION_ADMIN,
         ...$ownerFields]);
     if ($input['report_exports'] ?? false) {
         $plan = PricingPlan::create([
@@ -94,8 +94,8 @@ function browserFixture(array $input): array
     $exam->update(['status' => 'active']);
 
     $researchReviewer = ($input['research'] ?? false) ? User::factory()->create([
-        'organization_id' => $organization->id, 'role' => User::ROLE_ORGANIZATION_ADMIN, ...$ownerFields,
+        'organization_id' => $organization->id, 'role' => ($input['management'] ?? false) ? User::ROLE_SUPER_ADMIN : User::ROLE_ORGANIZATION_ADMIN, ...$ownerFields,
     ]) : null;
 
-    return ['reviewer_email' => $researchReviewer?->email, 'exam_id' => $exam->id, 'code' => $exam->code, 'identifier' => $candidate->candidate_number, 'actor_id' => $actor->id, 'actor_email' => $actor->email];
+    return ['owner_id' => $ownerId, 'reviewer_email' => $researchReviewer?->email, 'exam_id' => $exam->id, 'code' => $exam->code, 'identifier' => $candidate->candidate_number, 'actor_id' => $actor->id, 'actor_email' => $actor->email];
 }

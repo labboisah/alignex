@@ -6,6 +6,7 @@ use App\Models\Candidate;
 use App\Models\CandidateGroup;
 use App\Models\Department;
 use App\Services\CurrentContextService;
+use App\Services\RecordDeletionService;
 use App\Support\ReferenceCode;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -92,7 +93,7 @@ class CandidateGroupController extends Controller
         abort_unless($this->scopedGroups($request)->whereKey($candidateGroup->id)->exists(), 403);
         abort_unless($this->canManageGroup($request, $candidateGroup), 403);
 
-        $candidateGroup->delete();
+        app(RecordDeletionService::class)->delete($candidateGroup);
 
         return back()->with('success', 'Candidate group deleted.');
     }

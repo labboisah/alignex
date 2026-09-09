@@ -1,3 +1,4 @@
+import OwnerStatusButton from '@/Components/Platform/OwnerStatusButton';
 import { Head, Link } from '@inertiajs/react';
 import { BookOpen, Boxes, FileQuestion, GraduationCap, ShieldCheck, Users } from 'lucide-react';
 import { DataTable, PageHeader, PortalAppShell, StatusBadge } from '@/Components/Platform';
@@ -16,10 +17,11 @@ const links = [
     ['Candidates', 'candidates'],
 ] as const;
 
-export default function ProfessionalSchoolShow({ professionalSchool, dashboard }: { professionalSchool: School; dashboard: Record<string, number> }) {
+export default function ProfessionalSchoolShow({ canUpdate = false, professionalSchool, dashboard }: { canUpdate?: boolean; professionalSchool: School; dashboard: Record<string, number> }) {
     return (
         <PortalAppShell title={professionalSchool.name}>
             <Head title={professionalSchool.name} />
+            {canUpdate && <div className="mb-4"><OwnerStatusButton path={'/professional-schools/'+professionalSchool.id+'/status'} status={professionalSchool.status} /></div>}
             <PageHeader
                 eyebrow="Professional School"
                 title={professionalSchool.name}

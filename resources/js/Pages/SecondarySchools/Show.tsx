@@ -1,3 +1,4 @@
+import OwnerStatusButton from '@/Components/Platform/OwnerStatusButton';
 import { Head, Link } from '@inertiajs/react';
 import { BookOpen, ClipboardList, GraduationCap, Users } from 'lucide-react';
 import { DashboardCard, PageHeader, PortalAppShell, StatusBadge } from '@/Components/Platform';
@@ -21,10 +22,11 @@ type School = Record<string, unknown> & {
     recent_exams?: Array<{ id: string; title: string; code: string; status: string; category?: string | null; mode?: string | null }>;
 };
 
-export default function ShowSecondarySchool({ secondarySchool, dashboard }: { secondarySchool: School; dashboard: Record<string, string | number | null> }) {
+export default function ShowSecondarySchool({ canUpdate = false, secondarySchool, dashboard }: { canUpdate?: boolean; secondarySchool: School; dashboard: Record<string, string | number | null> }) {
     return (
         <PortalAppShell title={secondarySchool.name}>
             <Head title={secondarySchool.name} />
+            {canUpdate && <div className="mb-4"><OwnerStatusButton path={'/secondary-schools/'+secondarySchool.id+'/status'} status={secondarySchool.status} /></div>}
             <section className="mx-auto max-w-7xl">
                 <PageHeader eyebrow="Secondary School" title={secondarySchool.name} description={`${secondarySchool.code} - ${secondarySchool.organization_name || 'Standalone school'}`} />
 

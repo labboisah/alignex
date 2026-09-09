@@ -187,6 +187,7 @@ class HandleInertiaRequests extends Middleware
             $navigation = collect([
                 ['label' => 'Dashboard', 'href' => '/dashboard'],
                 ['label' => 'Subjects', 'href' => '/subjects', 'permission' => 'manageQuestionBank'],
+                ['label' => 'Topics', 'href' => '/topics', 'permission' => 'manageQuestionBank'],
                 ['label' => 'Question Bank', 'href' => '/question-bank', 'permission' => 'manageQuestionBank'],
                 ['label' => 'Questions', 'href' => '/questions', 'permission' => 'manageQuestionBank'],
                 ['label' => 'Assessments', 'href' => '/exams?category=assessment', 'permission' => 'manageExams'],
@@ -200,20 +201,20 @@ class HandleInertiaRequests extends Middleware
             if ($user->isInstitutionLecturer()) {
                 $navigation = collect($this->institutionLecturerNavigation($user));
             } else {
-            $base = $user->professional_school_id ? '/professional-schools/'.$user->professional_school_id : '/professional-schools';
-            $navigation = collect([
-                ['label' => 'Dashboard', 'href' => '/dashboard'],
-                ['label' => 'Courses', 'href' => $base.'/courses', 'permission' => 'manageQuestionBank'],
-                ['label' => 'Modules', 'href' => $base.'/modules', 'permission' => 'manageQuestionBank'],
-                ['label' => 'Question Bank', 'href' => $base.'/question-banks', 'permission' => 'manageQuestionBank'],
-                ['label' => 'Questions', 'href' => $base.'/questions', 'permission' => 'manageQuestionBank'],
-                ['label' => 'Assessments', 'href' => '/exams?category=assessment', 'permission' => 'manageExams'],
-                ['label' => 'Results', 'href' => '/results', 'permission' => 'viewReports'],
-                ['label' => 'Offline Server', 'href' => '/offline-server/download', 'feature' => 'offline_activation'],
-                ['label' => 'Client App', 'href' => '/candidate-client/download'],
-                ['label' => 'Activation Codes', 'href' => '/offline-activation-codes', 'permission' => 'downloadOfflineServer', 'feature' => 'offline_activation'],
-                ['label' => 'Documentation', 'href' => '/documentation'],
-            ]);
+                $base = $user->professional_school_id ? '/professional-schools/'.$user->professional_school_id : '/professional-schools';
+                $navigation = collect([
+                    ['label' => 'Dashboard', 'href' => '/dashboard'],
+                    ['label' => 'Courses', 'href' => $base.'/courses', 'permission' => 'manageQuestionBank'],
+                    ['label' => 'Modules', 'href' => $base.'/modules', 'permission' => 'manageQuestionBank'],
+                    ['label' => 'Question Bank', 'href' => $base.'/question-banks', 'permission' => 'manageQuestionBank'],
+                    ['label' => 'Questions', 'href' => $base.'/questions', 'permission' => 'manageQuestionBank'],
+                    ['label' => 'Assessments', 'href' => '/exams?category=assessment', 'permission' => 'manageExams'],
+                    ['label' => 'Results', 'href' => '/results', 'permission' => 'viewReports'],
+                    ['label' => 'Offline Server', 'href' => '/offline-server/download', 'feature' => 'offline_activation'],
+                    ['label' => 'Client App', 'href' => '/candidate-client/download'],
+                    ['label' => 'Activation Codes', 'href' => '/offline-activation-codes', 'permission' => 'downloadOfflineServer', 'feature' => 'offline_activation'],
+                    ['label' => 'Documentation', 'href' => '/documentation'],
+                ]);
             }
         } else {
             $navigation = collect(match ($contextType) {
@@ -223,12 +224,14 @@ class HandleInertiaRequests extends Middleware
                         ['label' => 'Academic Sessions', 'href' => $secondaryHref('/academic-sessions'), 'permission' => 'manageSchools'],
                         ['label' => 'Terms', 'href' => $secondaryHref('/terms'), 'permission' => 'manageSchools'],
                         ['label' => 'Classes', 'href' => $secondaryHref('/classes'), 'permission' => 'manageSchools'],
+                        ['label' => 'Class Arms', 'href' => $secondaryHref('/arms'), 'permission' => 'manageSchools'],
                         ['label' => 'Students', 'href' => $secondaryHref('/students')],
                         ['label' => 'Student Groups', 'href' => $secondaryHref('/student-groups'), 'permission' => 'manageSchools'],
                         ['label' => 'Teachers', 'href' => $secondaryHref('/teachers'), 'permission' => 'manageSchools', 'feature' => 'teacher_management'],
                     ]],
                     ['label' => 'Exam', 'children' => [
                         ['label' => 'Subjects', 'href' => '/subjects', 'permission' => 'manageQuestionBank'],
+                        ['label' => 'Topics', 'href' => '/topics', 'permission' => 'manageQuestionBank'],
                         ['label' => 'Question Bank', 'href' => '/question-bank', 'permission' => 'manageQuestionBank'],
                         ['label' => 'Questions', 'href' => '/questions', 'permission' => 'manageQuestionBank'],
                         ['label' => 'Exams', 'href' => '/exams?category=terminal', 'permission' => 'manageExams'],
@@ -280,6 +283,7 @@ class HandleInertiaRequests extends Middleware
                     ]],
                     ['label' => 'Exam', 'children' => [
                         ['label' => 'Subjects', 'href' => '/subjects', 'permission' => 'manageQuestionBank'],
+                        ['label' => 'Topics', 'href' => '/topics', 'permission' => 'manageQuestionBank'],
                         ['label' => 'Question Bank', 'href' => $cbtCenterBase.'/question-banks', 'permission' => 'manageQuestionBank'],
                         ['label' => 'Questions', 'href' => '/questions', 'permission' => 'manageQuestionBank'],
                         ['label' => 'Exams', 'href' => '/exams', 'permission' => 'manageExams'],
@@ -304,6 +308,7 @@ class HandleInertiaRequests extends Middleware
                     ]],
                     ['label' => 'Questions', 'children' => [
                         ['label' => 'Subjects', 'href' => '/subjects', 'permission' => 'manageQuestionBank'],
+                        ['label' => 'Topics', 'href' => '/topics', 'permission' => 'manageQuestionBank'],
                         ['label' => 'Question Bank', 'href' => '/question-bank', 'permission' => 'manageQuestionBank'],
                         ['label' => 'Questions', 'href' => '/questions', 'permission' => 'manageQuestionBank'],
                     ]],
@@ -410,13 +415,13 @@ class HandleInertiaRequests extends Middleware
             ->get(['id', 'name', 'code']);
 
         return $departments->map(fn (Department $department): array => [
-                'label' => $this->departmentNavigationLabel($department),
-                'children' => [
-                    ['label' => 'Lecturers', 'href' => '/institutions/'.$user->institution_id.'/departments/'.$department->id.'/lecturers', 'permission' => 'manageSchools'],
-                    ['label' => 'Candidates', 'href' => '/candidates?department_id='.$department->id, 'permission' => 'manageExams'],
-                    ['label' => 'Candidate Groups', 'href' => '/candidate-groups?department_id='.$department->id, 'permission' => 'manageExams'],
-                ],
-            ])->all();
+            'label' => $this->departmentNavigationLabel($department),
+            'children' => [
+                ['label' => 'Lecturers', 'href' => '/institutions/'.$user->institution_id.'/departments/'.$department->id.'/lecturers', 'permission' => 'manageSchools'],
+                ['label' => 'Candidates', 'href' => '/candidates?department_id='.$department->id, 'permission' => 'manageExams'],
+                ['label' => 'Candidate Groups', 'href' => '/candidate-groups?department_id='.$department->id, 'permission' => 'manageExams'],
+            ],
+        ])->all();
     }
 
     /**
@@ -506,7 +511,7 @@ class HandleInertiaRequests extends Middleware
     }
 
     /**
-     * @param array<int, array<string, mixed>> $navigation
+     * @param  array<int, array<string, mixed>>  $navigation
      * @return array<int, array<string, mixed>>
      */
     private function filterNavigation(array $navigation, User $user): array

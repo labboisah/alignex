@@ -1,3 +1,5 @@
+import { useState as useEditState } from 'react';
+import { RecordEditor, statusField } from '@/Components/Platform/RecordEditor';
 import { Head, router, useForm } from '@inertiajs/react';
 import { FormEvent } from 'react';
 import { DataTable, PageHeader, PortalAppShell, StatusBadge } from '@/Components/Platform';
@@ -12,19 +14,8 @@ export default function Classes({ secondarySchool, classes, basePath }: { second
         event.preventDefault();
         classForm.post(path, { preserveScroll: true, onSuccess: () => classForm.reset() });
     };
-    const edit = (row: Record<string, unknown>) => {
-        const name = window.prompt('Class name', String(row.name ?? ''));
-        if (name === null) return;
-        const level = window.prompt('Level', String(row.level ?? 'JSS 1'));
-        if (level === null) return;
-
-        router.patch(`${path}/${row.id}`, {
-            name,
-            level,
-            level_order: row.level_order ?? '',
-            status: row.status ?? 'active',
-        }, { preserveScroll: true });
-    };
+    const [editing, setEditing] = useEditState<Record<string, any> | null>(null);
+    const edit = (row: any) => setEditing(row);
     const destroy = (row: Record<string, unknown>) => {
         if (window.confirm(`Delete ${String(row.name)}?`)) {
             router.delete(`${path}/${row.id}`, { preserveScroll: true });
@@ -33,7 +24,9 @@ export default function Classes({ secondarySchool, classes, basePath }: { second
 
     return (
         <PortalAppShell title="Classes">
+            {editing && <RecordEditor key={String(editing.id)} title="Edit Classes" path={path + '/' + editing.id} values={editing} fields={[{name:'name',label:'Name',required:true},{name:'level',label:'Level',required:true,options:['JSS 1','JSS 2','JSS 3','SS 1','SS 2','SS 3'].map(r=>({value:r,label:r}))},{name:'level_order',label:'Display order',type:'number'},statusField]} onCancel={() => setEditing(null)} />}
             <Head title="Classes" />
+            <a className="mb-4 inline-block font-semibold text-primary" href={basePath ? '/secondary-school/arms' : '/secondary-schools/'+secondarySchool.id+'/arms'}>Manage class arms</a>
             <PageHeader eyebrow={secondarySchool.name} title="Classes" description="Add multiple classes under each level and use student groups for exam batches." />
             <ImportBox secondarySchoolId={secondarySchool.id} section="classes" form={importForm} basePath={basePath ? structureBase : undefined} />
             <form onSubmit={submitClass} className="mb-6 grid gap-3 rounded-md border border-border bg-white p-4 shadow-sm md:grid-cols-4">
