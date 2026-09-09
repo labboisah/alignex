@@ -142,6 +142,20 @@ class StoreExamRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
+            if (($this->input('exam_mode') ?? $this->input('mode')) !== Exam::MODE_ADAPTIVE) {
+                $seenSubjects = [];
+                foreach ($this->input('subjects', []) as $index => $row) {
+                    $subjectId = is_array($row) ? ($row['subject_id'] ?? null) : null;
+                    if (! is_string($subjectId) || $subjectId === '') {
+                        continue;
+                    }
+                    if (isset($seenSubjects[$subjectId])) {
+                        $validator->errors()->add("subjects.{$index}.subject_id", 'This subject is already included. Select its question banks in one paper row for a traditional exam.');
+                    }
+                    $seenSubjects[$subjectId] = true;
+                }
+            }
+
             if ($this->filled('exam_mode') && $this->input('mode') !== $this->input('exam_mode')) {
                 $validator->errors()->add('exam_mode', 'Legacy mode and exam mode must agree.');
             }

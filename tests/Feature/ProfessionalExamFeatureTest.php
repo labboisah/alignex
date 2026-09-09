@@ -15,6 +15,7 @@ use App\Models\QuestionBank;
 use App\Models\Subject;
 use App\Models\TrainingBatch;
 use App\Models\User;
+use App\Services\AdaptivePreparationService;
 use Database\Seeders\RolesSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -164,7 +165,7 @@ class ProfessionalExamFeatureTest extends TestCase
             'course_id' => $course->id,
             'module_id' => $module->id,
             'exam_owner_type' => Exam::OWNER_PROFESSIONAL_SCHOOL,
-            'exam_category' => Exam::CATEGORY_PROFESSIONAL,
+            'exam_category' => Exam::CATEGORY_ASSESSMENT,
             'exam_mode' => Exam::MODE_ADAPTIVE,
             'subject_id' => null,
         ]);
@@ -192,7 +193,7 @@ class ProfessionalExamFeatureTest extends TestCase
 
         foreach ([
             ['PRO-TRAD-001', Exam::CATEGORY_PROFESSIONAL, Exam::MODE_TRADITIONAL],
-            ['PRO-ADAPT-001', Exam::CATEGORY_PROFESSIONAL, Exam::MODE_ADAPTIVE],
+            ['PRO-ADAPT-001', Exam::CATEGORY_ASSESSMENT, Exam::MODE_ADAPTIVE],
             ['PRO-CERT-001', Exam::CATEGORY_CERTIFICATION, Exam::MODE_TRADITIONAL],
         ] as [$code, $category, $mode]) {
             $this->actingAs($admin)
@@ -327,6 +328,63 @@ class ProfessionalExamFeatureTest extends TestCase
         return [$exam->refresh(), $attempt->refresh()->load('candidate')];
     }
 
+    public function test_adaptive_module_rows_can_share_a_subject_without_losing_their_banks_or_budgets(): void
+    {
+        [$school, $programme, $course, $module, $subject] = $this->professionalHierarchy();
+        $admin = User::factory()->create(['role' => User::ROLE_PROFESSIONAL_SCHOOL_ADMIN, 'professional_school_id' => $school->id]);
+        $otherModule = $module->replicate();
+        $otherModule->fill(['name' => 'Second module', 'code' => 'SECOND'])->save();
+        $payload = $this->examPayload($subject, [
+            'professional_school_id' => $school->id, 'programme_id' => $programme->id,
+            'course_id' => $course->id, 'module_id' => null, 'exam_code' => 'SHARED-ADAPT',
+        ]);
+        $bank = QuestionBank::findOrFail($payload['question_bank_id']);
+        $bank->update(['module_id' => $module->id]);
+        $otherBank = $bank->replicate();
+        $otherBank->fill(['name' => 'Second bank', 'code' => 'SECOND-BANK', 'module_id' => $otherModule->id])->save();
+        $payload['subjects'][0] += ['question_bank_ids' => [$bank->id], 'course_id' => $course->id, 'module_id' => $module->id];
+        $payload['subjects'][] = [
+            'subject_id' => $subject->id, 'question_bank_ids' => [$otherBank->id],
+            'course_id' => $course->id, 'module_id' => $otherModule->id,
+            'number_of_questions' => 7, 'marks_per_question' => 1,
+        ];
+        $this->actingAs($admin)->post('/exams', $payload)->assertRedirect()->assertSessionHasNoErrors();
+        $exam = Exam::where('code', 'SHARED-ADAPT')->firstOrFail();
+        $rows = $exam->examSubjects()->orderBy('display_order')->get();
+        $this->assertCount(2, $rows);
+        $this->assertSame([$subject->id, $subject->id], $rows->pluck('subject_id')->all());
+        $this->assertSame([$bank->id, $otherBank->id], $rows->pluck('question_bank_id')->all());
+        $this->assertEquals([50, 7], $rows->pluck('question_count')->all());
+        $this->assertEquals([100, 7], $rows->pluck('total_marks')->all());
+        $areas = app(AdaptivePreparationService::class)->inspect($exam)['blueprint']['areas'];
+        $this->assertCount(2, $areas);
+        $this->assertNotSame($areas[0]['area_key'], $areas[1]['area_key']);
+        $this->assertEquals([$module->id, $otherModule->id], array_column($areas, 'module_id'));
+        $payload['subjects'][1]['number_of_questions'] = 8;
+        $this->patch("/exams/{$exam->id}", $payload)->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertEquals([50, 8], $exam->examSubjects()->orderBy('display_order')->pluck('question_count')->all());
+
+        // Switching the same rows to traditional mode must fail before persistence.
+        $payload['mode'] = $payload['exam_mode'] = Exam::MODE_TRADITIONAL;
+        $this->patch("/exams/{$exam->id}", $payload)->assertSessionHasErrors('subjects.1.subject_id');
+        $this->assertSame(Exam::MODE_ADAPTIVE, $exam->fresh()->exam_mode);
+    }
+
+    public function test_traditional_duplicate_subject_rows_return_validation_instead_of_database_errors(): void
+    {
+        [$school, $programme, $course, $module, $subject] = $this->professionalHierarchy();
+        $admin = User::factory()->create(['role' => User::ROLE_PROFESSIONAL_SCHOOL_ADMIN, 'professional_school_id' => $school->id]);
+        $payload = $this->examPayload($subject, [
+            'professional_school_id' => $school->id, 'programme_id' => $programme->id,
+            'course_id' => $course->id, 'module_id' => $module->id,
+            'mode' => Exam::MODE_TRADITIONAL, 'exam_mode' => Exam::MODE_TRADITIONAL,
+            'exam_code' => 'DUPLICATE-TRAD',
+        ]);
+        $payload['subjects'][] = $payload['subjects'][0];
+        $this->actingAs($admin)->post('/exams', $payload)->assertSessionHasErrors('subjects.1.subject_id');
+        $this->assertDatabaseMissing('exams', ['code' => 'DUPLICATE-TRAD']);
+    }
+
     private function professionalSchool(): ProfessionalSchool
     {
         $organization = Organization::factory()->create();
@@ -396,7 +454,7 @@ class ProfessionalExamFeatureTest extends TestCase
             'training_batch_id' => $batch->id,
             'question_bank_id' => $bank->id,
             'exam_owner_type' => Exam::OWNER_PROFESSIONAL_SCHOOL,
-            'exam_category' => Exam::CATEGORY_PROFESSIONAL,
+            'exam_category' => Exam::CATEGORY_ASSESSMENT,
             'title' => 'Cloud Architecture Certification',
             'exam_code' => 'PRO-CLOUD-001',
             'exam_type' => 'professional',

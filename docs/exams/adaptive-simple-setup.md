@@ -21,3 +21,14 @@ The **Your improvement** chart shows cumulative earned marks after each complete
 
 
 Planned next version: [document-based question generation and adaptive recovery](adaptive-resource-generation-plan.md). This proposal covers uploaded learning resources, generated questions, weakness-focused subsequent levels, and online/offline delivery.
+
+
+## Professional-school sections sharing a subject
+
+Adaptive paper rows may use the same subject mapping for different module/question-bank pools. Each row retains its own ID, bank selection, course/module mapping, question quota and marks; adaptive preparation assigns each row a separate area. Pools must still be disjoint and pass the existing readiness checks.
+
+Migration `2026_09_09_190000_allow_adaptive_sections_to_share_subjects.php` replaces the old unique exam/subject index with a regular index. It preserves rows and foreign keys. Its rollback refuses to restore uniqueness while duplicate subject mappings exist, rather than deleting sections.
+
+Traditional exam creation and editing reject repeated nonempty subject IDs with a validation message; multiple banks for one traditional subject belong in one paper row.
+
+Verification: 13 professional/adaptive tests passed (127 assertions), including adaptive creation/editing with two module banks sharing a subject and rejection of duplicate traditional rows. The targeted migration was applied to the local MySQL database.
