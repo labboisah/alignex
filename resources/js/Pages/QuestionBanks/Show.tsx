@@ -27,6 +27,7 @@ export default function ShowQuestionBank({ questionBank, can }: Props) {
                 backHref="/question-bank"
                 actions={
                     <>
+                        <Button asChild type="button" variant="secondary"><Link href={`/questions?bank=${record.id}`}>Manage question statuses</Link></Button>
                         <ProtectedAction allowed={can.update}>
                             <Button asChild type="button" variant="secondary">
                                 <Link href={`/question-bank/${record.id}/edit`}>

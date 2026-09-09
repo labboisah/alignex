@@ -14,6 +14,13 @@ type Props = {
 };
 
 export default function QuestionsIndex({ questions, can, questionBanks, subjects, topics }: Props) {
+    const pageUrl = usePage().url;
+    const [bankId, setBankId] = useState(() => new URLSearchParams(pageUrl.split('?')[1] ?? '').get('bank') ?? '');
+    const bulk = useForm<{ question_ids: string[]; status: string }>({ question_ids: [], status: 'approved' });
+    const visibleQuestions = questions.data.filter(question => !bankId || question.question_bank_id === bankId);
+    const eligible = visibleQuestions.filter(question => question.can?.update === true);
+    const selectedIds = bulk.data.question_ids.filter(id => eligible.some(question => question.id === id));
+    const allSelected = eligible.length > 0 && selectedIds.length === eligible.length;
     const currentContext = usePage().props.current_context as { type?: string } | undefined;
     const isSecondary = currentContext?.type === 'secondary_school';
     const isInstitution = currentContext?.type === 'institution' || questions.data.some((question) => question.institution_id);
@@ -41,10 +48,42 @@ export default function QuestionsIndex({ questions, can, questionBanks, subjects
 
             <BulkTools templateHref="/questions/template" uploadHref="/questions/import" questionBanks={questionBanks} subjects={subjects} topics={topics} isSecondary={isSecondary} isInstitution={isInstitution} isProfessional={isProfessional} isCbt={isCbt} />
 
+            <form aria-label="Update question statuses" className="mb-4 space-y-3 rounded-md border border-border bg-white p-4" onSubmit={event => {
+                event.preventDefault();
+                bulk.transform(data => ({ ...data, question_ids: selectedIds }));
+                bulk.patch('/questions/bulk-status', {
+                    preserveScroll: true, onSuccess: () => bulk.reset('question_ids'),
+                });
+            }}>
+                <div className="flex flex-wrap items-end gap-4">
+                    <label className="text-sm font-semibold">Filter by bank
+                        <select aria-label="Filter by bank" className="mt-1 block rounded-md border-border" value={bankId} disabled={bulk.processing} onChange={event => { setBankId(event.target.value); bulk.reset('question_ids'); bulk.clearErrors(); }}>
+                            <option value="">All banks</option>
+                            {questionBanks.data.map(bank => <option key={bank.id} value={bank.id}>{bank.name}</option>)}
+                        </select>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" aria-label="Select all questions" checked={allSelected} ref={element => { if (element) element.indeterminate = selectedIds.length > 0 && !allSelected; }}
+                            disabled={bulk.processing || !eligible.length} onChange={event => bulk.setData('question_ids', event.target.checked ? eligible.map(question => question.id) : [])} />
+                        Select all {bankId ? 'in this bank' : 'listed questions'}
+                    </label>
+                    <label className="text-sm font-semibold">Set status
+                        <select aria-label="Set status" className="mt-1 block rounded-md border-border" value={bulk.data.status} disabled={bulk.processing} onChange={event => bulk.setData('status', event.target.value)}>
+                            {['draft', 'review', 'approved', 'rejected', 'archived'].map(status => <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>)}
+                        </select>
+                    </label>
+                    <Button type="submit" disabled={bulk.processing || !selectedIds.length}>{bulk.processing ? 'Updating...' : 'Apply status'}</Button>
+                </div>
+                <p aria-live="polite" className="text-sm text-slate-600">{selectedIds.length} of {eligible.length} editable questions selected.</p>
+                {Object.values(bulk.errors).map((error, index) => <p key={index} role="alert" className="text-sm text-danger">{error}</p>)}
+            </form>
+
             <DataTable<Question>
-                rows={questions.data}
+                rows={visibleQuestions}
                 emptyTitle="No questions found"
                 columns={[
+                    { key: 'selection', header: 'Select', render: question => <input type="checkbox" aria-label={'Select question: ' + question.stem} disabled={bulk.processing || question.can?.update !== true}
+                        checked={selectedIds.includes(question.id)} onChange={event => bulk.setData('question_ids', event.target.checked ? [...selectedIds, question.id] : selectedIds.filter(id => id !== question.id))} /> },
                     { key: 'stem', header: 'Question', render: (question) => <span className="line-clamp-2 font-semibold text-slateDark">{question.stem}</span> },
                     { key: 'question_bank_name', header: 'Bank', render: (question) => question.question_bank_name ?? 'N/A' },
                     { key: 'structure', header: isInstitution ? 'Course' : isProfessional ? 'Course / Module' : 'Subject', render: (question) => isInstitution ? question.question_bank_course_name ?? 'N/A' : isProfessional ? [question.question_bank_course_name, question.question_bank_module_name].filter(Boolean).join(' / ') || question.subject_name || 'N/A' : question.subject_name ?? 'N/A' },

@@ -20,7 +20,7 @@ export default function Questions({ professionalSchool, questions, questionBanks
                 eyebrow={professionalSchool.name}
                 title="Questions"
                 description="Manage the approved and draft questions available to this professional school."
-                actions={<Button asChild><Link href="/questions/create">Add Question</Link></Button>}
+                actions={<div className="flex gap-2"><Button asChild variant="secondary"><Link href="/questions">Manage question statuses</Link></Button><Button asChild><Link href="/questions/create">Add Question</Link></Button></div>}
             />
             <form onSubmit={submitImport} className="mb-6">
                 <FormSection

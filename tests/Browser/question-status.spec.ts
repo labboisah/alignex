@@ -1,0 +1,33 @@
+import { test, expect } from '@playwright/test';
+
+test('bank select-all and individual status updates persist', async ({ page, request }) => {
+    test.setTimeout(180000);
+    const fixture = await request.post('/__browser/fixture', { data: { owner: 'organization', management: true } });
+    expect(fixture.ok()).toBeTruthy();
+    const data = await fixture.json();
+    await page.goto('/login');
+    await page.getByLabel('Email', { exact: true }).fill(data.actor_email);
+    await page.getByLabel('Password', { exact: true }).fill('password');
+    await page.getByRole('button', { name: 'Log in', exact: true }).click();
+    await page.waitForURL(url => !url.pathname.startsWith('/login'));
+    await page.goto('/question-bank/' + data.bank_id);
+    await page.getByRole('link', { name: 'Manage question statuses', exact: true }).click();
+    await expect(page.getByRole('combobox', { name: 'Filter by bank' })).toHaveValue(data.bank_id);
+    const all = page.getByRole('checkbox', { name: 'Select all questions', exact: true });
+    await all.check();
+    await expect(page.getByText('12 of 12 editable questions selected.', { exact: true })).toBeVisible();
+    await page.getByRole('combobox', { name: 'Set status', exact: true }).selectOption('draft');
+    await page.getByRole('button', { name: 'Apply status', exact: true }).click();
+    await expect(page.getByText('12 question(s) updated.', { exact: true })).toBeVisible({timeout:30000});
+    await expect(page.getByRole('cell', { name: 'Draft', exact: true })).toHaveCount(12);
+    await expect(all).not.toBeChecked();
+    await page.getByRole('checkbox', { name: /Select question:/ }).first().check();
+    await page.getByRole('combobox', { name: 'Set status', exact: true }).selectOption('approved');
+    await page.getByRole('button', { name: 'Apply status', exact: true }).click();
+    await expect(page.getByText('1 question(s) updated.', { exact: true })).toBeVisible({timeout:30000});
+    await expect(page.getByRole('cell', { name: 'Approved', exact: true })).toHaveCount(1);
+    await expect(page.getByRole('cell', { name: 'Draft', exact: true })).toHaveCount(11);
+    await page.reload();
+    await expect(page.getByRole('cell', { name: 'Approved', exact: true })).toHaveCount(1);
+    await expect(page.getByRole('cell', { name: 'Draft', exact: true })).toHaveCount(11);
+});

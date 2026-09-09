@@ -384,6 +384,7 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
             Route::post('/questions', [QuestionController::class, 'store'])->name('questions.store');
             Route::get('/questions/{question}', [QuestionController::class, 'show'])->name('questions.show');
             Route::get('/questions/{question}/edit', [QuestionController::class, 'edit'])->name('questions.edit');
+            Route::patch('/questions/bulk-status', [QuestionController::class, 'bulkStatus'])->name('questions.bulk-status');
             Route::patch('/questions/{question}', [QuestionController::class, 'update'])->name('questions.update');
             Route::delete('/questions/{question}', [QuestionController::class, 'destroy'])->name('questions.destroy');
         });

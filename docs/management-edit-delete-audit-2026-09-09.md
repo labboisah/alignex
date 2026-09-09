@@ -196,3 +196,13 @@ The report does not certify unrelated placeholder modules, every role/browser co
 - Browser workflows: institution and secondary tests passed together; professional workflow passed on its final rerun after correcting its dropdown selector. All three workflows have passing results.
 - Production build succeeded; changed PHP files were formatted; source whitespace checks passed.
 
+
+## Bulk question status updates
+
+Open a question bank and choose **Manage question statuses**, or open **Questions** and use **Filter by bank**. Tick individual question checkboxes or **Select all in this bank**, choose Draft, Review, Approved, Rejected or Archived, then click **Apply status**.
+
+Selecting all applies to every editable question currently listed for the chosen bank (the list is not paginated). With **All banks** selected, it applies across the listed banks. Changing the bank filter clears the selection. The selection count shows the scope before applying. Successful updates clear the selection and report how many statuses actually changed.
+
+The server validates the status and every selected ID, authorizes each question using the existing update policy, and applies the batch in one transaction. Missing, deleted or unauthorized questions prevent the entire batch from changing. Each changed status is logged with the question, bank, actor and previous/new status. Only status is changed; question content, options and exam records are not edited or deleted. This follows the existing question editing permissions and does not introduce a separate reviewer role or re-score completed examinations.
+
+Bulk status verification: 8 backend tests passed (85 assertions), the bank select-all/individual-update/reload browser test passed, and the production build succeeded.

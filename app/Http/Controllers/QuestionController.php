@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\BulkQuestionStatusRequest;
 use App\Http\Requests\StoreQuestionRequest;
 use App\Http\Requests\UpdateQuestionRequest;
 use App\Http\Resources\QuestionBankResource;
@@ -12,6 +13,7 @@ use App\Models\Question;
 use App\Models\QuestionBank;
 use App\Models\Subject;
 use App\Models\Topic;
+use App\Services\BulkQuestionStatusService;
 use App\Services\CurrentContextService;
 use App\Services\RecordDeletionService;
 use Illuminate\Http\RedirectResponse;
@@ -41,6 +43,14 @@ class QuestionController extends Controller
             ],
             ...$this->formOptions($request),
         ]);
+    }
+
+    public function bulkStatus(BulkQuestionStatusRequest $request, BulkQuestionStatusService $service): RedirectResponse
+    {
+        $data = $request->validated();
+        $count = $service->update($request->user(), $data['question_ids'], $data['status']);
+
+        return back()->with('success', "{$count} question(s) updated.");
     }
 
     public function create(Request $request): Response
