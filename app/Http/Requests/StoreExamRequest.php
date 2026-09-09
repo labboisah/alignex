@@ -20,7 +20,12 @@ class StoreExamRequest extends FormRequest
         if (($this->input('exam_mode') ?? $this->input('mode')) === Exam::MODE_ADAPTIVE && is_array($this->input('settings', []))) {
             $questions = collect(is_array($this->input('subjects')) ? $this->input('subjects') : [])
                 ->sum(fn ($row) => is_array($row) && is_numeric($row['number_of_questions'] ?? null) ? (int) $row['number_of_questions'] : 0);
-            $this->merge(['settings' => array_replace(AdaptiveSettings::defaults($questions), $this->input('settings', []))]);
+            $this->merge(['settings' => array_replace(AdaptiveSettings::defaults($questions), [
+                'progressive_remediation_enabled' => true, 'recovery_penalty_percent' => 10, 'max_scored_levels' => 3,
+                'min_level_budget' => '0.01', 'mastery_threshold_percent' => 70, 'min_evidence_per_area' => 1,
+                'level_duration_minutes' => $this->input('duration_minutes', 30), 'progression_closes_at' => $this->input('end_at'),
+                'level_cooldown_minutes' => 0, 'allow_unscored_remediation' => false, 'adaptive_show_level_feedback' => true,
+            ], $this->input('settings', []))]);
         }
     }
 
@@ -39,6 +44,12 @@ class StoreExamRequest extends FormRequest
 
         return [
             ...array_fill_keys(array_map(fn ($key) => 'settings.'.$key, array_keys(AdaptiveSettings::rules(false))), ['sometimes']),
+            'settings.adaptive_show_level_feedback' => ['sometimes', 'boolean'],
+            'adaptive_pilot' => ['exclude_unless:mode,adaptive', 'sometimes', 'array:online_enabled,offline_enabled,purpose,diagnostic_only'],
+            'adaptive_pilot.online_enabled' => ['required_with:adaptive_pilot', 'boolean'],
+            'adaptive_pilot.offline_enabled' => ['required_with:adaptive_pilot', 'boolean'],
+            'adaptive_pilot.purpose' => [Rule::requiredIf(fn () => $this->boolean('adaptive_pilot.online_enabled') || $this->boolean('adaptive_pilot.offline_enabled')), 'nullable', 'string', 'min:10', 'max:2000'],
+            'adaptive_pilot.diagnostic_only' => [Rule::when(fn () => $this->boolean('adaptive_pilot.online_enabled') || $this->boolean('adaptive_pilot.offline_enabled'), ['required', 'accepted'], ['sometimes', 'boolean'])],
             'subjects.*.topic_ids' => ['nullable', 'array'],
             'subjects.*.topic_ids.*' => ['string', 'exists:topics,id', 'distinct'],
             'subjects.*.module_id' => ['nullable', 'integer', 'exists:modules,id'],

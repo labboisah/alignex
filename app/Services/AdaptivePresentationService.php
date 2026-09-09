@@ -8,12 +8,49 @@ use App\Models\AdaptiveLevelRun;
 use App\Models\AdaptiveProgression;
 use App\Models\AdaptiveSnapshot;
 use App\Models\CandidateExamAttempt;
+use App\Models\Course;
+use App\Models\ProfessionalModule;
+use App\Models\Subject;
 use App\Support\AdaptiveSettings;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 
 class AdaptivePresentationService
 {
+    public function areaLabel(array $area): string
+    {
+        return $area['label'] ?? ProfessionalModule::find($area['module_id'] ?? null)?->name
+            ?? Course::find($area['course_id'] ?? null)?->name
+            ?? Subject::find($area['subject_id'] ?? null)?->name
+            ?? 'Area '.substr($area['area_key'], 4);
+    }
+
+    private function feedback(CandidateExamAttempt $attempt, AdaptiveLevel $level, AdaptiveProgression $progression, AdaptiveSnapshot $snapshot): ?array
+    {
+        if (! ($snapshot->blueprint['exam_settings']['adaptive_show_level_feedback'] ?? false)
+            || ! in_array($level->status, ['submitted', 'closed'], true) || $attempt->status === 'disqualified'
+            || AdaptiveLevel::where('progression_id', $progression->id)->where('number', '>', $level->number)->exists()) {
+            return null;
+        }
+        $labels = collect($snapshot->blueprint['areas'])->mapWithKeys(fn ($area) => [$area['area_key'] => $this->areaLabel($area)]);
+
+        return [
+            'levels' => AdaptiveLevel::where('progression_id', $progression->id)->whereIn('status', ['submitted', 'closed'])
+                ->where('number', '<=', $level->number)->orderBy('number')->get()->map(fn ($row) => [
+                    'number' => (int) $row->number, 'score' => number_format($row->earned_units / 100, 2, '.', ''),
+                    'available_marks' => number_format($row->available_units / 100, 2, '.', ''),
+                    'penalty_marks' => number_format($row->penalty_units / 100, 2, '.', ''),
+                ])->all(),
+            'areas' => AdaptiveAreaBalance::where('progression_id', $progression->id)->orderBy('area_key')->get()->map(fn ($area) => [
+                'name' => $labels[$area->area_key] ?? 'Area',
+                'status' => $area->mastery === 'mastered' ? 'Strength' : ($area->evidence_count > 0 ? 'Needs more practice' : 'Not yet assessed'),
+            ])->all(),
+            'earned_marks' => number_format($progression->earned_units / 100, 2, '.', ''),
+            'original_marks' => number_format($progression->original_units / 100, 2, '.', ''),
+            'remaining_marks' => number_format($progression->recoverable_units / 100, 2, '.', ''),
+        ];
+    }
+
     public function candidate(CandidateExamAttempt $attempt, AdaptiveLevel $level, AdaptiveProgression $progression, AdaptiveSnapshot $snapshot): array
     {
         $settings = $snapshot->settings;
@@ -27,7 +64,7 @@ class AdaptivePresentationService
         $latest = ! AdaptiveLevel::where('progression_id', $progression->id)->where('number', '>', $level->number)->exists();
         $weak = AdaptiveAreaBalance::where('progression_id', $progression->id)->whereIn('mastery', ['weak', 'untested', 'insufficient_evidence'])->exists();
         if ($level->status === 'submitted' && $latest && ! $run?->is_practice && $settings['progressive_remediation_enabled']) {
-            $availableAt = $level->submitted_at->copy()->addMinutes($settings['level_cooldown_minutes']);
+            $availableAt = $level->submitted_at->copy()->addMinutes((int) $settings['level_cooldown_minutes']);
             $recovery['available_at'] = $availableAt->toISOString();
             $recovery['message'] = 'Scored recovery is closed.';
             if (! $open) {
@@ -71,11 +108,12 @@ class AdaptivePresentationService
                 'settings' => ['require_fullscreen' => (bool) ($controls['require_fullscreen'] ?? false),
                     'require_webcam' => (bool) ($controls['require_webcam'] ?? false),
                     'monitor_screenshots' => (bool) ($controls['monitor_screenshots'] ?? false)],
-                'instructions' => 'This is an adaptive practice/diagnostic pilot, not a certification or recruitment result. Confirm each answer to continue. Confirmed answers cannot be changed. Only your current question is available.'],
+                'instructions' => 'This exam helps you identify strengths and improve weaker areas. Confirm each answer to continue. Confirmed answers cannot be changed. Only your current question is available.'],
             'can_start' => $allowed && $level->status === 'prepared' && $attempt->exam->status === 'active'
                 && (! $starts || ! $starts->isFuture()) && (! $ends || $ends->isFuture()) && $open,
             'starts_in_seconds' => $starts ? max(0, (int) now()->diffInSeconds($starts, false)) : 0,
             'recovery' => $recovery,
+            'learning_progress' => $this->feedback($attempt, $level, $progression, $snapshot),
         ];
     }
 }

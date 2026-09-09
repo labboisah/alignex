@@ -213,7 +213,7 @@ class AdaptiveLifecycleService
     {
         $duration = $snapshot->settings['progressive_remediation_enabled']
             ? $snapshot->settings['level_duration_minutes'] : $snapshot->blueprint['duration_minutes'];
-        $due = now()->addMinutes($duration);
+        $due = now()->addMinutes((int) $duration);
         $limits = [$progression->closes_at];
         if ((int) $level->number === 1) {
             $limits[] = $snapshot->blueprint['ends_at'] ? Carbon::parse($snapshot->blueprint['ends_at']) : null;
@@ -456,7 +456,7 @@ class AdaptiveLifecycleService
 
             return $this->payload($previous, $previousLevel, $progression, AdaptiveAttemptState::where('attempt_id', $previous->id)->firstOrFail(), $snapshot);
         }
-        if ($previousLevel->submitted_at->copy()->addMinutes($settings['level_cooldown_minutes'])->isFuture()) {
+        if ($previousLevel->submitted_at->copy()->addMinutes((int) $settings['level_cooldown_minutes'])->isFuture()) {
             $this->reject('exam', 'The recovery cooldown has not ended.');
         }
         $practice = (bool) ($data['practice'] ?? false);

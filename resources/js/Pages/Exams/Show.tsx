@@ -31,7 +31,7 @@ export default function ShowExam({ exam, can, supervisors = [], supervisorOption
                             <ProtectedAction allowed={can.update}><Button asChild type="button" variant="secondary"><Link href={`/exams/${record.id}/edit`}><Pencil className="h-4 w-4" />Edit</Link></Button></ProtectedAction>
                             <Button asChild type="button" variant="secondary"><Link href={`/candidates/assignments?exam_id=${record.id}`}><UserPlus className="h-4 w-4" />{isSecondary ? 'Assign Students' : 'Assign Candidates'}</Link></Button>
                             <ProtectedAction allowed={can.update}><Button type="button" variant="secondary" onClick={() => window.confirm(`Refresh ${isSecondary ? 'students' : 'candidates'} from the selected ${refreshSourceLabel(record)}?`) && router.post(`/exams/${record.id}/participants/refresh`, {}, { preserveScroll: true })}><RefreshCw className="h-4 w-4" />Refresh {isSecondary ? 'Students' : 'Candidates'}</Button></ProtectedAction>
-                            <Button asChild type="button" variant="secondary"><Link href={`/exams/${record.id}/papers`}><Shuffle className="h-4 w-4" />Generate Papers</Link></Button>
+                            {record.mode !== 'adaptive' && record.exam_mode !== 'adaptive' && <Button asChild type="button" variant="secondary"><Link href={`/exams/${record.id}/papers`}><Shuffle className="h-4 w-4" />Generate Papers</Link></Button>}
                             <Button asChild type="button" variant="secondary"><Link href={`/exams/${record.id}/monitor`}><Monitor className="h-4 w-4" />Monitor</Link></Button>
                             <Button asChild type="button" variant="secondary"><Link href={`/exams/${record.id}/monitor/incident-report`}><FileText className="h-4 w-4" />Incident Report</Link></Button>
                             <Button asChild type="button" variant="secondary"><Link href={`/results/exams/${record.id}`}><BarChart3 className="h-4 w-4" />Results</Link></Button>
@@ -42,7 +42,7 @@ export default function ShowExam({ exam, can, supervisors = [], supervisorOption
                         </>
                     }
                 />
-                {(record.exam_mode ?? record.mode) === 'adaptive' && can.update && <div className="mb-4"><Button asChild variant="secondary"><Link href={'/exams/' + record.id + '/adaptive'}>Check adaptive pool and snapshots</Link></Button></div>}
+                {(record.exam_mode ?? record.mode) === 'adaptive' && can.update && <div className="mb-4"><Button asChild variant="secondary"><Link href={'/exams/' + record.id + '/adaptive'}>Question readiness</Link></Button>{['offline','hybrid'].includes(String(record.delivery_mode)) && <Button asChild variant="secondary"><Link href={'/exams/' + record.id + '/adaptive/pilot'}>Center delivery</Link></Button>}</div>}
                 {adaptiveNotice && <div role="status" className="mb-5 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{adaptiveNotice}</div>}
                 <div className="grid gap-4 md:grid-cols-4">
                     <Metric label="Status" value={record.status_label} badge={record.status} />

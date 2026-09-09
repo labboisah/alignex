@@ -1,5 +1,27 @@
 # Adaptive examination knowledge base
 
+For organizers: [simple adaptive exam setup](adaptive-simple-setup.md).
+
+Next-version proposal: [document-based question generation and adaptive recovery](adaptive-resource-generation-plan.md).
+
+## Simplified setup and learning feedback — 9 September 2026
+
+Choose Adaptive when creating an Assessment or Practice exam. The normal exam form now handles activation and question preparation internally; organizers do not need to approve a pilot, create snapshots, or configure a shadow engine.
+
+The learning settings offer additional levels (on by default for new adaptive exams), maximum levels, a percentage deduction from remaining marks, an area completion target, time per level, waiting time, and the final date for further levels. Internal defaults handle selection policy, question quotas and minimum evidence. The normal exam duration and end time supply defaults. Traditional CBT retains its existing behavior.
+
+Saving automatically checks the approved question pool and freezes its internal version. Drafts may retain readiness problems; active/scheduled exams must pass before the save succeeds. Missing questions are reported during setup. Creation and preparation run in the same transaction. Offline/hybrid organizers use **Center delivery** to assign a prepared package without another approval form.
+
+New exams offer completed-level feedback by default, with a plain-language checkbox to turn it off. It includes per-level earned/available marks and deductions, cumulative earned marks, strengths, and areas needing practice. The current level must end before feedback is sent. Item keys, individual answer correctness and future questions remain hidden. A **Start next level** action appears when weaker areas, marks, fresh questions, time and level limits permit. Final result release remains separate.
+
+Previous frozen snapshots retain their feedback choice; missing feedback settings stay private. Completed traditional attempts cannot be retroactively turned into adaptive levels. The locally inspected completed exam had one attempt, no adaptive state and an unready question snapshot; a fresh adaptive exam is needed to test the corrected flow. Existing responses and marks were not rewritten.
+
+The advanced engine, audit records, delivery reservations and operational controls remain internal. This change does not enable consequential calibrated scoring.
+
+
+
+Configuration update (9 September 2026): exam creation/editing saves adaptive delivery approval to the database. Owner/exam environment allowlists have been retired; .env retains only system-wide engine and operational settings. See [configuration and pilot setup](adaptive-pilot.md).
+
 Reviewed: 8 September 2026. Supervised online/offline diagnostic pilots are implemented for all five owner contexts, including secondary-school formative assessment/practice. Terminal exams remain traditional. Consequential assessment validation remains pending.
 
 See [pilot setup and recovery runbook](adaptive-pilot.md) and [Phase 7 current status](adaptive-phase-7.md). Per-exam approval is required; no live cohort was automatically enabled. Earlier phase notes below describe historical increments and are superseded by the pilot runbook where they differ.

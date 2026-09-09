@@ -22,8 +22,22 @@ async function start(page: Page, request: APIRequestContext, input: Record<strin
 }
 async function answer(page: Page, correct = false) {
     await page.getByRole('radio', { name: correct ? 'A. First option' : 'B. Second option' }).check();
-    await page.getByRole('button', { name: 'Confirm and continue' }).click();
+    await page.getByRole('button', { name: /^(Confirm and continue|Finish level)$/ }).click();
     await expect(page.getByRole('button', { name: 'Saving…' })).toHaveCount(0);
+}
+async function finishRemaining(page: Page) {
+    for (let remaining = 10; remaining > 0; remaining--) {
+        if ((await envelope(page)).payload.submitted) break;
+        const before = (await envelope(page)).payload.state_version;
+        await answer(page);
+        await expect.poll(async () => (await envelope(page)).payload.state_version).toBeGreaterThan(before);
+    }
+    await expect(page.getByRole('heading', { name: 'Level completed' })).toBeVisible();
+}
+async function beginNextLevel(page: Page) {
+    await page.getByRole('button', { name: 'Start next level', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'Start your next level?' })).toBeVisible();
+    await page.getByRole('button', { name: 'Begin next level', exact: true }).click();
 }
 async function envelope(page: Page) {
     return page.evaluate(() => JSON.parse(localStorage.getItem('alignex_adaptive_session')!));
@@ -43,7 +57,7 @@ for (const owner of ['organization', 'institution', 'professional_school', 'cbt_
         await answer(page);
         await expect(page.getByRole('heading', { name: 'Level completed' })).toBeVisible();
         await expect(page.getByText('Scores remain hidden', { exact: false })).toBeVisible();
-        await page.getByRole('button', { name: 'Start recovery level' }).click();
+        await beginNextLevel(page);
         await expect(page.getByRole('radio')).toHaveCount(2);
         expect((await envelope(page)).payload.level).toBe(2);
         const state = await (await request.get('/__browser/state/' + data.exam_id)).json();
@@ -65,11 +79,11 @@ test('draft and keyboard selection survive refresh; duplicate clicks commit once
     await expect(page.getByRole('radio').first()).toBeChecked();
     expect((await envelope(page)).payload.current_item.question_id).toBe(initial.payload.current_item.question_id);
     await page.getByRole('button', { name: 'Confirm and continue' }).evaluate(button => { (button as HTMLButtonElement).click(); (button as HTMLButtonElement).click(); });
-    await expect(page.getByText('1 responses confirmed', { exact: true })).toBeVisible();
+    await expect(page.getByText('1 of 3 responses confirmed', { exact: true })).toBeVisible();
     const state = await (await request.get('/__browser/state/' + data.exam_id)).json();
     expect(state.committed).toBe(1);
     await page.reload();
-    await expect(page.getByText('1 responses confirmed', { exact: true })).toBeVisible();
+    await expect(page.getByText('1 of 3 responses confirmed', { exact: true })).toBeVisible();
 });
 
 test('lost commit response and offline reconnect reuse the durable operation', async ({ page, request, context }) => {
@@ -82,7 +96,7 @@ test('lost commit response and offline reconnect reuse the durable operation', a
     expect(pending.body.idempotency_key).toBeTruthy();
     await page.unroute('**/api/candidate/answer');
     await page.reload();
-    await expect(page.getByText('1 responses confirmed', { exact: true })).toBeVisible();
+    await expect(page.getByText('1 of 3 responses confirmed', { exact: true })).toBeVisible();
     expect((await envelope(page)).pending.body.idempotency_key).toBe(pending.body.idempotency_key);
     await context.setOffline(true);
     await expect(page.getByText('You are offline.', { exact: false })).toBeVisible();
@@ -96,11 +110,11 @@ test('lost commit response and offline reconnect reuse the durable operation', a
 
 test('lost recovery response restores the new token without a second penalty', async ({ page, request }) => {
     const data = await start(page, request);
-    await page.getByRole('button', { name: 'Finish level', exact: true }).click();
+    await finishRemaining(page);
     await expect(page.getByRole('heading', { name: 'Level completed' })).toBeVisible();
     const oldToken = (await envelope(page)).token;
     await page.route('**/api/candidate/next-level', async route => { await route.fetch(); await route.abort('failed'); });
-    await page.getByRole('button', { name: 'Start recovery level' }).click();
+    await beginNextLevel(page);
     await expect(page.getByRole('button', { name: 'Retry pending request' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Retry pending request' })).toBeEnabled();
     const key = (await envelope(page)).pending.body.idempotency_key;
@@ -145,7 +159,7 @@ test('server expiry finalizes the level and supervisor ending closes recovery', 
     await expect(page.getByRole('radio')).toHaveCount(0);
     await request.post('/__browser/action', { data: { ...data, action: 'end' } });
     await page.getByRole('button', { name: 'Refresh exam state' }).click();
-    await expect(page.getByRole('button', { name: 'Start recovery level' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Start next level' })).toHaveCount(0);
 });
 
 test('proctor tab policy disqualifies through browser events and prevents further answers', async ({ page, request }) => {
@@ -207,15 +221,15 @@ for (const owner of ['organization', 'secondary_school']) {
 test('completed aggregate is displayed only when the release policy permits it', async ({ page, request }) => {
     await start(page, request, { settings: { max_scored_levels: 1, show_result_immediately: true } });
     await answer(page, true);
-    await page.getByRole('button', { name: 'Finish level', exact: true }).click();
+    await finishRemaining(page);
     await expect(page.getByText('Released aggregate result: 2.00 / 6.00')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Start recovery level' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Start next level' })).toHaveCount(0);
 });
 
 test('authorized supervisor sees level history, immutable reset and stop events', async ({ page, request, context }) => {
     const data = await start(page, request);
-    await page.getByRole('button', { name: 'Finish level', exact: true }).click();
-    await page.getByRole('button', { name: 'Start recovery level' }).click();
+    await finishRemaining(page);
+    await beginNextLevel(page);
     await expect(page.getByRole('radio')).toHaveCount(2);
     const supervisor = await context.newPage();
     supervisor.on('dialog', dialog => dialog.accept());
@@ -239,8 +253,8 @@ test('authorized supervisor sees level history, immutable reset and stop events'
 test('adaptive diagnostic report shows recovery history and handles export failure and retry', async ({ page, request, context }) => {
     const data = await start(page, request, { report_exports: true });
     await answer(page, true);
-    await page.getByRole('button', { name: 'Finish level', exact: true }).click();
-    await page.getByRole('button', { name: 'Start recovery level' }).click();
+    await finishRemaining(page);
+    await beginNextLevel(page);
     await expect(page.getByRole('radio')).toHaveCount(2);
     const report = await context.newPage();
     await report.goto('/login');
@@ -257,7 +271,7 @@ test('adaptive diagnostic report shows recovery history and handles export failu
     await expect(report.getByRole('heading', { name: /Level 2/ })).toBeVisible();
     await expect(report.getByText(/Do not use for recruitment/)).toBeVisible();
     await report.locator('article').first().locator('summary').click();
-    await expect(report.locator('article').first().getByText('Unconfirmed', { exact: true })).toBeVisible();
+    await expect(report.locator('article').first().getByText('Incorrect', { exact: true }).first()).toBeVisible();
     await report.route('**/results/adaptive/progressions/*/export.csv', route => route.fulfill({ status: 503, body: 'Unavailable' }));
     await report.getByRole('button', { name: 'Download diagnostic CSV' }).click();
     await expect(report.getByText(/Export could not be downloaded/)).toBeVisible();
@@ -317,24 +331,79 @@ test('phase 6 calibration template import independent review and revocation', as
     await expect(page.getByRole('button', { name: 'Run shadow evaluation' })).toBeDisabled();
 });
 
-test('diagnostic pilot controls save explicit owner approval', async ({page,request})=>{
+test('center delivery hides technical approval steps', async ({page,request})=>{
     const data=await fixture(request);
     await page.goto('/login');
     await page.getByLabel('Email',{exact:true}).fill(data.actor_email);
     await page.getByLabel('Password',{exact:true}).fill('password');
     await page.getByRole('button',{name:'Log in',exact:true}).click();
-    await page.waitForURL(url => !url.pathname.startsWith('/login'));
+    await page.waitForURL(url=>!url.pathname.startsWith('/login'));
     await page.goto('/exams/'+data.exam_id+'/adaptive/pilot');
-    await expect(page.getByRole('heading',{name:'Pilot controls',exact:true})).toBeVisible();
-    await page.getByLabel('Enable online diagnostic starts').check();
-    await page.getByLabel('Permit new offline package reservations').check();
-    await page.getByLabel('Purpose and cohort limits').fill('Supervised diagnostic pilot with a small assigned cohort.');
-    await page.getByLabel('This is a diagnostic pilot', {exact:false}).check();
-    await Promise.all([
-        page.waitForResponse(r=>r.request().method()==='POST' && r.url().endsWith('/adaptive/pilot')),
-        page.getByRole('button',{name:'Save pilot controls',exact:true}).click(),
-    ]);
-    await expect(page.getByLabel('Enable online diagnostic starts')).toBeChecked();
+    await expect(page.getByRole('heading',{name:'Prepare a center package',exact:true})).toBeVisible();
+    await expect(page.getByRole('heading',{name:'Pilot controls',exact:true})).toHaveCount(0);
+});
+
+test('learning progress shows level marks and weaknesses before the next level', async ({page,request})=>{
+    await start(page,request,{settings:{adaptive_show_level_feedback:true}});
+    await answer(page,true);
+    await finishRemaining(page);
+    await expect(page.getByRole('heading',{name:'Your progress',exact:true})).toBeVisible();
+    await expect(page.getByText('Needs more practice',{exact:false})).toBeVisible();
+    await expect(page.getByRole('table', { name: 'Total marks earned after each level' })).toContainText('2.00');
+    await expect(page.getByRole('heading', { name: 'Your improvement', exact: true })).toBeVisible();
+    await expect(page.getByText('Level 1 is your starting point.', { exact: false })).toBeVisible();
+    await beginNextLevel(page);
+    await expect(page.getByRole('radio')).toHaveCount(2);
+    expect((await envelope(page)).payload.level).toBe(2);
+    await expect(page.getByRole('heading',{name:'Your progress',exact:true})).toHaveCount(0);
+    await answer(page, true);
+    await finishRemaining(page);
+    await expect(page.getByText('+1.20 marks gained since Level 1.', { exact: true })).toBeVisible();
+    await expect(page.getByRole('table', { name: 'Total marks earned after each level' })).toContainText('3.20');
+});
+test('simple adaptive settings save without technical approval or preparation steps', async ({page,request})=>{
+    const data=await fixture(request);
+    await page.goto('/login');
+    await page.getByLabel('Email',{exact:true}).fill(data.actor_email);
+    await page.getByLabel('Password',{exact:true}).fill('password');
+    await page.getByRole('button',{name:'Log in',exact:true}).click();
+    await page.waitForURL(url=>!url.pathname.startsWith('/login'));
+    await page.goto('/exams/'+data.exam_id+'/edit');
+    await page.getByRole('combobox',{name:'Exam Type',exact:true}).selectOption('assessment');
+    await page.getByRole('button',{name:'Step 3: Settings',exact:true}).click();
+    await expect(page.getByRole('heading',{name:'Adaptive learning',exact:true})).toBeVisible();
+    await expect(page.getByText('Adaptive delivery approval',{exact:true})).toHaveCount(0);
+    await expect(page.getByText('Selection policy',{exact:true})).toHaveCount(0);
+    await page.getByRole('button',{name:'Step 4: Review',exact:true}).click();
+    await page.getByRole('button',{name:'Save Changes',exact:true}).click();
+    await page.waitForURL(url=>url.pathname==='/exams/'+data.exam_id);
+    await expect(page.getByRole('link',{name:'Question readiness',exact:true})).toBeVisible();
+});
+
+test('confirmation works without randomUUID and finish appears only on the last question', async ({ page, request }) => {
+    await page.addInitScript(() => Object.defineProperty(window.crypto, 'randomUUID', { value: undefined }));
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    const data = await start(page, request);
+    await expect(page.getByRole('button', { name: 'Finish level', exact: true })).toHaveCount(0);
+    await answer(page, true);
+    await expect(page.getByRole('button', { name: 'Finish level', exact: true })).toHaveCount(0);
+    await answer(page);
+    await expect(page.getByRole('button', { name: 'Confirm and continue', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Finish level', exact: true })).toBeVisible();
     await page.reload();
-    await expect(page.getByLabel('Permit new offline package reservations')).toBeChecked();
+    await expect(page.getByRole('button', { name: 'Finish level', exact: true })).toBeVisible();
+    await answer(page, true);
+    await expect(page.getByRole('heading', { name: 'Level completed' })).toBeVisible();
+    const state = await (await request.get('/__browser/state/' + data.exam_id)).json();
+    expect(state.committed).toBe(3);
+    expect(Number(state.earned)).toBe(400);
+    await page.evaluate(() => { window.confirm = () => false; });
+    await page.getByRole('button', { name: 'Start next level', exact: true }).click();
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    expect((await envelope(page)).payload.level).toBe(1);
+    await beginNextLevel(page);
+    await expect(page.getByRole('radio')).toHaveCount(2);
+    expect((await envelope(page)).payload.level).toBe(2);
+    expect(errors).toEqual([]);
 });

@@ -1,40 +1,24 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import { PageHeader, PortalAppShell } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
-
-type Area = { area_key: string; question_count: number; available: number; required: number; difficulty: Record<string, number> };
-type Props = {
-    exam: { id: string; title: string };
-    readiness: { ready: boolean; warnings: string[]; areas: Area[]; item_count: number };
-    rollout: { can_publish: boolean };
-    snapshots: { id: number; version: number; ready: boolean; created_at: string }[];
-};
-export default function AdaptivePreparation({ exam, readiness, snapshots, rollout }: Props) {
-    const { post, processing, errors } = useForm({});
-    return <PortalAppShell title="Adaptive preparation">
-        <Head title="Adaptive preparation" />
-        <section className="mx-auto max-w-6xl space-y-5">
-            <PageHeader title={exam.title} description="Check coverage and freeze an immutable configuration and question-pool version. This does not publish or start the exam." actions={<Button asChild variant="secondary"><Link href={'/exams/' + exam.id}>Back to exam</Link></Button>} />
-            <div role="status" className="rounded-md border border-border bg-white p-4">
-                <p className="font-semibold">{readiness.ready ? 'Pool checks passed' : 'Pool needs attention'}</p>
-                <p className="text-sm text-slate-600">{readiness.item_count} eligible questions. New pilot starts: {rollout.can_publish ? 'enabled for this approved exam' : 'disabled'}. Online diagnostics only.</p>
-                {readiness.warnings.length > 0 && <ul className="mt-3 list-disc pl-5 text-sm text-amber-800">{readiness.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul>}
+type Area={area_key:string;label?:string;question_count:number;available:number;required:number};
+type Props={exam:{id:string;title:string};readiness:{ready:boolean;warnings:string[];areas:Area[];item_count:number}};
+export default function AdaptivePreparation({exam,readiness}:Props) {
+    const {post,processing,errors}=useForm({});
+    const friendly=(text:string)=>readiness.areas.reduce((value,area)=>value.replaceAll(area.area_key,area.label??'Selected subject'),text);
+    return <PortalAppShell title="Question readiness"><Head title="Question readiness"/>
+        <section className="mx-auto max-w-5xl space-y-5">
+            <PageHeader title={exam.title} description="We check and prepare your questions automatically when you save the exam." actions={<Button asChild variant="secondary"><Link href={'/exams/'+exam.id}>Back to exam</Link></Button>}/>
+            <div role="status" className="rounded border bg-white p-5"><h2 className="font-semibold">{readiness.ready?'Your questions are ready':'Add or update questions before candidates start'}</h2>
+                <p>{readiness.item_count} approved questions are available for adaptive selection.</p>
+                {readiness.warnings.length>0&&<ul className="list-disc pl-5">{readiness.warnings.map((warning,index)=><li key={index}>{friendly(warning)}</li>)}</ul>}
             </div>
-            {Object.values(errors).length > 0 && <div role="alert" className="text-sm text-danger">{Object.values(errors).join(' ')}</div>}
-            <div className="overflow-x-auto rounded-md border border-border bg-white p-4">
-                {readiness.areas.length === 0 ? <p>No paper rows are configured. Edit the exam to add a blueprint.</p> :
-                    <table className="w-full text-left text-sm"><thead><tr><th>Area</th><th>Quota</th><th>Required fresh pool</th><th>Available</th><th>Easy / Medium / Hard</th></tr></thead>
-                        <tbody>{readiness.areas.map(area => <tr key={area.area_key}><td className="py-2">{area.area_key}</td><td>{area.question_count}</td><td>{area.required}</td><td>{area.available}</td><td>{area.difficulty.easy} / {area.difficulty.medium} / {area.difficulty.hard}</td></tr>)}</tbody>
-                    </table>}
-            </div>
-            <Link className="block text-primary underline" href={'/exams/' + exam.id + '/adaptive/pilot'}>Online and offline diagnostic pilot controls</Link>
-            <Link className="text-primary underline" href={'/exams/' + exam.id + '/adaptive/research'}>Calibration and shadow engine research</Link>
-            <Button disabled={processing} onClick={() => post('/exams/' + exam.id + '/adaptive/prepare', { preserveScroll: true })}>{processing ? 'Saving snapshot...' : 'Save preparation snapshot'}</Button>
-            <div className="rounded-md border border-border bg-white p-4">
-                <h2 className="font-semibold">Snapshot history</h2>
-                {snapshots.length === 0 ? <p className="mt-2 text-sm text-slate-600">No snapshots yet. Save one to preserve this configuration and its pool.</p> :
-                    <ul className="mt-2 space-y-2 text-sm">{snapshots.map(snapshot => <li key={snapshot.id}>Version {snapshot.version}: {snapshot.ready ? 'pool checks passed' : 'needs attention'} — {snapshot.created_at}</li>)}</ul>}
-            </div>
+            {Object.values(errors).length>0&&<p role="alert">{Object.values(errors).join(' ')}</p>}
+            <table className="w-full rounded border bg-white text-left"><thead><tr><th>Subject or area</th><th>Questions per level</th><th>Needed for all levels</th><th>Available</th></tr></thead><tbody>
+                {readiness.areas.map(area=><tr key={area.area_key}><td>{area.label??'Selected subject'}</td><td>{area.question_count}</td><td>{area.required}</td><td>{area.available}</td></tr>)}
+            </tbody></table>
+            <div className="flex gap-3"><Button asChild variant="secondary"><Link href={'/exams/'+exam.id+'/edit'}>Edit exam settings</Link></Button>
+                <Button disabled={processing} onClick={()=>post('/exams/'+exam.id+'/adaptive/prepare',{preserveScroll:true})}>{processing?'Checking...':'Check questions again'}</Button></div>
         </section>
     </PortalAppShell>;
 }

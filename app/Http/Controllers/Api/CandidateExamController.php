@@ -53,7 +53,7 @@ class CandidateExamController extends Controller
         // In particular, resuming Level 2 must not select the submitted Level 1 attempt.
         if ($exam && ($adaptiveCandidate = $this->candidateForLogin($exam, $data))) {
             if (app(AdaptiveRolloutService::class)->isAdaptive($exam)
-                && ! CandidateExamAttempt::where('exam_id', $exam->id)->where('candidate_id', $adaptiveCandidate->id)->exists()) {
+                && ! CandidateExamAttempt::where('exam_id', $exam->id)->where('candidate_id', $adaptiveCandidate->id)->whereNotNull('started_at')->exists()) {
                 app(AdaptiveAttemptPreparationService::class)->prepareAssignedCandidate($exam, $adaptiveCandidate);
             }
             $adaptiveAttempt = CandidateExamAttempt::where('exam_id', $exam->id)

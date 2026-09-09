@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AdaptivePilotControl;
 use App\Models\AdaptiveProgression;
 use App\Models\CandidateExamAttempt;
 use App\Models\Exam;
@@ -164,7 +165,7 @@ class AdaptiveReportingTest extends TestCase
         require_once base_path('tests/Browser/fixtures.php');
         $fixture = browserFixture(['owner' => $owner, 'settings' => ['max_scored_levels' => 1]]);
         $exam = Exam::findOrFail($fixture['exam_id']);
-        config(['adaptive.pilot_enabled' => true, 'adaptive.pilot_owners' => [$owner.':'.$exam->exam_owner_id], 'adaptive.pilot_exams' => [$exam->id]]);
+        AdaptivePilotControl::create(['exam_id' => $exam->id, 'owner_key' => app(AdaptiveRolloutService::class)->ownerKey($exam), 'online_enabled' => true, 'offline_enabled' => false, 'purpose' => 'Reporting test diagnostic cohort.', 'updated_by' => $exam->created_by]);
         $rollout = app(AdaptiveRolloutService::class);
         $this->assertTrue($rollout->status($exam)['can_publish']);
         $proposed = new Exam($exam->getAttributes());
@@ -184,7 +185,7 @@ class AdaptiveReportingTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page->where('report.marks.earned', '6.00')->where('report.snapshot.engine_version', 'simple-v1'));
         $exam->update(['result_release_settings' => ['release_mode' => 'released']]);
         $this->postJson('/api/candidate/result', ['exam_code' => $fixture['code'], 'identifier' => $fixture['identifier']])->assertOk()->assertJsonPath('result.score', '6.00');
-        config(['adaptive.pilot_enabled' => false]);
+        AdaptivePilotControl::where('exam_id', $exam->id)->update(['online_enabled' => false]);
         $this->withToken($token)->getJson('/api/candidate/exam')->assertOk();
     }
 
@@ -192,7 +193,7 @@ class AdaptiveReportingTest extends TestCase
     {
         $exam = Exam::factory()->create(['exam_owner_type' => 'organization', 'mode' => 'adaptive', 'exam_mode' => 'adaptive', 'exam_category' => 'assessment', 'delivery_mode' => 'online']);
         $service = app(AdaptiveRolloutService::class);
-        config(['adaptive.pilot_enabled' => true, 'adaptive.pilot_owners' => [$service->ownerKey($exam)], 'adaptive.pilot_exams' => [$exam->id]]);
+        $control = AdaptivePilotControl::create(['exam_id' => $exam->id, 'owner_key' => $service->ownerKey($exam), 'online_enabled' => true, 'offline_enabled' => false, 'purpose' => 'Reporting test diagnostic cohort.', 'updated_by' => $exam->created_by]);
         $this->assertTrue($service->status($exam)['can_publish']);
         foreach (['recruitment', 'certification', 'professional', 'terminal'] as $category) {
             $exam->exam_category = $category;
@@ -202,10 +203,10 @@ class AdaptiveReportingTest extends TestCase
         $exam->delivery_mode = 'offline';
         $this->assertFalse($service->status($exam)['can_publish']);
         $exam->delivery_mode = 'online';
-        config(['adaptive.pilot_exams' => ['wrong-exam']]);
+        $control->update(['owner_key' => 'organization:wrong-owner']);
         $this->assertFalse($service->status($exam)['can_publish']);
         $exam->exam_owner_type = 'secondary_school';
-        config(['adaptive.pilot_exams' => [$exam->id], 'adaptive.pilot_owners' => [$service->ownerKey($exam)]]);
+        $control->update(['owner_key' => $service->ownerKey($exam)]);
         $this->assertTrue($service->status($exam)['can_publish']);
         $exam->exam_category = 'terminal';
         $this->assertFalse($service->status($exam)['can_publish']);

@@ -30,10 +30,29 @@ class AdaptiveAttemptPreparationService
                 throw ValidationException::withMessages(['exam' => 'This candidate cannot prepare an initial adaptive attempt.']);
             }
             $existing = CandidateExamAttempt::where('exam_id', $exam->id)->where('candidate_id', $candidate->id)
-                ->orderByDesc('attempt_number')->first();
+                ->orderByDesc('attempt_number')->lockForUpdate()->first();
             if ($existing) {
                 if (! AdaptiveAttemptState::where('attempt_id', $existing->id)->exists()) {
-                    throw ValidationException::withMessages(['exam' => 'Existing traditional attempt history must be preserved.']);
+                    $snapshot = AdaptiveSnapshot::where('exam_id', $exam->id)->latest('version')->first();
+                    if ($existing->started_at || $existing->status !== 'not_started' || $existing->answers()->exists()
+                        || $existing->submitted_at || $existing->auto_submitted_at || $existing->disqualified_at || $existing->server_due_at
+                        || ! $snapshot?->ready) {
+                        throw ValidationException::withMessages(['exam' => 'This candidate cannot start adaptive levels. Ask the organizer to check the questions and candidate assignment. Existing answers are preserved.']);
+                    }
+                    // Old paper generation could create fixed papers for an adaptive exam.
+                    // Only discard unused scaffolding; binding failure rolls this transaction back.
+                    $paperCount = $existing->papers()->count();
+                    if ($paperCount > 0) {
+                        $existing->papers()->delete();
+                        $existing->update(['total_questions' => 0, 'total_marks' => 0]);
+                        $exam->auditLogs()->create([
+                            'candidate_exam_attempt_id' => $existing->id, 'actor_type' => 'system',
+                            'event_type' => 'adaptive_unused_papers_replaced',
+                            'description' => 'Unused fixed papers replaced by adaptive preparation before the attempt started.',
+                            'metadata' => ['paper_count' => $paperCount], 'occurred_at' => now(),
+                        ]);
+                    }
+                    $this->bind($existing, $snapshot);
                 }
 
                 return $existing;
@@ -68,7 +87,7 @@ class AdaptiveAttemptPreparationService
             }
             $exam = Exam::whereKey($attempt->exam_id)->lockForUpdate()->first();
             if (! $exam || $attempt->started_at || $attempt->status !== CandidateExamAttempt::STATUS_NOT_STARTED
-                || $attempt->papers()->exists() || ! $snapshot->ready || (string) $snapshot->exam_id !== (string) $exam->id
+                || $attempt->papers()->exists() || $attempt->answers()->exists() || ! $snapshot->ready || (string) $snapshot->exam_id !== (string) $exam->id
                 || ! $exam->candidates()->where('candidates.id', $attempt->candidate_id)->exists()) {
                 throw ValidationException::withMessages(['exam' => 'Only an assigned, unstarted, empty attempt can bind a ready snapshot from this exam.']);
             }

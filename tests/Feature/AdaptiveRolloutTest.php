@@ -17,6 +17,7 @@ use App\Services\CandidateExamSessionService;
 use App\Services\ExamPaperGeneratorService;
 use App\Support\ExamOwnershipRules;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -24,7 +25,7 @@ class AdaptiveRolloutTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_adaptive_draft_is_saved_but_publication_is_blocked_even_for_allowlisted_owner(): void
+    public function test_exam_creation_persists_approval_and_legacy_environment_is_ignored(): void
     {
         $organization = Organization::factory()->create();
         $user = User::factory()->create(['role' => User::ROLE_ORGANIZATION_ADMIN, 'organization_id' => $organization->id]);
@@ -33,6 +34,7 @@ class AdaptiveRolloutTest extends TestCase
         $candidate = Candidate::factory()->create(['organization_id' => $organization->id]);
         $payload = [
             'title' => 'Adaptive draft', 'exam_code' => 'ADAPT-DRAFT', 'exam_type' => 'assessment',
+            'adaptive_pilot' => ['online_enabled' => false, 'offline_enabled' => false, 'purpose' => '', 'diagnostic_only' => false],
             'exam_category' => 'assessment', 'mode' => 'adaptive', 'exam_mode' => 'adaptive',
             'delivery_mode' => 'online', 'start_at' => now()->addDay()->toDateTimeString(),
             'end_at' => now()->addDays(2)->toDateTimeString(), 'duration_minutes' => 30,
@@ -42,7 +44,7 @@ class AdaptiveRolloutTest extends TestCase
         ];
         $this->actingAs($user)->post('/exams', $payload)->assertSessionHasNoErrors()->assertRedirect();
         $exam = Exam::where('code', 'ADAPT-DRAFT')->firstOrFail();
-        config(['adaptive.pilot_enabled' => true, 'adaptive.pilot_owners' => ['organization:'.$organization->id]]);
+        config(['adaptive.pilot_enabled' => true, 'adaptive.pilot_owners' => ['organization:'.$organization->id], 'adaptive.pilot_exams' => [$exam->id]]);
         $status = app(AdaptiveRolloutService::class)->status($exam);
         $this->assertTrue($status['owner_allowlisted']);
         $this->assertTrue($status['runtime_ready']);
@@ -53,6 +55,43 @@ class AdaptiveRolloutTest extends TestCase
         }
         $this->post('/exams', [...$payload, 'exam_code' => 'BLOCKED', 'status' => 'active'])->assertSessionHasErrors('exam');
         $this->assertDatabaseMissing('exams', ['code' => 'BLOCKED']);
+        $this->assertDatabaseHas('adaptive_pilot_controls', ['exam_id' => $exam->id, 'online_enabled' => false, 'offline_enabled' => false]);
+        $automatic = $payload;
+        unset($automatic['adaptive_pilot']);
+        $this->post('/exams', [...$automatic, 'exam_code' => 'EMPTY-POOL', 'status' => 'active'])->assertSessionHasErrors('subjects');
+        $this->assertDatabaseMissing('exams', ['code' => 'EMPTY-POOL']);
+        foreach (['easy', 'medium', 'hard'] as $band) {
+            for ($i = 0; $i < 3; $i++) {
+                $question = Question::factory()->create(['question_bank_id' => $bank->id, 'subject_id' => $subject->id, 'difficulty' => $band,
+                    'question_type' => 'single_choice', 'status' => 'approved', 'marks' => 1]);
+                QuestionOption::factory()->create(['question_id' => $question->id, 'label' => 'A', 'is_correct' => true]);
+                QuestionOption::factory()->create(['question_id' => $question->id, 'label' => 'B', 'is_correct' => false]);
+            }
+        }
+        $this->post('/exams', [...$automatic, 'exam_code' => 'AUTO-LEVELS', 'status' => 'active', 'start_at' => now()->subMinute()->toDateTimeString()])->assertSessionHasNoErrors();
+        $auto = Exam::where('code', 'AUTO-LEVELS')->firstOrFail();
+        $this->assertDatabaseHas('adaptive_snapshots', ['exam_id' => $auto->id, 'ready' => true]);
+        $this->assertDatabaseHas('adaptive_pilot_controls', ['exam_id' => $auto->id, 'online_enabled' => true]);
+        $this->assertTrue($auto->settings['progressive_remediation_enabled']);
+        $this->postJson('/api/candidate/login', ['exam_code' => $auto->code, 'identifier' => $candidate->candidate_number, 'device_fingerprint' => 'automatic-level-device'])
+            ->assertOk()->assertJsonPath('delivery_mode', 'adaptive')->assertJsonPath('level', 1);
+        $approval = ['online_enabled' => true, 'offline_enabled' => true, 'purpose' => 'Diagnostic cohort approved during exam creation.', 'diagnostic_only' => true];
+        $this->post('/exams', [...$payload, 'exam_code' => 'DB-INVALID', 'status' => 'active', 'adaptive_pilot' => [...$approval, 'diagnostic_only' => false]])->assertSessionHasErrors('adaptive_pilot.diagnostic_only');
+        $this->assertDatabaseMissing('exams', ['code' => 'DB-INVALID']);
+        $this->post('/exams', [...$payload, 'exam_code' => 'DB-APPROVED', 'status' => 'active', 'adaptive_pilot' => $approval])->assertSessionHasNoErrors();
+        $approved = Exam::where('code', 'DB-APPROVED')->firstOrFail();
+        $this->assertDatabaseHas('adaptive_pilot_controls', ['exam_id' => $approved->id, 'owner_key' => 'organization:'.$organization->id, 'online_enabled' => true, 'offline_enabled' => true]);
+        config(['adaptive.pilot_enabled' => false, 'adaptive.pilot_owners' => [], 'adaptive.pilot_exams' => []]);
+        $this->assertTrue(app(AdaptiveRolloutService::class)->status($approved)['can_publish']);
+        $withoutControls = $payload;
+        unset($withoutControls['adaptive_pilot']);
+        $this->patch('/exams/'.$approved->id, [...$withoutControls, 'exam_code' => 'DB-APPROVED', 'status' => 'active'])->assertSessionHasNoErrors();
+        $this->assertTrue(app(AdaptiveRolloutService::class)->status($approved->fresh())['can_publish']);
+        $this->get('/exams/'.$approved->id.'/edit')->assertOk()->assertInertia(fn ($page) => $page->where('adaptive_control.online_enabled', true));
+        Gate::before(fn ($user, $ability) => $ability === 'viewAdaptiveReport' ? false : null);
+        $this->post('/exams', [...$payload, 'exam_code' => 'NO-APPROVAL-PERMISSION', 'adaptive_pilot' => $approval])->assertForbidden();
+        $this->assertDatabaseMissing('exams', ['code' => 'NO-APPROVAL-PERMISSION']);
+
     }
 
     public function test_new_adaptive_login_and_previously_issued_token_are_blocked(): void
@@ -106,13 +145,13 @@ class AdaptiveRolloutTest extends TestCase
         $this->assertSame('adaptive', $exam->fresh()->mode);
     }
 
-    public function test_owner_allowlist_is_exact_and_secondary_terminal_remains_traditional(): void
+    public function test_legacy_environment_cannot_approve_owners_and_secondary_terminal_remains_traditional(): void
     {
         $service = app(AdaptiveRolloutService::class);
         config(['adaptive.pilot_enabled' => true, 'adaptive.pilot_owners' => ['organization:1']]);
         foreach (Exam::OWNER_TYPES as $owner) {
             $exam = new Exam(['exam_owner_type' => $owner, 'exam_owner_id' => 1, 'exam_category' => 'assessment']);
-            $this->assertSame($owner === 'organization', $service->status($exam)['owner_allowlisted']);
+            $this->assertFalse($service->status($exam)['owner_allowlisted']);
             $this->assertFalse($service->status($exam)['can_publish']);
         }
         $this->assertTrue(ExamOwnershipRules::isValid('secondary_school', 'terminal', 'traditional'));

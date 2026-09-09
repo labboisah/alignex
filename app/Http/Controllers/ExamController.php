@@ -25,6 +25,8 @@ use App\Models\SecondarySchool;
 use App\Models\StudentGroup;
 use App\Models\Subject;
 use App\Models\User;
+use App\Services\AdaptivePilotService;
+use App\Services\AdaptivePreparationService;
 use App\Services\AdaptiveRolloutService;
 use App\Services\CurrentContextService;
 use App\Services\ExamParticipantAssignmentService;
@@ -80,7 +82,7 @@ class ExamController extends Controller
 
         return Inertia::render('Exams/Show', [
             'exam' => ExamResource::make($exam->load(['organization', 'institution', 'faculty', 'department', 'school', 'center', 'secondarySchool', 'professionalSchool', 'cbtCenter', 'examType', 'questionBank', 'examSubjects.subject', 'examSubjects.questionBank', 'candidates'])->loadCount(['participants', 'attempts', 'examSubjects'])),
-            'adaptive_notice' => app(AdaptiveRolloutService::class)->isAdaptive($exam) ? AdaptiveRolloutService::MESSAGE : null,
+            'adaptive_notice' => app(AdaptiveRolloutService::class)->isAdaptive($exam) ? 'Candidates begin at Level 1 and can improve weaker areas in further levels, according to your settings.' : null,
             'supervisors' => $this->supervisorRows($exam),
             'supervisorOptions' => $this->supervisorOptions($request->user(), $exam),
             'can' => [
@@ -98,6 +100,7 @@ class ExamController extends Controller
         $exam = app(ExamStatusService::class)->sync($exam);
 
         return Inertia::render('Exams/Edit', [
+            'adaptive_control' => app(AdaptivePilotService::class)->control($exam),
             'exam' => ExamResource::make($exam->load(['organization', 'institution', 'faculty', 'department', 'school', 'center', 'secondarySchool', 'professionalSchool', 'cbtCenter', 'examType', 'questionBank', 'examSubjects.subject', 'examSubjects.questionBank', 'candidates'])->loadCount(['participants', 'attempts', 'examSubjects'])),
             ...$this->formOptions($request),
         ]);
@@ -385,7 +388,7 @@ class ExamController extends Controller
             'settings' => $data['settings'],
         ];
 
-        app(AdaptiveRolloutService::class)->ensureSaveAllowed(new Exam($payload), $exam);
+        app(AdaptiveRolloutService::class)->ensureSaveAllowed(new Exam($payload), $exam, false);
 
         if ($tenant['exam_owner_type'] === Exam::OWNER_SECONDARY_SCHOOL) {
             $secondaryStudentIds = $this->secondaryStudentIdsForExam($tenant, $data);
@@ -442,6 +445,8 @@ class ExamController extends Controller
         }
 
         $exam ? $exam->update($payload) : $exam = Exam::create($payload);
+        app(AdaptivePilotService::class)->saveWithExam($exam, $request->user(), $data['adaptive_pilot'] ?? null);
+        app(AdaptiveRolloutService::class)->ensureSaveAllowed($exam, $exam);
         $exam->examSubjects()->delete();
 
         foreach (array_values($data['subjects']) as $index => $subject) {
@@ -481,6 +486,13 @@ class ExamController extends Controller
 
         if ($tenant['exam_owner_type'] === Exam::OWNER_SECONDARY_SCHOOL) {
             app(ExamParticipantAssignmentService::class)->syncStudents($exam, data_get($exam->settings ?? [], 'secondary_student_ids', []));
+        }
+
+        if ($examMode === Exam::MODE_ADAPTIVE) {
+            $prepared = app(AdaptivePreparationService::class)->prepare($exam->fresh(), $request->user()->id);
+            if (! $prepared->ready && in_array($exam->status, [Exam::STATUS_ACTIVE, Exam::STATUS_SCHEDULED], true)) {
+                throw ValidationException::withMessages(['subjects' => 'Add enough approved questions before opening this exam. '.implode(' ', $prepared->readiness['warnings'])]);
+            }
         }
 
         return $exam;
@@ -877,7 +889,7 @@ class ExamController extends Controller
                 ['value' => Exam::CATEGORY_PRACTICE, 'label' => 'Practice'],
                 ['value' => Exam::CATEGORY_GENERAL, 'label' => 'General'],
             ],
-            'adaptive_notice' => AdaptiveRolloutService::MESSAGE,
+            'adaptive_notice' => 'Adaptive exams adjust questions as candidates answer and can offer further levels on weaker areas.',
             'modes' => [
                 ['value' => 'traditional', 'label' => 'Traditional'],
                 ['value' => 'adaptive', 'label' => 'Adaptive'],

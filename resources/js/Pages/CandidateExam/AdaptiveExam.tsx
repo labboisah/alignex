@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/Components/ui/button';
+import { ConfirmDialog } from '@/Components/Platform/ConfirmDialog';
+import AdaptiveImprovementChart from './AdaptiveImprovementChart';
 
 type Item = { question_id: string; question_text: string; question_type: string; options: { id: string; label: string; option_text: string }[] };
 export type AdaptivePayload = {
     delivery_mode: 'adaptive'; candidate: { full_name: string; registration_number: string };
     exam: { title: string; instructions: string; settings: { require_fullscreen: boolean; require_webcam: boolean; monitor_screenshots: boolean } };
     attempt: { id: string; status: string }; level: number; is_practice: boolean; state_version: number;
-    current_item: Item | null; selected_option_ids: string[]; remaining_time: number; committed_questions: number;
+    current_item: Item | null; selected_option_ids: string[]; remaining_time: number; committed_questions: number; total_questions: number; is_last_question: boolean;
     submitted: boolean; stop_reason: string | null; can_start: boolean; starts_in_seconds: number; exam_token?: string;
     recovery: { can_start: boolean; can_practice: boolean; penalty_percent: number; message: string; available_at: string | null };
+    learning_progress?: {earned_marks:string;original_marks:string;remaining_marks:string;levels:{number:number;score:string;available_marks:string;penalty_marks:string}[];areas:{name:string;status:string}[]} | null;
     result: { score: string; total_marks: string } | null;
 };
 type Pending = { path: string; body: Record<string, unknown>; token: string; attemptId: string };
@@ -26,6 +29,12 @@ function session(): Session {
     const payload = JSON.parse(localStorage.getItem('alignex_exam_payload') || 'null');
     if (!payload || payload.delivery_mode !== 'adaptive') throw new Error('Please log in again.');
     return { payload, token: localStorage.getItem('alignex_exam_token') || '' };
+}
+function operationId() {
+    if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+    const bytes = new Uint8Array(16);
+    window.crypto.getRandomValues(bytes);
+    return Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('');
 }
 function fingerprint() { return localStorage.getItem('alignex_device_fingerprint') || ''; }
 function persist(value: Session) {
@@ -70,6 +79,8 @@ export default function AdaptiveExam() {
     const stream = useRef<MediaStream | null>(null);
     const video = useRef<HTMLVideoElement | null>(null);
     const heading = useRef<HTMLHeadingElement | null>(null);
+    const errorAlert = useRef<HTMLDivElement | null>(null);
+    useEffect(() => { if (error) errorAlert.current?.focus(); }, [error]);
     const expiryRequested = useRef(false);
 
     const accept = useCallback((next: AdaptivePayload) => {
@@ -236,12 +247,14 @@ export default function AdaptiveExam() {
         if (!payload?.current_item || !controlsReady || remaining <= 0) return;
         if (commit && selected.length === 0 && !window.confirm('Continue without answering? This question cannot be revisited.')) return;
         void mutate('answer', { question_id: payload.current_item.question_id, selected_option_ids: selected, state_version: payload.state_version,
-            commit, ...(commit ? { idempotency_key: crypto.randomUUID() } : {}) });
+            commit, ...(commit ? { idempotency_key: operationId() } : {}) });
     };
-    const nextLevel = (practice: boolean) => {
-        if (!window.confirm(practice ? 'Start unscored practice? It cannot increase your score.' :
-            'Start the next recovery level? It deducts ' + payload?.recovery.penalty_percent + '% of remaining recoverable marks. Previously earned marks are retained.')) return;
-        void mutate('next-level', { practice, idempotency_key: crypto.randomUUID() });
+    const nextLevel = async (practice: boolean) => {
+        try {
+            await mutate('next-level', { practice, idempotency_key: operationId() });
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Unable to start the next level. Refresh the exam state and try again.');
+        }
     };
     const disabled = busy || Boolean(pending) || otherTab;
     return <main className="min-h-screen bg-slate-50 px-4 py-8 text-slate-900">
@@ -251,7 +264,7 @@ export default function AdaptiveExam() {
                 <h1 className="mt-1 text-2xl font-bold">{payload?.exam.title || 'Restoring your exam'}</h1>
                 {payload && <p className="mt-2 text-sm">{payload.candidate.full_name} · {payload.candidate.registration_number} · Level {payload.level}{payload.is_practice ? ' · Unscored practice' : ''}</p>}
             </header>
-            {error && <div role="alert" className="rounded-md border border-red-300 bg-red-50 p-4">{error}</div>}
+            {error && <div ref={errorAlert} tabIndex={-1} role="alert" className="rounded-md border border-red-300 bg-red-50 p-4">{error}</div>}
             {notice && <p role="status" className="text-primary">{notice}</p>}
             {otherTab && <div role="alert" className="rounded-md border border-amber-300 bg-amber-50 p-4">This exam changed in another tab. Refresh its server state before continuing.</div>}
             <div className="flex flex-wrap gap-3">
@@ -268,11 +281,34 @@ export default function AdaptiveExam() {
                         : payload.stop_reason === 'supervisor_end' ? 'Your supervisor ended this level. Your committed responses were finalized.'
                         : payload.stop_reason === 'pool_exhausted' ? 'No eligible questions remain. Your committed responses were finalized; contact your supervisor.'
                         : 'Your committed responses have been finalized.'}</p>
-                    {payload.result ? <p className="text-lg font-semibold">Released aggregate result: {payload.result.score} / {payload.result.total_marks}</p> : <p>Scores remain hidden until the aggregate result is ready and released.</p>}
+                    {payload.learning_progress && <div className="space-y-4">
+                        <h3 className="text-lg font-semibold">Your progress</h3>
+                        <p>You have earned {payload.learning_progress.earned_marks} of {payload.learning_progress.original_marks} marks so far. {payload.learning_progress.remaining_marks} marks remain available to improve.</p>
+                        <AdaptiveImprovementChart progress={payload.learning_progress} />
+                        <table className="w-full text-left"><thead><tr><th>Level</th><th>Marks earned</th><th>Available marks</th><th>Deduction for this level</th></tr></thead><tbody>
+                            {payload.learning_progress.levels.map(row=><tr key={row.number}><td>{row.number}</td><td>{row.score}</td><td>{row.available_marks}</td><td>{row.penalty_marks}</td></tr>)}
+                        </tbody></table>
+                        <h3 className="text-lg font-semibold">Strengths and areas to improve</h3>
+                        <ul>{payload.learning_progress.areas.map((area,index)=><li key={index}>{area.name}: {area.status}</li>)}</ul>
+                        {payload.recovery.can_start && <p>Your next level uses new questions from the areas you need to improve. Your earned marks are kept.</p>}
+                    </div>}
+                    {payload.result ? <p className="text-lg font-semibold">Released aggregate result: {payload.result.score} / {payload.result.total_marks}</p> : <p>{payload.learning_progress ? 'Your final result will be available when the organizer releases it.' : 'Scores remain hidden until the aggregate result is ready and released.'}</p>}
                     <p>{payload.recovery.message}</p>
                     {payload.recovery.available_at && <p className="text-sm">Recovery available from {new Date(payload.recovery.available_at).toLocaleString()}.</p>}
-                    {payload.recovery.can_start && <Button disabled={disabled} onClick={() => nextLevel(false)}>Start recovery level</Button>}
-                    {payload.recovery.can_practice && <Button disabled={disabled} onClick={() => nextLevel(true)}>Start unscored practice</Button>}
+                    {payload.recovery.can_start && <ConfirmDialog
+                        trigger={<Button disabled={disabled}>{busy ? 'Starting next level…' : 'Start next level'}</Button>}
+                        title="Start your next level?"
+                        description={`This level focuses on areas to improve. It deducts ${payload.recovery.penalty_percent}% from the remaining available marks. Marks already earned are kept. The timer starts when you continue.`}
+                        confirmLabel="Begin next level"
+                        onConfirm={() => nextLevel(false)}
+                    />}
+                    {payload.recovery.can_practice && <ConfirmDialog
+                        trigger={<Button disabled={disabled}>Start unscored practice</Button>}
+                        title="Start unscored practice?"
+                        description="This practice level helps you work on weaker areas. It cannot increase your score. The timer starts when you continue."
+                        confirmLabel="Begin practice"
+                        onConfirm={() => nextLevel(true)}
+                    />}
                 </section> : payload.attempt.status === 'not_started' ? <section className="space-y-4 rounded-lg border bg-white p-6">
                     <h2 className="text-xl font-bold">Before you begin</h2><p>{payload.exam.instructions}</p><p>The server finishes each level according to its area coverage and question limits. The questions you receive may differ from another candidate's.</p>
                     <p>Drafts can be changed until you confirm. Reconnecting or refreshing does not begin another level. Closing the browser does not stop the server timer.</p>
@@ -280,7 +316,7 @@ export default function AdaptiveExam() {
                     {!controlsReady && <Button disabled={disabled} onClick={() => void prepareControls()}>Enable required exam controls</Button>}
                     <Button disabled={disabled || !controlsReady || !payload.can_start} onClick={() => void mutate('start')}>{busy ? 'Starting…' : 'Start adaptive exam'}</Button>
                 </section> : <section className="space-y-5 rounded-lg border bg-white p-6">
-                    <div className="flex justify-between gap-3"><p>{payload.committed_questions} responses confirmed</p><p aria-label="Time remaining" className="font-mono font-bold">{clock(remaining)}</p></div>
+                    <div className="flex justify-between gap-3"><p>{payload.committed_questions} of {payload.total_questions} responses confirmed</p><p aria-label="Time remaining" className="font-mono font-bold">{clock(remaining)}</p></div>
                     {!controlsReady && <div role="alert"><p>Restore the required exam controls to continue.</p><Button onClick={() => void prepareControls()}>Restore exam controls</Button></div>}
                     {payload.current_item ? <>
                         <h2 ref={heading} tabIndex={-1} className="text-xl font-semibold">{payload.current_item.question_text}</h2>
@@ -297,10 +333,9 @@ export default function AdaptiveExam() {
                         <p className="text-sm text-slate-600">Confirmation is final. You cannot return to a confirmed question.</p>
                         <div className="flex flex-wrap gap-3">
                             <Button variant="secondary" disabled={disabled || !controlsReady || remaining <= 0} onClick={() => answer(false)}>Save draft</Button>
-                            <Button disabled={disabled || !controlsReady || remaining <= 0} onClick={() => answer(true)}>{busy ? 'Saving…' : 'Confirm and continue'}</Button>
+                            <Button disabled={disabled || !controlsReady || remaining <= 0} onClick={() => answer(true)}>{busy ? 'Saving…' : payload.is_last_question ? 'Finish level' : 'Confirm and continue'}</Button>
                         </div>
                     </> : <p role="status">No current question is available. Refresh the server state or contact your supervisor.</p>}
-                    <Button variant="secondary" disabled={disabled} onClick={() => { if (window.confirm('Finish this level now? An unconfirmed draft earns no marks.')) void mutate('submit'); }}>Finish level</Button>
                 </section>}
             </>}
             <Button variant="ghost" disabled={busy || Boolean(pending)} onClick={() => {

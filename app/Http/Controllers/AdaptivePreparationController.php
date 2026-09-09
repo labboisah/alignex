@@ -34,6 +34,6 @@ class AdaptivePreparationController extends Controller
     {
         $snapshot = $service->prepare($exam, $request->user()->id);
 
-        return back()->with('success', 'Adaptive snapshot version '.$snapshot->version.' saved. Delivery requires explicit pilot approval for this owner and exam.');
+        return back()->with('success', $snapshot->ready ? 'Your questions are ready.' : 'Some questions need attention. Review the list below.');
     }
 }

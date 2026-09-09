@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AdaptivePilotControl;
 use App\Models\Candidate;
 use App\Models\CandidateExamAttempt;
 use App\Models\CandidatePaper;
@@ -56,9 +57,7 @@ class AdaptiveOfflineBoundaryTest extends TestCase
     {
         [$attempt] = $this->fixture(false);
         $exam = $attempt->exam;
-        config(['adaptive.pilot_enabled' => true,
-            'adaptive.pilot_owners' => [app(AdaptiveRolloutService::class)->ownerKey($exam)],
-            'adaptive.pilot_exams' => [$exam->id]]);
+        AdaptivePilotControl::create(['exam_id' => $exam->id, 'owner_key' => app(AdaptiveRolloutService::class)->ownerKey($exam), 'online_enabled' => true, 'offline_enabled' => false, 'purpose' => 'Boundary test diagnostic cohort.', 'updated_by' => $exam->created_by]);
         $this->assertTrue(app(AdaptiveRolloutService::class)->status($exam)['can_publish']);
         $this->syncAdmin();
         $this->getJson('/api/offline/exam-packages/'.$exam->code)->assertUnprocessable()
@@ -107,12 +106,10 @@ class AdaptiveOfflineBoundaryTest extends TestCase
     {
         [$attempt, $snapshot] = $this->fixture(false);
         $exam = $attempt->exam;
-        config(['adaptive.pilot_enabled' => true,
-            'adaptive.pilot_owners' => [app(AdaptiveRolloutService::class)->ownerKey($exam)],
-            'adaptive.pilot_exams' => [$exam->id]]);
+        AdaptivePilotControl::create(['exam_id' => $exam->id, 'owner_key' => app(AdaptiveRolloutService::class)->ownerKey($exam), 'online_enabled' => true, 'offline_enabled' => false, 'purpose' => 'Boundary test diagnostic cohort.', 'updated_by' => $exam->created_by]);
         $state = $this->start($attempt);
         $deadline = $attempt->fresh()->server_due_at->toISOString();
-        config(['adaptive.pilot_exams' => []]);
+        AdaptivePilotControl::where('exam_id', $exam->id)->update(['online_enabled' => false]);
         $this->commit($attempt, $state, true, 'after-rollout-pause');
         $this->assertSame($deadline, $attempt->fresh()->server_due_at->toISOString());
         $this->assertSame('adaptive', $exam->fresh()->effectiveMode());

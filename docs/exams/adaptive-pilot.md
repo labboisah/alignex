@@ -1,5 +1,22 @@
 # Adaptive diagnostic pilot runbook
 
+## Simplified setup and learning feedback — 9 September 2026
+
+Choose Adaptive when creating an Assessment or Practice exam. The normal exam form now handles activation and question preparation internally; organizers do not need to approve a pilot, create snapshots, or configure a shadow engine.
+
+The learning settings offer additional levels (on by default for new adaptive exams), maximum levels, a percentage deduction from remaining marks, an area completion target, time per level, waiting time, and the final date for further levels. Internal defaults handle selection policy, question quotas and minimum evidence. The normal exam duration and end time supply defaults. Traditional CBT retains its existing behavior.
+
+Saving automatically checks the approved question pool and freezes its internal version. Drafts may retain readiness problems; active/scheduled exams must pass before the save succeeds. Missing questions are reported during setup. Creation and preparation run in the same transaction. Offline/hybrid organizers use **Center delivery** to assign a prepared package without another approval form.
+
+New exams offer completed-level feedback by default, with a plain-language checkbox to turn it off. It includes per-level earned/available marks and deductions, cumulative earned marks, strengths, and areas needing practice. The current level must end before feedback is sent. Item keys, individual answer correctness and future questions remain hidden. A **Start next level** action appears when weaker areas, marks, fresh questions, time and level limits permit. Final result release remains separate.
+
+Previous frozen snapshots retain their feedback choice; missing feedback settings stay private. Completed traditional attempts cannot be retroactively turned into adaptive levels. The locally inspected completed exam had one attempt, no adaptive state and an unready question snapshot; a fresh adaptive exam is needed to test the corrected flow. Existing responses and marks were not rewritten.
+
+The advanced engine, audit records, delivery reservations and operational controls remain internal. This change does not enable consequential calibrated scoring.
+
+The sections below document internal operations and the earlier pilot rollout. Any earlier manual approval/preparation instructions are superseded by the automatic exam-save workflow above.
+
+
 Updated: 8 September 2026.
 
 ## Scope and delivery
@@ -17,7 +34,9 @@ Online delivery retains the Laravel simple-v1/recovery-v1 lifecycle. Offline del
 5. Create a separate adaptive assessment/practice exam, configure dates, objective questions, areas and recovery policy, assign active candidates, and prepare a ready immutable snapshot. Ensure fresh questions cover every level.
 6. Open the exam's Adaptive Preparation page, then the pilot controls link. Record the purpose/cohort limits and explicitly acknowledge diagnostic-only use. Enable only the delivery modes required.
 
-Per-exam controls override legacy environment allowlists when a control record exists. Missing records retain the old allowlist behavior. Nothing automatically approves a live exam. All five owners require their own authorized exam; a center hosting candidates does not gain another owner's administrative access.
+Adaptive delivery controls are stored exclusively in adaptive_pilot_controls, scoped to the exam and its exact owner. Set them while creating/editing an adaptive exam, or later on its pilot page. New records default to disabled; missing records never fall back to environment allowlists. Existing database approvals are preserved when a request omits these controls. Enabling delivery requires diagnostic acknowledgement and authorized access. Traditional exam forms do not persist adaptive controls.
+
+Only system-wide settings remain in .env: ADAPTIVE_ENGINE_SHADOW_ENABLED, ADAPTIVE_ENGINE_URL, ADAPTIVE_ENGINE_SECRET, ADAPTIVE_PILOT_NODE and ADAPTIVE_PILOT_EMERGENCY_STOP. ADAPTIVE_PILOT_ENABLED, ADAPTIVE_PILOT_OWNERS and ADAPTIVE_PILOT_EXAMS are retired and ignored by runtime checks. Existing started levels retain their original state during a pause. All five owners require their own authorized exam; a center hosting candidates does not gain another owner's administrative access.
 
 ## Online session
 
@@ -92,3 +111,5 @@ npx.cmd tsc --noEmit
 ~~~
 
 These are development and isolated integration checks. They do not substitute for target-hardware rehearsal, installed-release distribution or assessment validity evidence.
+
+Deployment note: if another installation still relies on environment-only approvals, save the equivalent approvals through its existing pilot page before upgrading. After this change, an exam without a matching database record cannot start, regardless of old environment values. The local configuration transition found no environment-only approvals to transfer.

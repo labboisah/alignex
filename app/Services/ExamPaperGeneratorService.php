@@ -79,6 +79,9 @@ class ExamPaperGeneratorService
      */
     public function generate(Exam $exam): array
     {
+        if ($exam->effectiveMode() === Exam::MODE_ADAPTIVE) {
+            throw ValidationException::withMessages(['exam' => 'Adaptive questions are prepared automatically when candidates log in. Fixed paper generation is only needed for traditional exams.']);
+        }
         app(AdaptiveRolloutService::class)->ensureDeliveryAllowed($exam);
 
         if (! $this->canGenerate($exam)) {
@@ -164,6 +167,9 @@ class ExamPaperGeneratorService
 
     private function canGenerate(Exam $exam): bool
     {
+        if ($exam->effectiveMode() === Exam::MODE_ADAPTIVE) {
+            return false;
+        }
         if ($exam->starts_at && now()->greaterThanOrEqualTo($exam->starts_at)) {
             return false;
         }

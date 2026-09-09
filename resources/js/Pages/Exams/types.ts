@@ -62,6 +62,7 @@ export type ExamSettings = {
     allow_retake: boolean;
     certificate_auto_generate?: boolean;
     attempt_limit?: number | string;
+    adaptive_show_level_feedback?: boolean;
     adaptive_start_difficulty?: string;
     adaptive_step_policy?: string;
     adaptive_min_questions?: number | string;

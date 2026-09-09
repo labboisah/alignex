@@ -41,6 +41,7 @@ type ExamFormData = {
     candidate_ids: string[];
     subjects: ExamSubject[];
     settings: ExamSettings;
+    adaptive_pilot: {online_enabled:boolean;offline_enabled:boolean;purpose:string;diagnostic_only:boolean};
 };
 
 const inputClass = 'mt-1 block w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm';
@@ -63,16 +64,19 @@ const defaultSettings: ExamSettings = {
     attempt_limit: 1,
     adaptive_start_difficulty: 'medium',
     adaptive_step_policy: 'simple',
+    progressive_remediation_enabled: true,
+    adaptive_show_level_feedback: true,
 };
 
 export function ExamWizard({ exam, subjects, organizations = [], schools = [], centers = [], secondarySchools = [], professionalSchools = [], cbtCenters = [], academicSessions = [], academicTerms = [], studentGroups = [], programmes = [], courses = [], modules = [], trainingBatches = [], participantCandidates = [], cbtCandidates = [], questionGroups = [], candidateGroups = [], questionBanks = [], examTypes, examCategories = [], modes, deliveryModes, statuses, submitLabel }: { exam?: Exam; subjects: { data: SubjectOption[] }; organizations?: TenantOption[]; schools?: TenantOption[]; centers?: TenantOption[]; secondarySchools?: TenantOption[]; professionalSchools?: TenantOption[]; cbtCenters?: TenantOption[]; academicSessions?: TenantOption[]; academicTerms?: TenantOption[]; studentGroups?: TenantOption[]; programmes?: TenantOption[]; courses?: TenantOption[]; modules?: TenantOption[]; trainingBatches?: TenantOption[]; participantCandidates?: TenantOption[]; cbtCandidates?: TenantOption[]; questionGroups?: TenantOption[]; candidateGroups?: TenantOption[]; questionBanks?: TenantOption[]; examTypes: SelectOption[]; examCategories?: SelectOption[]; modes: SelectOption[]; deliveryModes: SelectOption[]; statuses: SelectOption[]; submitLabel: string }) {
     const [step, setStep] = useState(1);
+    const adaptiveControl = usePage().props.adaptive_control as {online_enabled:boolean;offline_enabled:boolean;purpose:string} | null | undefined;
     const adaptiveNotice = usePage().props.adaptive_notice as string | undefined;
     const auth = usePage().props.auth as { user?: { role?: string } };
     const isAssessmentRole = auth.user?.role === 'teacher' || auth.user?.role === 'facilitator';
     const currentContext = (usePage().props.current_context ?? null) as CurrentContext | null;
     const inferredContext = contextFrom(exam, currentContext, { organizations, secondarySchools, professionalSchools, cbtCenters, academicSessions, programmes, courses, cbtCandidates, questionBanks });
-    const { data, setData, post, patch, processing, errors } = useForm<ExamFormData>({
+    const { data, setData, post, patch, processing, errors, transform } = useForm<ExamFormData>({
         exam_owner_type: inferredContext.type,
         organization_id: exam?.organization_id ? String(exam.organization_id) : inferredContext.organization_id,
         institution_id: exam?.institution_id ? String(exam.institution_id) : inferredContext.institution_id,
@@ -107,6 +111,7 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
         candidate_ids: exam?.candidate_ids ?? [],
         subjects: exam?.subjects?.length ? exam.subjects : [emptyPaperRow()],
         settings: { ...defaultSettings, ...(exam?.settings ?? {}) },
+        adaptive_pilot: {online_enabled:adaptiveControl?.online_enabled ?? false,offline_enabled:adaptiveControl?.offline_enabled ?? false,purpose:adaptiveControl?.purpose ?? '',diagnostic_only:false},
     });
 
     const totals = useMemo(() => {
@@ -147,6 +152,14 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
 
     const submit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
+        transform(values => {
+            const {adaptive_pilot,...rest}=values;
+            const count=values.subjects.reduce((sum,row)=>sum+Number(row.number_of_questions||0),0);
+            return {...rest,settings:values.mode==='adaptive' ? {
+                ...values.settings,
+                ...(values.settings.progressive_remediation_enabled !== false ? {adaptive_min_questions:count,adaptive_max_questions:count} : {}),
+            } : {...values.settings,progressive_remediation_enabled:false}};
+        });
         const options = { onError: (nextErrors: Record<string, string>) => setStep(stepForErrors(nextErrors)) };
         exam ? patch(`/exams/${exam.id}`, options) : post('/exams', options);
     };
@@ -580,7 +593,7 @@ function stepForErrors(errors: Record<string, string>) {
         return 2;
     }
 
-    if (keys.some((key) => key.startsWith('settings'))) {
+    if (keys.some((key) => key.startsWith('settings') || key.startsWith('adaptive_pilot'))) {
         return 3;
     }
 

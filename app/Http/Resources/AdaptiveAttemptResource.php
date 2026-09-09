@@ -51,6 +51,8 @@ class AdaptiveAttemptResource extends JsonResource
             'level' => (int) $level->number, 'is_practice' => $run?->is_practice ?? false,
             'state_version' => (int) $state->state_version, 'current_item' => $current, 'selected_option_ids' => $selected,
             'committed_questions' => AdaptiveResponse::where('level_id', $level->id)->whereNotNull('committed_at')->count(),
+            'total_questions' => (int) $attempt->total_questions,
+            'is_last_question' => $current !== null && $attempt->total_questions > 0 && $state->step >= $attempt->total_questions,
             'remaining_time' => $level->due_at ? max(0, (int) now()->diffInSeconds($level->due_at, false)) : 0,
             'server_now' => now()->toISOString(), 'stop_reason' => $state->stop_reason,
             'submitted' => in_array($level->status, ['submitted', 'closed'], true),

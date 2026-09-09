@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AdaptiveAttemptState;
 use App\Models\AdaptiveOfflinePackage;
 use App\Models\CandidateExamAttempt;
 use App\Models\Exam;
@@ -9,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 
 class AdaptiveRolloutService
 {
-    public const MESSAGE = 'Adaptive practice requires an enabled pilot, an approved owner and exam, and online assessment/practice delivery. Existing started attempts retain their original delivery.';
+    public const MESSAGE = 'This adaptive exam is not open for new levels. Check its availability and delivery settings. Existing started levels keep their original time and answers.';
 
     public function isAdaptive(Exam $exam): bool
     {
@@ -36,22 +37,20 @@ class AdaptiveRolloutService
     {
         $pilot = app(AdaptivePilotService::class)->control($exam);
         $approved = $pilot?->online_enabled ?? false;
-        $enabled = $pilot ? $approved : (bool) config('adaptive.pilot_enabled', false);
-        $allowlisted = in_array($this->ownerKey($exam), config('adaptive.pilot_owners', []), true);
+        $enabled = $approved;
         $categoryEligible = in_array($exam->exam_category, [Exam::CATEGORY_ASSESSMENT, Exam::CATEGORY_PRACTICE], true)
             && in_array($exam->effectiveOwnerType(), [Exam::OWNER_ORGANIZATION, Exam::OWNER_INSTITUTION, Exam::OWNER_PROFESSIONAL_SCHOOL, Exam::OWNER_CBT_CENTER, Exam::OWNER_SECONDARY_SCHOOL], true);
         $runtimeReady = true; // Online descriptive diagnostics only; not validated ability scoring.
-        $examAllowlisted = $exam->id && in_array((string) $exam->id, config('adaptive.pilot_exams', []), true);
-        $online = $exam->delivery_mode === 'online';
+        $online = in_array($exam->delivery_mode, ['online', 'hybrid'], true);
 
         return [
             'pilot_enabled' => $enabled,
-            'owner_allowlisted' => $approved || $allowlisted,
+            'owner_allowlisted' => $pilot !== null,
             'category_eligible' => $categoryEligible,
             'runtime_ready' => $runtimeReady,
-            'exam_allowlisted' => $approved || (bool) $examAllowlisted,
+            'exam_allowlisted' => $approved,
             'online_eligible' => $online,
-            'can_publish' => ! config('adaptive.pilot_emergency_stop', false) && $enabled && ($approved || ($allowlisted && $examAllowlisted)) && $categoryEligible && $online && $runtimeReady,
+            'can_publish' => ! config('adaptive.pilot_emergency_stop', false) && $enabled && $categoryEligible && $online && $runtimeReady,
             'message' => self::MESSAGE,
         ];
     }
@@ -70,10 +69,13 @@ class AdaptiveRolloutService
             return;
         }
 
+        if ($this->isAdaptive($attempt->exam) && ! AdaptiveAttemptState::where('attempt_id', $attempt->id)->exists()) {
+            throw ValidationException::withMessages(['exam' => 'This candidate has no adaptive level prepared. Ask the organizer to check the exam setup.']);
+        }
         $this->ensureDeliveryAllowed($attempt->exam);
     }
 
-    public function ensureSaveAllowed(Exam $proposed, ?Exam $existing): void
+    public function ensureSaveAllowed(Exam $proposed, ?Exam $existing, bool $checkPublication = true): void
     {
         if ($existing && AdaptiveOfflinePackage::where('exam_id', $existing->id)->exists()) {
             throw ValidationException::withMessages(['exam' => 'An offline package has frozen this exam. Create another exam for changed configuration.']);
@@ -83,7 +85,7 @@ class AdaptiveRolloutService
             throw ValidationException::withMessages(['exam' => 'An exam with started attempts cannot be changed to or edited in adaptive mode. Its existing paper and scoring are preserved.']);
         }
 
-        if ($this->isAdaptive($proposed) && in_array($proposed->status, [Exam::STATUS_SCHEDULED, Exam::STATUS_ACTIVE], true)) {
+        if ($checkPublication && $this->isAdaptive($proposed) && in_array($proposed->status, [Exam::STATUS_SCHEDULED, Exam::STATUS_ACTIVE], true)) {
             $proposed = clone $proposed;
             $proposed->setAttribute('id', $existing?->id);
             $status = $this->status($proposed);
