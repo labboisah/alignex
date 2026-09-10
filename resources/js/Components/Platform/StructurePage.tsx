@@ -1,11 +1,12 @@
+import { type FilterCatalog } from '@/Components/Platform/RecordFilters';
 import { Head, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { DataTable, PageHeader, PortalAppShell } from '@/Components/Platform';
 import { RecordEditor, statusField, type EditField } from '@/Components/Platform/RecordEditor';
 import { Button } from '@/Components/ui/button';
 
-export default function StructurePage({ title, path, owner, rows, fields, defaults, canManage = true }: {
-    title: string; path: string; owner: string; rows: Record<string, any>[]; fields: EditField[]; defaults: Record<string, any>; canManage?: boolean;
+export default function StructurePage({ title, path, owner, rows, fields, defaults, filterCatalog, canManage = true }: {
+    title: string; path: string; owner: string; rows: Record<string, any>[]; fields: EditField[]; defaults: Record<string, any>; canManage?: boolean; filterCatalog?: FilterCatalog;
 }) {
     const [editing, setEditing] = useState<Record<string,any> | null>(null);
     const errors = usePage().props.errors as Record<string,string>;
@@ -14,7 +15,7 @@ export default function StructurePage({ title, path, owner, rows, fields, defaul
         {canManage && <RecordEditor key={editing?.id ?? 'new'} title={editing ? 'Edit '+title : 'New '+title} path={editing ? path+'/'+editing.id : path}
             method={editing ? 'patch' : 'post'} values={editing ? Object.fromEntries(Object.keys(defaults).map(key=>[key,editing[key] ?? defaults[key]])) : defaults}
             fields={[...fields,statusField]} onCancel={editing ? ()=>setEditing(null) : undefined} />}
-        <DataTable filterable rows={rows} emptyTitle={'No '+title.toLowerCase()} columns={[
+        <DataTable filterable filterCatalog={filterCatalog ?? Object.fromEntries(fields.filter(field => field.name.endsWith('_id') && field.options).map(field => [field.name.slice(0, -3), field.options!.map(option => ({id: option.value, name: option.label}))]))} rows={rows} emptyTitle={'No '+title.toLowerCase()} columns={[
             {key:'name',header:'Name'},{key:'code',header:'Code'},
             ...fields.filter(field => field.name.endsWith('_id') && field.options).map(field => ({key:field.name,header:field.label,render:(row:any)=>field.options?.find(option=>option.value===String(row[field.name]))?.label ?? 'N/A'})),
             {key:'status',header:'Status'},

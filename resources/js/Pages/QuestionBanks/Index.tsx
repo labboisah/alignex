@@ -7,10 +7,11 @@ import { QuestionBank } from './types';
 
 type Props = {
     questionBanks: { data: QuestionBank[] };
+    filterProgrammes?: any[]; importCourses?: any[]; importModules?: any[]; filterSubjects?: any[];
     can: { create: boolean };
 };
 
-export default function QuestionBanksIndex({ questionBanks, can }: Props) {
+export default function QuestionBanksIndex({ questionBanks, can, filterProgrammes = [], importCourses = [], importModules = [], filterSubjects = [] }: Props) {
     const currentContext = usePage().props.current_context as { type?: string } | undefined;
     const isProfessional = currentContext?.type === 'professional_school' || questionBanks.data.some((bank) => bank.professional_school_id);
     const isInstitution = currentContext?.type === 'institution' || questionBanks.data.some((bank) => bank.institution_id);
@@ -36,7 +37,7 @@ export default function QuestionBanksIndex({ questionBanks, can }: Props) {
 
             {!isInstitution && <BulkTools templateHref="/question-bank/template" uploadHref="/question-bank/import" />}
 
-            <DataTable<QuestionBank> filterable
+            <DataTable<QuestionBank> filterable filterCatalog={{programme: filterProgrammes, course: importCourses, module: importModules, subject: filterSubjects}}
                 rows={questionBanks.data}
                 emptyTitle="No question banks found"
                 columns={[

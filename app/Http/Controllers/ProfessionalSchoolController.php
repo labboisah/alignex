@@ -538,7 +538,6 @@ class ProfessionalSchoolController extends Controller
         $this->authorizeRecord($request->user(), $professionalSchool);
         $questionBankScope = fn (Builder $query) => $this->scopeFacilitatorQuestionBanks($query->where('professional_school_id', $professionalSchool->id), $request->user());
         $bankQuery = $professionalSchool->questionBanks()
-            ->whereIn('status', [QuestionBank::STATUS_ACTIVE, QuestionBank::STATUS_DRAFT])
             ->with(['course:id,name', 'module:id,name'])
             ->orderBy('name');
         $this->scopeFacilitatorQuestionBanks($bankQuery, $request->user());

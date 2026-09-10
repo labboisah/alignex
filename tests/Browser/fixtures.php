@@ -101,8 +101,8 @@ function browserFixture(array $input): array
 
     if (($input['management_filters'] ?? false) && $type === 'professional_school') {
         $emptyProgramme = Programme::create(['professional_school_id' => $ownerId, 'name' => 'Empty Programme', 'code' => 'EMPTY-P', 'status' => 'active']);
-        $emptyCourse = Course::create(['professional_school_id' => $ownerId, 'programme_id' => $emptyProgramme->id, 'name' => 'Course without bank', 'code' => 'EMPTY-C', 'status' => 'active']);
-        ProfessionalModule::create(['professional_school_id' => $ownerId, 'programme_id' => $emptyProgramme->id, 'course_id' => $emptyCourse->id, 'name' => 'Module without bank', 'code' => 'EMPTY-M', 'status' => 'active']);
+        $emptyCourse = Course::create(['professional_school_id' => $ownerId, 'programme_id' => $emptyProgramme->id, 'name' => 'Course without bank', 'code' => 'EMPTY-C', 'status' => 'inactive']);
+        ProfessionalModule::create(['professional_school_id' => $ownerId, 'programme_id' => $emptyProgramme->id, 'course_id' => $emptyCourse->id, 'name' => 'Module without bank', 'code' => 'EMPTY-M', 'status' => 'inactive']);
         $filterBanks = [];
         foreach ([1, 2] as $number) {
             $programme = Programme::create(['professional_school_id' => $ownerId, 'name' => "Filter Programme {$number}", 'code' => "FP{$number}", 'status' => 'active']);
@@ -113,6 +113,10 @@ function browserFixture(array $input): array
                 $filterBank->fill(['status' => $moduleNumber === 3 ? 'draft' : 'active', 'name' => "Filter Bank {$moduleNumber}", 'code' => "FB{$moduleNumber}", 'programme_id' => $programme->id, 'course_id' => $course->id, 'module_id' => $module->id])->save();
                 if ($moduleNumber !== 1) {
                     Question::factory()->create(['question_bank_id' => $filterBank->id, 'subject_id' => $subject->id, 'topic_id' => null, 'stem' => "Filter question {$moduleNumber}", 'status' => 'draft']);
+                }
+                if ($moduleNumber === 3) {
+                    $emptyBank = $filterBank->replicate();
+                    $emptyBank->fill(['name' => 'Empty draft bank', 'code' => 'EMPTY-DRAFT', 'status' => 'draft'])->save();
                 }
                 $filterBanks[] = $filterBank->id;
             }

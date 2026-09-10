@@ -31,7 +31,20 @@ class QuestionBankController extends Controller
     {
         Gate::authorize('viewAny', QuestionBank::class);
 
+        $context = app(CurrentContextService::class)->current($request->user());
+        $filterSubjects = $this->scopedSubjects($request);
+        if (($context['type'] ?? null) === 'institution') {
+            $filterSubjects->whereRaw('1 = 0');
+        } elseif ($context) {
+            $filterSubjects->where($context['type'].'_id', $context['id']);
+            if ($context['type'] === 'organization') {
+                $filterSubjects->whereNull('secondary_school_id')->whereNull('professional_school_id')->whereNull('cbt_center_id');
+            }
+        }
+
         return Inertia::render('QuestionBanks/Index', [
+            ...app(\App\Services\QuestionImportHierarchyService::class)->options($request->user()),
+            'filterSubjects' => $filterSubjects->orderBy('name')->get(['id', 'name']),
             'questionBanks' => QuestionBankResource::collection(
                 $this->scopedQuestionBanks($request)
                     ->with(['organization', 'institution', 'faculty', 'department', 'school', 'center', 'subject', 'secondarySchool', 'professionalSchool', 'cbtCenter', 'programme', 'course', 'module'])

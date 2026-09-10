@@ -229,3 +229,16 @@ The import picker now receives active, authorized courses and modules independen
 Professional import now includes Active and Draft banks. A bankless course/module remains selectable and displays a message explaining that a matching bank must be created or access checked. No bank is automatically created, activated or approved. Owner and facilitator assignment scoping remains enforced.
 
 Verification: 12 regression tests passed together, and the assignment/owner-isolation regression passed on its final rerun after repairing its test fixture (13 passing checks total). The browser test covered bankless hierarchy on both import pages and a real CSV import into a Draft bank. Production and browser builds passed.
+
+### Management filter visibility correction ? 10 September 2026
+
+Management filters now combine the loaded records with independent, authorized hierarchy choices. Empty programmes, courses, modules and question banks remain selectable; a selection with no children displays zero matching records and keeps the filter controls available. Draft records are included by default, and status choices remain available when another filter produces no matches.
+
+- Professional structure and bank screens use their complete scoped parent lists. Institution course filters include programmes without courses.
+- Shared bank filters receive independent programmes, courses, modules and subjects. Both question screens include accessible banks even when those banks contain no questions.
+- Upload course/module choices include inactive records, and the professional bank selector includes Draft, Active and Archived banks. These are management choices; examination question eligibility and approval requirements are unchanged.
+- Shared question rows expose course/module IDs for reliable filtering, including when different records have the same name.
+- Ownership, context and facilitator-assignment restrictions remain in force. Clearing filters restores the supplied list; soft-deleted records are not restored.
+- Filtering remains client-side over the supplied scoped records; this change does not introduce server pagination.
+
+Validation: the initial 14 backend regression tests and the final 15 professional/institution/question-bank checks passed. The browser regression passed across hierarchy lists, empty/inactive selections, empty Draft banks, Draft questions, bulk selection and both CSV upload flows. Production and browser assets were rebuilt.

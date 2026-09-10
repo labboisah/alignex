@@ -58,7 +58,7 @@ export default function QuestionBanks({ professionalSchool, programmes, courses,
                     <Field label="Description" error={errors.description}><textarea rows={3} className={inputClass} value={data.description} onChange={(event) => setData('description', event.target.value)} /></Field>
                 </FormSection>
             </form>
-            <DataTable filterable rows={questionBanks} emptyTitle="No question banks" columns={[
+            <DataTable filterable filterCatalog={{programme: programmes, course: courses, module: modules, subject: subjects}} rows={questionBanks} emptyTitle="No question banks" columns={[
                 { key: 'name', header: 'Name' },
                 { key: 'programme', header: 'Programme', render: (row: any) => row.programme?.name ?? 'N/A' },
                 { key: 'course', header: 'Course', render: (row: any) => row.course?.name ?? 'N/A' },

@@ -1,4 +1,4 @@
-import { useRecordFilters } from './RecordFilters';
+import { useRecordFilters, type FilterCatalog } from './RecordFilters';
 import { ReactNode } from 'react';
 import { EmptyState } from './EmptyState';
 import { LoadingState } from './LoadingState';
@@ -11,8 +11,8 @@ export type DataTableColumn<T> = {
     className?: string;
 };
 
-export function DataTable<T extends Record<string, unknown>>({ columns, rows: sourceRows, filterable = false, loading = false, emptyTitle = 'No records found', className }: { columns: DataTableColumn<T>[]; rows: T[]; filterable?: boolean; loading?: boolean; emptyTitle?: string; className?: string }) {
-    const filters = useRecordFilters(sourceRows, filterable);
+export function DataTable<T extends Record<string, unknown>>({ columns, rows: sourceRows, filterable = false, filterCatalog = {}, loading = false, emptyTitle = 'No records found', className }: { columns: DataTableColumn<T>[]; rows: T[]; filterable?: boolean; filterCatalog?: FilterCatalog; loading?: boolean; emptyTitle?: string; className?: string }) {
+    const filters = useRecordFilters(sourceRows, filterable, filterCatalog);
     const rows = filterable ? filters.filteredRows : sourceRows;
     if (loading) {
         return <LoadingState message="Loading records..." />;

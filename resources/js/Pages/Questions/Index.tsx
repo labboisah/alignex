@@ -21,7 +21,7 @@ export default function QuestionsIndex({ questions, can, questionBanks, subjects
     const pageUrl = usePage().url;
     const [bankId, setBankId] = useState(() => new URLSearchParams(pageUrl.split('?')[1] ?? '').get('bank') ?? '');
     const bulk = useForm<{ question_ids: string[]; status: string }>({ question_ids: [], status: 'approved' });
-    const filters = useRecordFilters(questions.data.filter(question => !bankId || question.question_bank_id === bankId));
+    const filters = useRecordFilters(questions.data.filter(question => !bankId || question.question_bank_id === bankId), true, {course: importCourses, module: importModules, question_bank: questionBanks.data, subject: subjects.data});
     const visibleQuestions = filters.filteredRows;
     const eligible = visibleQuestions.filter(question => question.can?.update === true);
     const selectedIds = bulk.data.question_ids.filter(id => eligible.some(question => question.id === id));

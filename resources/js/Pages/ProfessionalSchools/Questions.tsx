@@ -43,7 +43,7 @@ export default function Questions({ professionalSchool, questions, questionBanks
                     )}
                 </FormSection>
             </form>
-            <DataTable filterable
+            <DataTable filterable filterCatalog={{course: importCourses, module: importModules, question_bank: questionBanks}}
                 rows={questions}
                 emptyTitle="No questions"
                 columns={[

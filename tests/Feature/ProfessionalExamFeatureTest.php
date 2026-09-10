@@ -400,6 +400,23 @@ class ProfessionalExamFeatureTest extends TestCase
             ->has('questionBanks', 1)->where('questionBanks.0.id', $bank->id));
     }
 
+    public function test_management_options_include_inactive_empty_hierarchy_and_archived_banks(): void
+    {
+        [$school, $programme, $course, $module, $subject] = $this->professionalHierarchy();
+        $course->update(['status' => 'inactive']);
+        $module->update(['status' => 'inactive']);
+        $admin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
+        $bank = QuestionBank::factory()->create(['organization_id' => null, 'professional_school_id' => $school->id,
+            'subject_id' => $subject->id, 'course_id' => $course->id, 'module_id' => $module->id, 'status' => 'archived']);
+        foreach (['/questions', '/question-bank', "/professional-schools/{$school->id}/questions"] as $url) {
+            $this->actingAs($admin)->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page
+                ->has('importCourses', 1)->where('importCourses.0.id', $course->id)
+                ->has('importModules', 1)->where('importModules.0.id', $module->id));
+        }
+        $this->get("/professional-schools/{$school->id}/questions")->assertInertia(fn (Assert $page) => $page
+            ->has('questionBanks', 1)->where('questionBanks.0.id', $bank->id)->has('questions', 0));
+    }
+
     public function test_import_hierarchy_is_limited_to_the_facilitators_assignments_and_owner(): void
     {
         [$school, $programme, $course, $module] = $this->professionalHierarchy();
