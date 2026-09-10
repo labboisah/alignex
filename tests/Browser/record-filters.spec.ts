@@ -30,6 +30,10 @@ test('hierarchy lists filter and both import screens choose the matching bank', 
     await expect(page.getByRole('cell',{name:'Filter Bank 3',exact:true})).toBeVisible();
     await expect(page.getByRole('cell',{name:'Filter Bank 1',exact:true})).toHaveCount(0);
     await page.goto('/questions');
+    await page.getByRole('combobox',{name:'Import course',exact:true}).selectOption({label:'Course without bank'});
+    await page.getByRole('combobox',{name:'Import module',exact:true}).selectOption({label:'Module without bank'});
+    await expect(page.getByText('No question banks match this selection.',{exact:false})).toBeVisible();
+    await expect(page.getByRole('combobox',{name:'Import question bank',exact:true}).locator('option')).toHaveCount(1);
     await page.getByRole('combobox',{name:'Filter course',exact:true}).selectOption({label:'Filter Course 1'});
     await page.getByRole('combobox',{name:'Filter module',exact:true}).selectOption({label:'Filter Module 2'});
     await expect(page.getByRole('cell',{name:'Filter question 2',exact:true})).toBeVisible();
@@ -52,6 +56,9 @@ test('hierarchy lists filter and both import screens choose the matching bank', 
     await page.getByRole('button',{name:'Upload',exact:true}).click();
     await expect(page.getByRole('cell',{name:'Global imported question',exact:true})).toBeVisible({timeout:30000});
     await page.goto(base+'/questions');
+    await page.getByRole('combobox',{name:'Import course',exact:true}).selectOption({label:'Course without bank'});
+    await page.getByRole('combobox',{name:'Import module',exact:true}).selectOption({label:'Module without bank'});
+    await expect(page.getByText('No question banks match this selection.',{exact:false})).toBeVisible();
     await page.getByRole('combobox',{name:'Import course',exact:true}).selectOption({label:'Filter Course 2'});
     await page.getByRole('combobox',{name:'Import module',exact:true}).selectOption({label:'Filter Module 3'});
     await page.getByRole('combobox',{name:'Import question bank',exact:true}).selectOption(data.filter_bank_ids[2]);

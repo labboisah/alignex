@@ -221,3 +221,11 @@ For question import:
 Changing course/subject clears module and bank choices; changing module clears the bank. The upload button requires a bank and file. The global form derives the subject from the chosen bank and retains optional topic selection where applicable. Both global and professional-school import routes retain their server-side owner/assignment checks.
 
 Verified with 14 backend regression tests and an end-to-end browser test covering hierarchy filtering, filtered bulk selection, stale-selection clearing, and real CSV imports into the chosen banks on both screens. Production and browser builds passed. No records were deleted or reassigned.
+
+### Upload course visibility correction
+
+The import picker now receives active, authorized courses and modules independently of question banks. Previously it inferred the hierarchy from banks, and the professional upload page included only Active banks. This hid active courses whose banks were Draft or absent.
+
+Professional import now includes Active and Draft banks. A bankless course/module remains selectable and displays a message explaining that a matching bank must be created or access checked. No bank is automatically created, activated or approved. Owner and facilitator assignment scoping remains enforced.
+
+Verification: 12 regression tests passed together, and the assignment/owner-isolation regression passed on its final rerun after repairing its test fixture (13 passing checks total). The browser test covered bankless hierarchy on both import pages and a real CSV import into a Draft bank. Production and browser builds passed.

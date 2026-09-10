@@ -1,4 +1,4 @@
-import QuestionBankPicker from '@/Components/Platform/QuestionBankPicker';
+import QuestionBankPicker, { type ImportCourse, type ImportModule } from '@/Components/Platform/QuestionBankPicker';
 import { useRecordFilters } from '@/Components/Platform/RecordFilters';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { Download, Eye, Pencil, Plus, Trash2, Upload } from 'lucide-react';
@@ -8,6 +8,8 @@ import { Button } from '@/Components/ui/button';
 import { Question, QuestionBankOption, SubjectOption, TopicOption } from './types';
 
 type Props = {
+    importCourses?: ImportCourse[];
+    importModules?: ImportModule[];
     questions: { data: Question[] };
     can: { create: boolean };
     questionBanks: { data: QuestionBankOption[] };
@@ -15,7 +17,7 @@ type Props = {
     topics: { data: TopicOption[] };
 };
 
-export default function QuestionsIndex({ questions, can, questionBanks, subjects, topics }: Props) {
+export default function QuestionsIndex({ questions, can, questionBanks, subjects, topics, importCourses = [], importModules = [] }: Props) {
     const pageUrl = usePage().url;
     const [bankId, setBankId] = useState(() => new URLSearchParams(pageUrl.split('?')[1] ?? '').get('bank') ?? '');
     const bulk = useForm<{ question_ids: string[]; status: string }>({ question_ids: [], status: 'approved' });
@@ -49,7 +51,7 @@ export default function QuestionsIndex({ questions, can, questionBanks, subjects
                 }
             />
 
-            <BulkTools templateHref="/questions/template" uploadHref="/questions/import" questionBanks={questionBanks} subjects={subjects} topics={topics} isSecondary={isSecondary} isInstitution={isInstitution} isProfessional={isProfessional} isCbt={isCbt} />
+            <BulkTools importCourses={importCourses} importModules={importModules} templateHref="/questions/template" uploadHref="/questions/import" questionBanks={questionBanks} subjects={subjects} topics={topics} isSecondary={isSecondary} isInstitution={isInstitution} isProfessional={isProfessional} isCbt={isCbt} />
 
             {filters.controls}
             <form aria-label="Update question statuses" className="mb-4 space-y-3 rounded-md border border-border bg-white p-4" onSubmit={event => {
@@ -119,7 +121,7 @@ export default function QuestionsIndex({ questions, can, questionBanks, subjects
     );
 }
 
-function BulkTools({ templateHref, uploadHref, questionBanks, topics, isSecondary, isInstitution, isProfessional, isCbt }: { templateHref: string; uploadHref: string; questionBanks: { data: QuestionBankOption[] }; subjects: { data: SubjectOption[] }; topics: { data: TopicOption[] }; isSecondary: boolean; isInstitution: boolean; isProfessional: boolean; isCbt: boolean }) {
+function BulkTools({ importCourses, importModules, templateHref, uploadHref, questionBanks, topics, isSecondary, isInstitution, isProfessional, isCbt }: { importCourses:ImportCourse[]; importModules:ImportModule[]; templateHref: string; uploadHref: string; questionBanks: { data: QuestionBankOption[] }; subjects: { data: SubjectOption[] }; topics: { data: TopicOption[] }; isSecondary: boolean; isInstitution: boolean; isProfessional: boolean; isCbt: boolean }) {
     const form = useForm<{file:File|null;question_bank_id:string;subject_id:string;topic_id:string}>({file:null,question_bank_id:'',subject_id:'',topic_id:''});
     const [pickerVersion,setPickerVersion] = useState(0);
     const availableTopics = topics.data.filter(topic => topic.subject_id === form.data.subject_id);
@@ -129,7 +131,7 @@ function BulkTools({ templateHref, uploadHref, questionBanks, topics, isSecondar
     }}>
         <h2 className="font-semibold">Import questions</h2>
         <div className="grid gap-3 md:grid-cols-3">
-            <QuestionBankPicker key={pickerVersion} banks={questionBanks.data} courseMode={isInstitution || isProfessional} value={form.data.question_bank_id} disabled={form.processing}
+            <QuestionBankPicker courses={importCourses} moduleOptions={importModules} key={pickerVersion} banks={questionBanks.data} courseMode={isInstitution || isProfessional} value={form.data.question_bank_id} disabled={form.processing}
                 onChange={bank=>form.setData({...form.data,question_bank_id:bank?.id ?? '',subject_id:bank?.subject_id ?? '',topic_id:''})} />
             {!isSecondary && !isInstitution && !isCbt && <label className="text-sm font-semibold">Topic (optional)<select aria-label="Import topic" className="mt-1 block w-full rounded border-border" disabled={!form.data.question_bank_id || form.processing} value={form.data.topic_id} onChange={event=>form.setData('topic_id',event.target.value)}>
                 <option value="">None</option>{availableTopics.map(topic=><option key={topic.id} value={topic.id}>{topic.name}</option>)}

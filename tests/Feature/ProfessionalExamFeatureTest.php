@@ -385,6 +385,37 @@ class ProfessionalExamFeatureTest extends TestCase
         $this->assertDatabaseMissing('exams', ['code' => 'DUPLICATE-TRAD']);
     }
 
+    public function test_question_upload_shows_active_hierarchy_without_banks_and_includes_draft_banks(): void
+    {
+        [$school, $programme, $course, $module, $subject] = $this->professionalHierarchy();
+        $admin = User::factory()->create(['role' => User::ROLE_PROFESSIONAL_SCHOOL_ADMIN, 'professional_school_id' => $school->id]);
+        foreach (['/questions', "/professional-schools/{$school->id}/questions"] as $url) {
+            $this->actingAs($admin)->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page
+                ->has('importCourses', 1)->where('importCourses.0.id', $course->id)
+                ->has('importModules', 1)->where('importModules.0.id', $module->id));
+        }
+        $bank = QuestionBank::factory()->create(['organization_id' => null, 'professional_school_id' => $school->id,
+            'subject_id' => $subject->id, 'course_id' => $course->id, 'module_id' => $module->id, 'status' => 'draft']);
+        $this->get("/professional-schools/{$school->id}/questions")->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->has('questionBanks', 1)->where('questionBanks.0.id', $bank->id));
+    }
+
+    public function test_import_hierarchy_is_limited_to_the_facilitators_assignments_and_owner(): void
+    {
+        [$school, $programme, $course, $module] = $this->professionalHierarchy();
+        $unassigned = Course::create(['professional_school_id' => $school->id, 'programme_id' => $programme->id, 'name' => 'Unassigned', 'code' => 'UNASSIGNED', 'status' => 'active']);
+        $otherSchool = $school->replicate();
+        $otherSchool->fill(['code' => 'OTHER-SCHOOL', 'email' => 'other-school@example.test'])->save();
+        Course::create(['professional_school_id' => $otherSchool->id, 'name' => 'Other owner', 'code' => 'OTHER', 'status' => 'active']);
+        $facilitator = User::factory()->create(['role' => User::ROLE_FACILITATOR, 'professional_school_id' => $school->id]);
+        $facilitator->assignedModules()->attach($module->id, ['course_id' => $course->id]);
+        foreach (['/questions', "/professional-schools/{$school->id}/questions"] as $url) {
+            $this->actingAs($facilitator)->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page
+                ->has('importCourses', 1)->where('importCourses.0.id', $course->id)
+                ->has('importModules', 1)->where('importModules.0.id', $module->id));
+        }
+    }
+
     private function professionalSchool(): ProfessionalSchool
     {
         $organization = Organization::factory()->create();

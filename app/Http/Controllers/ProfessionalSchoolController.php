@@ -16,6 +16,7 @@ use App\Models\QuestionBank;
 use App\Models\Subject;
 use App\Models\TrainingBatch;
 use App\Models\User;
+use App\Services\QuestionImportHierarchyService;
 use App\Services\RecordDeletionService;
 use App\Support\ReferenceCode;
 use Illuminate\Database\Eloquent\Builder;
@@ -537,13 +538,14 @@ class ProfessionalSchoolController extends Controller
         $this->authorizeRecord($request->user(), $professionalSchool);
         $questionBankScope = fn (Builder $query) => $this->scopeFacilitatorQuestionBanks($query->where('professional_school_id', $professionalSchool->id), $request->user());
         $bankQuery = $professionalSchool->questionBanks()
-            ->where('status', QuestionBank::STATUS_ACTIVE)
+            ->whereIn('status', [QuestionBank::STATUS_ACTIVE, QuestionBank::STATUS_DRAFT])
             ->with(['course:id,name', 'module:id,name'])
             ->orderBy('name');
         $this->scopeFacilitatorQuestionBanks($bankQuery, $request->user());
 
         return Inertia::render('ProfessionalSchools/Questions', [
             'professionalSchool' => $this->row($professionalSchool),
+            ...app(QuestionImportHierarchyService::class)->options($request->user(), $professionalSchool->id),
             'questions' => Question::query()
                 ->whereHas('questionBank', $questionBankScope)
                 ->with(['questionBank:id,name,course_id,module_id', 'questionBank.course:id,name', 'questionBank.module:id,name', 'subject:id,name', 'topic:id,name', 'options'])

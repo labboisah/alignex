@@ -7,7 +7,7 @@ import { Button } from '@/Components/ui/button';
 
 const inputClass = 'mt-1 block w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm';
 
-export default function Questions({ professionalSchool, questions, questionBanks = [], importSummary }: { professionalSchool: any; questions: any[]; questionBanks?: any[]; importSummary?: any }) {
+export default function Questions({ professionalSchool, questions, questionBanks = [], importCourses = [], importModules = [], importSummary }: { professionalSchool: any; questions: any[]; questionBanks?: any[]; importCourses?: any[]; importModules?: any[]; importSummary?: any }) {
     const importForm = useForm<{ question_bank_id: string; file: File | null }>({ question_bank_id: '', file: null });
     const submitImport = (event: FormEvent) => {
         event.preventDefault();
@@ -30,7 +30,7 @@ export default function Questions({ professionalSchool, questions, questionBanks
                     footer={<div className="flex flex-wrap gap-2"><Button asChild type="button" variant="secondary"><a href={`/professional-schools/${professionalSchool.id}/questions/template`}>Download Template</a></Button><Button disabled={importForm.processing || !importForm.data.question_bank_id || !importForm.data.file}>Import Questions</Button></div>}
                 >
                     <div className="grid gap-4 md:grid-cols-2">
-                        <QuestionBankPicker banks={questionBanks} courseMode value={importForm.data.question_bank_id} disabled={importForm.processing} onChange={bank => importForm.setData('question_bank_id', bank?.id ?? '')} />
+                        <QuestionBankPicker courses={importCourses} moduleOptions={importModules} banks={questionBanks} courseMode value={importForm.data.question_bank_id} disabled={importForm.processing} onChange={bank => importForm.setData('question_bank_id', bank?.id ?? '')} />
                         {importForm.errors.question_bank_id && <p role="alert" className="text-danger">{importForm.errors.question_bank_id}</p>}
                         <Field label="CSV File" error={importForm.errors.file}>
                             <input required type="file" accept=".csv,text/csv" className={inputClass} onChange={(event) => importForm.setData('file', event.target.files?.[0] ?? null)} />

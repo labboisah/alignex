@@ -15,6 +15,7 @@ use App\Models\Subject;
 use App\Models\Topic;
 use App\Services\BulkQuestionStatusService;
 use App\Services\CurrentContextService;
+use App\Services\QuestionImportHierarchyService;
 use App\Services\RecordDeletionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -486,6 +487,7 @@ class QuestionController extends Controller
     private function formOptions(Request $request): array
     {
         return [
+            ...app(QuestionImportHierarchyService::class)->options($request->user()),
             'questionBanks' => QuestionBankResource::collection(
                 $this->scopedQuestionBanks($request)
                     ->with(['subject', 'institution', 'course', 'module'])
