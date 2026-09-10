@@ -48,6 +48,7 @@ export type QuestionBankOption = {
     course_id?: string | number | null;
     course_name?: string | null;
     module_name?: string | null;
+    module_id?: string | number | null;
     institution_id?: number | string | null;
     professional_school_id?: number | string | null;
 };

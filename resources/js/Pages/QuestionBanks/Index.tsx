@@ -36,7 +36,7 @@ export default function QuestionBanksIndex({ questionBanks, can }: Props) {
 
             {!isInstitution && <BulkTools templateHref="/question-bank/template" uploadHref="/question-bank/import" />}
 
-            <DataTable<QuestionBank>
+            <DataTable<QuestionBank> filterable
                 rows={questionBanks.data}
                 emptyTitle="No question banks found"
                 columns={[

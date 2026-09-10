@@ -88,7 +88,7 @@ export default function InstitutionProgrammes({ institution, faculties, departme
                 </FormSection>
             </form>
 
-            <DataTable rows={programmes} emptyTitle="No programmes" columns={[
+            <DataTable filterable rows={programmes} emptyTitle="No programmes" columns={[
                 { key: 'name', header: 'Name' },
                 { key: 'code', header: 'Code' },
                 { key: 'duration', header: 'Duration', render: (row: any) => row.duration ? `${row.duration} months` : 'N/A' },

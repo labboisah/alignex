@@ -1,3 +1,4 @@
+import { useRecordFilters } from './RecordFilters';
 import { ReactNode } from 'react';
 import { EmptyState } from './EmptyState';
 import { LoadingState } from './LoadingState';
@@ -10,17 +11,19 @@ export type DataTableColumn<T> = {
     className?: string;
 };
 
-export function DataTable<T extends Record<string, unknown>>({ columns, rows, loading = false, emptyTitle = 'No records found', className }: { columns: DataTableColumn<T>[]; rows: T[]; loading?: boolean; emptyTitle?: string; className?: string }) {
+export function DataTable<T extends Record<string, unknown>>({ columns, rows: sourceRows, filterable = false, loading = false, emptyTitle = 'No records found', className }: { columns: DataTableColumn<T>[]; rows: T[]; filterable?: boolean; loading?: boolean; emptyTitle?: string; className?: string }) {
+    const filters = useRecordFilters(sourceRows, filterable);
+    const rows = filterable ? filters.filteredRows : sourceRows;
     if (loading) {
         return <LoadingState message="Loading records..." />;
     }
 
     if (!rows.length) {
-        return <EmptyState title={emptyTitle} description="When records are available they will appear in this table." />;
+        return <>{filterable && filters.controls}<EmptyState title={emptyTitle} description="No records match the current selection." /></>;
     }
 
     return (
-        <div className={cn('overflow-hidden rounded-md border border-border bg-white shadow-sm', className)}>
+        <>{filterable && filters.controls}<div className={cn('overflow-hidden rounded-md border border-border bg-white shadow-sm', className)}>
             <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                     <thead className="border-b border-border bg-slate-50 text-xs uppercase text-slate-500">
@@ -45,6 +48,6 @@ export function DataTable<T extends Record<string, unknown>>({ columns, rows, lo
                     </tbody>
                 </table>
             </div>
-        </div>
+        </div></>
     );
 }

@@ -206,3 +206,18 @@ Selecting all applies to every editable question currently listed for the chosen
 The server validates the status and every selected ID, authorizes each question using the existing update policy, and applies the batch in one transaction. Missing, deleted or unauthorized questions prevent the entire batch from changing. Each changed status is logged with the question, bank, actor and previous/new status. Only status is changed; question content, options and exam records are not edited or deleted. This follows the existing question editing permissions and does not introduce a separate reviewer role or re-score completed examinations.
 
 Bulk status verification: 8 backend tests passed (85 assertions), the bank select-all/individual-update/reload browser test passed, and the production build succeeded.
+
+## Record filters and question import — 10 September 2026
+
+Search and cascading filters are available on professional programmes, courses, modules, question banks and questions, the shared question-bank/question lists, and institution programme/course lists. Filters appear when the loaded records contain the relevant programme, course, module, subject, bank, status or difficulty. Search matches names, codes, descriptions and question text. Clear filters restores the list; the displayed count shows matching versus loaded records. Empty results retain the filter controls.
+
+The question list's bulk selection acts on matching editable questions. The list filters operate on the existing owner-scoped Inertia records; this change does not add database pagination or expand permissions.
+
+For question import:
+1. Select a course for institution/professional banks, or a subject for subject-based banks.
+2. Optionally narrow professional course banks to a module.
+3. Select the matching question bank, choose a CSV and upload.
+
+Changing course/subject clears module and bank choices; changing module clears the bank. The upload button requires a bank and file. The global form derives the subject from the chosen bank and retains optional topic selection where applicable. Both global and professional-school import routes retain their server-side owner/assignment checks.
+
+Verified with 14 backend regression tests and an end-to-end browser test covering hierarchy filtering, filtered bulk selection, stale-selection clearing, and real CSV imports into the chosen banks on both screens. Production and browser builds passed. No records were deleted or reassigned.

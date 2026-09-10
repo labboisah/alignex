@@ -1,3 +1,4 @@
+import QuestionBankPicker from '@/Components/Platform/QuestionBankPicker';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Pencil, Trash2 } from 'lucide-react';
 import { FormEvent, ReactNode } from 'react';
@@ -26,15 +27,11 @@ export default function Questions({ professionalSchool, questions, questionBanks
                 <FormSection
                     title="Import Questions"
                     description="Upload CSV questions into the selected professional question bank. The course and module are taken from the bank."
-                    footer={<div className="flex flex-wrap gap-2"><Button asChild type="button" variant="secondary"><a href={`/professional-schools/${professionalSchool.id}/questions/template`}>Download Template</a></Button><Button disabled={importForm.processing || questionBanks.length === 0}>Import Questions</Button></div>}
+                    footer={<div className="flex flex-wrap gap-2"><Button asChild type="button" variant="secondary"><a href={`/professional-schools/${professionalSchool.id}/questions/template`}>Download Template</a></Button><Button disabled={importForm.processing || !importForm.data.question_bank_id || !importForm.data.file}>Import Questions</Button></div>}
                 >
                     <div className="grid gap-4 md:grid-cols-2">
-                        <Field label="Question Bank" error={importForm.errors.question_bank_id}>
-                            <select required className={inputClass} value={importForm.data.question_bank_id} onChange={(event) => importForm.setData('question_bank_id', event.target.value)}>
-                                <option value="">Choose question bank</option>
-                                {questionBanks.map((bank) => <option key={bank.id} value={bank.id}>{bank.name} ({bank.code}){bank.course_name || bank.module_name ? ` - ${[bank.course_name, bank.module_name].filter(Boolean).join(' / ')}` : ''}</option>)}
-                            </select>
-                        </Field>
+                        <QuestionBankPicker banks={questionBanks} courseMode value={importForm.data.question_bank_id} disabled={importForm.processing} onChange={bank => importForm.setData('question_bank_id', bank?.id ?? '')} />
+                        {importForm.errors.question_bank_id && <p role="alert" className="text-danger">{importForm.errors.question_bank_id}</p>}
                         <Field label="CSV File" error={importForm.errors.file}>
                             <input required type="file" accept=".csv,text/csv" className={inputClass} onChange={(event) => importForm.setData('file', event.target.files?.[0] ?? null)} />
                         </Field>
@@ -46,7 +43,7 @@ export default function Questions({ professionalSchool, questions, questionBanks
                     )}
                 </FormSection>
             </form>
-            <DataTable
+            <DataTable filterable
                 rows={questions}
                 emptyTitle="No questions"
                 columns={[

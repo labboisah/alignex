@@ -14,7 +14,7 @@ export default function StructurePage({ title, path, owner, rows, fields, defaul
         {canManage && <RecordEditor key={editing?.id ?? 'new'} title={editing ? 'Edit '+title : 'New '+title} path={editing ? path+'/'+editing.id : path}
             method={editing ? 'patch' : 'post'} values={editing ? Object.fromEntries(Object.keys(defaults).map(key=>[key,editing[key] ?? defaults[key]])) : defaults}
             fields={[...fields,statusField]} onCancel={editing ? ()=>setEditing(null) : undefined} />}
-        <DataTable rows={rows} emptyTitle={'No '+title.toLowerCase()} columns={[
+        <DataTable filterable rows={rows} emptyTitle={'No '+title.toLowerCase()} columns={[
             {key:'name',header:'Name'},{key:'code',header:'Code'},
             ...fields.filter(field => field.name.endsWith('_id') && field.options).map(field => ({key:field.name,header:field.label,render:(row:any)=>field.options?.find(option=>option.value===String(row[field.name]))?.label ?? 'N/A'})),
             {key:'status',header:'Status'},

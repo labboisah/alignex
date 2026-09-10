@@ -1,3 +1,5 @@
+import QuestionBankPicker from '@/Components/Platform/QuestionBankPicker';
+import { useRecordFilters } from '@/Components/Platform/RecordFilters';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { Download, Eye, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { FormEvent, useState } from 'react';
@@ -17,7 +19,8 @@ export default function QuestionsIndex({ questions, can, questionBanks, subjects
     const pageUrl = usePage().url;
     const [bankId, setBankId] = useState(() => new URLSearchParams(pageUrl.split('?')[1] ?? '').get('bank') ?? '');
     const bulk = useForm<{ question_ids: string[]; status: string }>({ question_ids: [], status: 'approved' });
-    const visibleQuestions = questions.data.filter(question => !bankId || question.question_bank_id === bankId);
+    const filters = useRecordFilters(questions.data.filter(question => !bankId || question.question_bank_id === bankId));
+    const visibleQuestions = filters.filteredRows;
     const eligible = visibleQuestions.filter(question => question.can?.update === true);
     const selectedIds = bulk.data.question_ids.filter(id => eligible.some(question => question.id === id));
     const allSelected = eligible.length > 0 && selectedIds.length === eligible.length;
@@ -48,6 +51,7 @@ export default function QuestionsIndex({ questions, can, questionBanks, subjects
 
             <BulkTools templateHref="/questions/template" uploadHref="/questions/import" questionBanks={questionBanks} subjects={subjects} topics={topics} isSecondary={isSecondary} isInstitution={isInstitution} isProfessional={isProfessional} isCbt={isCbt} />
 
+            {filters.controls}
             <form aria-label="Update question statuses" className="mb-4 space-y-3 rounded-md border border-border bg-white p-4" onSubmit={event => {
                 event.preventDefault();
                 bulk.transform(data => ({ ...data, question_ids: selectedIds }));
@@ -115,124 +119,25 @@ export default function QuestionsIndex({ questions, can, questionBanks, subjects
     );
 }
 
-function BulkTools({ templateHref, uploadHref, questionBanks, subjects, topics, isSecondary, isInstitution, isProfessional, isCbt }: { templateHref: string; uploadHref: string; questionBanks: { data: QuestionBankOption[] }; subjects: { data: SubjectOption[] }; topics: { data: TopicOption[] }; isSecondary: boolean; isInstitution: boolean; isProfessional: boolean; isCbt: boolean }) {
-    const { data, setData, post, processing, errors, reset } = useForm<{ file: File | null; course_id: string; subject_id: string; question_bank_id: string; topic_id: string }>({
-        file: null,
-        course_id: '',
-        subject_id: '',
-        question_bank_id: '',
-        topic_id: '',
-    });
-    const [uploadStatus, setUploadStatus] = useState<{ tone: 'success' | 'danger'; title: string } | null>(null);
-
-    const courseOptions = Array.from(
-        new Map(
-            questionBanks.data
-                .filter((bank) => bank.course_id)
-                .map((bank) => [String(bank.course_id), { id: String(bank.course_id), name: bank.course_name ?? 'Course' }]),
-        ).values(),
-    ).sort((first, second) => first.name.localeCompare(second.name));
-    const availableBanks = isInstitution
-        ? data.course_id
-            ? questionBanks.data.filter((bank) => String(bank.course_id ?? '') === data.course_id)
-            : []
-        : data.subject_id
-            ? questionBanks.data.filter((bank) => bank.subject_id === data.subject_id)
-            : [];
-    const availableTopics = topics.data.filter((topic) => !data.subject_id || topic.subject_id === data.subject_id);
-
-    const submit = (event: FormEvent<HTMLFormElement>) => {
+function BulkTools({ templateHref, uploadHref, questionBanks, topics, isSecondary, isInstitution, isProfessional, isCbt }: { templateHref: string; uploadHref: string; questionBanks: { data: QuestionBankOption[] }; subjects: { data: SubjectOption[] }; topics: { data: TopicOption[] }; isSecondary: boolean; isInstitution: boolean; isProfessional: boolean; isCbt: boolean }) {
+    const form = useForm<{file:File|null;question_bank_id:string;subject_id:string;topic_id:string}>({file:null,question_bank_id:'',subject_id:'',topic_id:''});
+    const [pickerVersion,setPickerVersion] = useState(0);
+    const availableTopics = topics.data.filter(topic => topic.subject_id === form.data.subject_id);
+    return <form aria-label="Import questions" className="mb-5 space-y-3 rounded border border-border bg-white p-4" onSubmit={event=>{
         event.preventDefault();
-        setUploadStatus(null);
-
-        post(uploadHref, {
-            forceFormData: true,
-            preserveScroll: true,
-            onBefore: () => {
-                if (isSecondary || isInstitution) {
-                    setData({ ...data, subject_id: isInstitution ? '' : data.subject_id, topic_id: '' });
-                }
-            },
-            onSuccess: () => {
-                reset('file');
-                setUploadStatus({ tone: 'success', title: 'Questions uploaded successfully.' });
-            },
-            onError: (formErrors) => {
-                const firstError = Object.values(formErrors)[0];
-                setUploadStatus({
-                    tone: 'danger',
-                    title: typeof firstError === 'string' ? firstError : 'Question upload failed. Check the form and try again.',
-                });
-            },
-        });
-    };
-
-    return (
-        <div className="mb-5 space-y-3">
-            {uploadStatus && <AlertBanner tone={uploadStatus.tone} title={uploadStatus.title} />}
-            <form onSubmit={submit} className={`grid gap-3 rounded-md border border-border bg-white p-4 shadow-sm lg:items-end ${isCbt || isSecondary || isInstitution ? 'lg:grid-cols-[auto_1fr_1fr_1fr_auto]' : 'lg:grid-cols-[auto_1fr_1fr_1fr_1fr_auto]'}`}>
-                <Button asChild type="button" variant="secondary">
-                    <a href={templateHref}>
-                        <Download className="h-4 w-4" />
-                        Template
-                    </a>
-                </Button>
-                {isInstitution ? (
-                    <label className="text-sm font-semibold text-slateDark">
-                        Course
-                        <select
-                            className="mt-1 block h-10 w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                            value={data.course_id}
-                            onChange={(event) => setData({ ...data, course_id: event.target.value, question_bank_id: '', subject_id: '', topic_id: '' })}
-                            required
-                        >
-                            <option value="">Choose course</option>
-                            {courseOptions.map((course) => <option key={course.id} value={course.id}>{course.name}</option>)}
-                        </select>
-                    </label>
-                ) : (
-                    <label className="text-sm font-semibold text-slateDark">
-                        {isProfessional ? 'Course / Module Mapping' : 'Subject'}
-                        <select
-                            className="mt-1 block h-10 w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                            value={data.subject_id}
-                            onChange={(event) => setData({ ...data, subject_id: event.target.value, question_bank_id: '', topic_id: '' })}
-                            required
-                        >
-                            <option value="">{isProfessional ? 'Choose mapping' : 'Choose subject'}</option>
-                            {subjects.data.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}
-                        </select>
-                        {errors.subject_id && <span className="mt-1 block text-sm text-danger">{errors.subject_id}</span>}
-                    </label>
-                )}
-                <label className="text-sm font-semibold text-slateDark">
-                    Question Bank
-                    <select className="mt-1 block h-10 w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm" value={data.question_bank_id} onChange={(event) => setData('question_bank_id', event.target.value)} required>
-                        <option value="">{isInstitution ? (data.course_id ? 'Choose bank' : 'Choose course first') : (data.subject_id ? 'Choose bank' : 'Choose subject first')}</option>
-                        {availableBanks.map((bank) => <option key={bank.id} value={bank.id}>{bank.name}</option>)}
-                    </select>
-                    {errors.question_bank_id && <span className="mt-1 block text-sm text-danger">{errors.question_bank_id}</span>}
-                </label>
-                {!isCbt && !isSecondary && !isInstitution && (
-                    <label className="text-sm font-semibold text-slateDark">
-                        {isProfessional ? 'Module Detail' : 'Topic'}
-                        <select className="mt-1 block h-10 w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm" value={data.topic_id} onChange={(event) => setData('topic_id', event.target.value)}>
-                            <option value="">None</option>
-                            {availableTopics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}
-                        </select>
-                        {errors.topic_id && <span className="mt-1 block text-sm text-danger">{errors.topic_id}</span>}
-                    </label>
-                )}
-                <label className="text-sm font-semibold text-slateDark">
-                    Upload CSV
-                    <input className="mt-1 block w-full rounded-md border border-border text-sm file:mr-3 file:h-10 file:border-0 file:bg-slate-100 file:px-3 file:text-sm file:font-semibold" type="file" accept=".csv,text/csv" onChange={(event) => setData('file', event.target.files?.[0] ?? null)} />
-                    {errors.file && <span className="mt-1 block text-sm text-danger">{errors.file}</span>}
-                </label>
-                <Button type="submit" disabled={processing || !data.file || (isInstitution ? !data.course_id : !data.subject_id) || !data.question_bank_id}>
-                    <Upload className="h-4 w-4" />
-                    Upload
-                </Button>
-            </form>
+        form.post(uploadHref,{forceFormData:true,preserveScroll:true,onSuccess:()=>{form.reset();setPickerVersion(v=>v+1);}});
+    }}>
+        <h2 className="font-semibold">Import questions</h2>
+        <div className="grid gap-3 md:grid-cols-3">
+            <QuestionBankPicker key={pickerVersion} banks={questionBanks.data} courseMode={isInstitution || isProfessional} value={form.data.question_bank_id} disabled={form.processing}
+                onChange={bank=>form.setData({...form.data,question_bank_id:bank?.id ?? '',subject_id:bank?.subject_id ?? '',topic_id:''})} />
+            {!isSecondary && !isInstitution && !isCbt && <label className="text-sm font-semibold">Topic (optional)<select aria-label="Import topic" className="mt-1 block w-full rounded border-border" disabled={!form.data.question_bank_id || form.processing} value={form.data.topic_id} onChange={event=>form.setData('topic_id',event.target.value)}>
+                <option value="">None</option>{availableTopics.map(topic=><option key={topic.id} value={topic.id}>{topic.name}</option>)}
+            </select></label>}
+            <label className="text-sm font-semibold">Upload CSV<input key={pickerVersion} aria-label="Upload CSV" type="file" accept=".csv,text/csv" disabled={form.processing} onChange={event=>form.setData('file',event.target.files?.[0] ?? null)} /></label>
         </div>
-    );
+        {Object.entries(form.errors).map(([key,message])=><p key={key} role="alert" className="text-sm text-danger">{message}</p>)}
+        <div className="flex gap-3"><Button asChild type="button" variant="secondary"><a href={templateHref}><Download className="h-4 w-4" />Template</a></Button>
+            <Button type="submit" disabled={form.processing || !form.data.file || !form.data.question_bank_id}>{form.processing ? 'Importing...' : 'Upload'}</Button></div>
+    </form>;
 }

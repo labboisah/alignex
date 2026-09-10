@@ -93,7 +93,7 @@ export default function InstitutionCourses({ institution, faculties, departments
                 </FormSection>
             </form>
 
-            <DataTable rows={courses} emptyTitle="No courses" columns={[
+            <DataTable filterable rows={courses} emptyTitle="No courses" columns={[
                 { key: 'name', header: 'Name' },
                 { key: 'code', header: 'Code' },
                 { key: 'programme', header: 'Programme', render: (row: any) => row.programme?.name ?? 'N/A' },

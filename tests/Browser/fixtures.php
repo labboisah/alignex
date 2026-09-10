@@ -8,7 +8,9 @@ use App\Models\ExamSubject;
 use App\Models\Institution;
 use App\Models\Organization;
 use App\Models\PricingPlan;
+use App\Models\ProfessionalModule;
 use App\Models\ProfessionalSchool;
+use App\Models\Programme;
 use App\Models\Question;
 use App\Models\QuestionBank;
 use App\Models\QuestionOption;
@@ -97,5 +99,22 @@ function browserFixture(array $input): array
         'organization_id' => $organization->id, 'role' => ($input['management'] ?? false) ? User::ROLE_SUPER_ADMIN : User::ROLE_ORGANIZATION_ADMIN, ...$ownerFields,
     ]) : null;
 
-    return ['bank_id' => $bank->id, 'owner_id' => $ownerId, 'reviewer_email' => $researchReviewer?->email, 'exam_id' => $exam->id, 'code' => $exam->code, 'identifier' => $candidate->candidate_number, 'actor_id' => $actor->id, 'actor_email' => $actor->email];
+    if (($input['management_filters'] ?? false) && $type === 'professional_school') {
+        $filterBanks = [];
+        foreach ([1, 2] as $number) {
+            $programme = Programme::create(['professional_school_id' => $ownerId, 'name' => "Filter Programme {$number}", 'code' => "FP{$number}", 'status' => 'active']);
+            $course = Course::create(['professional_school_id' => $ownerId, 'programme_id' => $programme->id, 'name' => "Filter Course {$number}", 'code' => "FC{$number}", 'status' => 'active']);
+            foreach (($number === 1 ? [1, 2] : [3]) as $moduleNumber) {
+                $module = ProfessionalModule::create(['professional_school_id' => $ownerId, 'programme_id' => $programme->id, 'course_id' => $course->id, 'name' => "Filter Module {$moduleNumber}", 'code' => "FM{$moduleNumber}", 'status' => 'active']);
+                $filterBank = $moduleNumber === 1 ? $bank : $bank->replicate();
+                $filterBank->fill(['name' => "Filter Bank {$moduleNumber}", 'code' => "FB{$moduleNumber}", 'programme_id' => $programme->id, 'course_id' => $course->id, 'module_id' => $module->id])->save();
+                if ($moduleNumber !== 1) {
+                    Question::factory()->create(['question_bank_id' => $filterBank->id, 'subject_id' => $subject->id, 'topic_id' => null, 'stem' => "Filter question {$moduleNumber}", 'status' => 'draft']);
+                }
+                $filterBanks[] = $filterBank->id;
+            }
+        }
+    }
+
+    return ['filter_bank_ids' => $filterBanks ?? [], 'bank_id' => $bank->id, 'owner_id' => $ownerId, 'reviewer_email' => $researchReviewer?->email, 'exam_id' => $exam->id, 'code' => $exam->code, 'identifier' => $candidate->candidate_number, 'actor_id' => $actor->id, 'actor_email' => $actor->email];
 }
