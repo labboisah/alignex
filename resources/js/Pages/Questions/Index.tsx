@@ -122,7 +122,7 @@ export default function QuestionsIndex({ questions, can, questionBanks, subjects
 }
 
 function BulkTools({ importCourses, importModules, templateHref, uploadHref, questionBanks, topics, isSecondary, isInstitution, isProfessional, isCbt }: { importCourses:ImportCourse[]; importModules:ImportModule[]; templateHref: string; uploadHref: string; questionBanks: { data: QuestionBankOption[] }; subjects: { data: SubjectOption[] }; topics: { data: TopicOption[] }; isSecondary: boolean; isInstitution: boolean; isProfessional: boolean; isCbt: boolean }) {
-    const form = useForm<{file:File|null;question_bank_id:string;subject_id:string;topic_id:string}>({file:null,question_bank_id:'',subject_id:'',topic_id:''});
+    const form = useForm<{file:File|null;question_bank_id:string;subject_id:string;topic_id:string;status:string}>({file:null,question_bank_id:'',subject_id:'',topic_id:'',status:'draft'});
     const [pickerVersion,setPickerVersion] = useState(0);
     const availableTopics = topics.data.filter(topic => topic.subject_id === form.data.subject_id);
     return <form aria-label="Import questions" className="mb-5 space-y-3 rounded border border-border bg-white p-4" onSubmit={event=>{
@@ -136,6 +136,12 @@ function BulkTools({ importCourses, importModules, templateHref, uploadHref, que
             {!isSecondary && !isInstitution && !isCbt && <label className="text-sm font-semibold">Topic (optional)<select aria-label="Import topic" className="mt-1 block w-full rounded border-border" disabled={!form.data.question_bank_id || form.processing} value={form.data.topic_id} onChange={event=>form.setData('topic_id',event.target.value)}>
                 <option value="">None</option>{availableTopics.map(topic=><option key={topic.id} value={topic.id}>{topic.name}</option>)}
             </select></label>}
+            <label className="text-sm font-semibold">Import status
+                <select aria-label="Import status" className="mt-1 block w-full rounded border-border" required disabled={form.processing} value={form.data.status} onChange={event => form.setData('status', event.target.value)}>
+                    {['draft', 'review', 'approved', 'rejected', 'archived'].map(status => <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>)}
+                </select>
+                <span className="mt-1 block text-xs font-normal text-slate-500">Applied to every imported question, overriding the CSV status.</span>
+            </label>
             <label className="text-sm font-semibold">Upload CSV<input key={pickerVersion} aria-label="Upload CSV" type="file" accept=".csv,text/csv" disabled={form.processing} onChange={event=>form.setData('file',event.target.files?.[0] ?? null)} /></label>
         </div>
         {Object.entries(form.errors).map(([key,message])=><p key={key} role="alert" className="text-sm text-danger">{message}</p>)}

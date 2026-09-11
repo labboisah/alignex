@@ -318,7 +318,9 @@ class OrganizationModuleTest extends TestCase
                     ->where('1.label', 'Candidates')
                     ->where('2.label', 'Questions')
                     ->where('3.label', 'Exams')
-                    ->where('3.children.1.label', 'Recruitment Exams')
+                    ->has('3.children', 1)
+                    ->where('3.children.0.label', 'Exams/Assessment')
+                    ->where('3.children.0.href', '/exams')
                     ->etc()
                 )
             );

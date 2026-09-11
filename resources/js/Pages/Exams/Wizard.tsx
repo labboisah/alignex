@@ -155,7 +155,7 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
         transform(values => {
             const {adaptive_pilot,...rest}=values;
             const count=values.subjects.reduce((sum,row)=>sum+Number(row.number_of_questions||0),0);
-            return {...rest,settings:values.mode==='adaptive' ? {
+            return {...rest,subjects:values.subjects.map(row => ({...row, difficulty_distribution: values.mode === 'adaptive' ? null : row.difficulty_distribution})),settings:values.mode==='adaptive' ? {
                 ...values.settings,
                 ...(values.settings.progressive_remediation_enabled !== false ? {adaptive_min_questions:count,adaptive_max_questions:count} : {}),
             } : {...values.settings,progressive_remediation_enabled:false}};
@@ -166,7 +166,12 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
 
     const setSubject = (index: number, next: Partial<ExamSubject>) => {
         const rows = [...data.subjects];
+        const distribution = rows[index].difficulty_distribution;
+        const selected = Object.keys(distribution ?? {});
         rows[index] = { ...rows[index], ...next };
+        if (next.number_of_questions !== undefined && selected.length === 1) {
+            rows[index].difficulty_distribution = { [selected[0]]: Number(next.number_of_questions) };
+        }
         setData('subjects', rows);
     };
 
@@ -307,7 +312,7 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
                     {errors.subjects && <div className="mb-2 text-sm text-danger">{errors.subjects}</div>}
                     <div className="space-y-3">
                         {data.subjects.map((row, index) => (
-                            <div key={index} className={`grid gap-3 rounded-md border border-border bg-white p-3 ${isProfessionalExam ? 'md:grid-cols-[1fr_1fr_1.2fr_0.7fr_0.7fr_0.7fr_auto]' : 'md:grid-cols-[1.4fr_1.4fr_0.8fr_0.8fr_0.8fr_auto]'}`}>
+                            <div key={index} className={`grid gap-3 rounded-md border border-border bg-white p-3 md:grid-cols-2 xl:grid-cols-4`}>
                                 {isProfessionalExam ? (
                                     <>
                                         <Field label="Course" error={fieldError(errors, `subjects.${index}.course_id`)}>
@@ -361,6 +366,20 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
                                 <Field label="Questions" error={fieldError(errors, `subjects.${index}.number_of_questions`)}>
                                     <input className={inputClass} type="number" min="1" value={row.number_of_questions} onChange={(event) => setSubject(index, { number_of_questions: event.target.value })} required />
                                 </Field>
+                                {data.mode === 'traditional' ? (
+                                    <Field label="Question Difficulty" error={fieldError(errors, 'subjects.' + index + '.difficulty_distribution')}>
+                                        <select className={inputClass}
+                                            value={Object.keys(row.difficulty_distribution ?? {}).length > 1 ? 'custom' : Object.keys(row.difficulty_distribution ?? {})[0] ?? 'all'}
+                                            onChange={(event) => setSubject(index, { difficulty_distribution: event.target.value === 'all' ? null : { [event.target.value]: Number(row.number_of_questions) } })}>
+                                            <option value="all">All difficulties</option>
+                                            <option value="easy">Simple (Easy) only</option>
+                                            <option value="medium">Medium only</option>
+                                            <option value="hard">Hard only</option>
+                                            {Object.keys(row.difficulty_distribution ?? {}).length > 1 && <option value="custom">Existing custom mix</option>}
+                                        </select>
+                                        <span className="mt-1 block text-xs text-slate-500">Only the selected difficulty is used. Enough matching questions must be available.</span>
+                                    </Field>
+                                ) : <div className="text-sm text-slate-500">Adaptive difficulty changes as candidates progress.</div>}
                                 <Field label="Marks Each" error={fieldError(errors, `subjects.${index}.marks_per_question`)}>
                                     <input className={inputClass} type="number" min="0.01" step="0.01" value={row.marks_per_question} onChange={(event) => setSubject(index, { marks_per_question: event.target.value })} required />
                                 </Field>

@@ -58,6 +58,8 @@ class ExamController extends Controller
                     ->latest()
                     ->get()
             ),
+            'categories' => Exam::CATEGORIES,
+            'filters' => $request->only(['category', 'mode']),
             'can' => ['create' => $request->user()->can('create', Exam::class)],
         ]);
     }

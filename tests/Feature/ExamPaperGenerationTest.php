@@ -84,6 +84,26 @@ class ExamPaperGenerationTest extends TestCase
         $this->assertArrayNotHasKey('is_correct', $payload['options'][0]);
     }
 
+    public function test_selected_difficulty_excludes_other_questions(): void
+    {
+        [$admin, $exam] = $this->examWithCandidateAndQuestions();
+        foreach (['easy', 'medium', 'hard'] as $difficulty) {
+            $exam->examSubjects()->update(['question_count' => 1, 'difficulty_distribution' => [$difficulty => 1]]);
+            $this->actingAs($admin)->post("/exams/{$exam->id}/papers/generate")->assertSessionHasNoErrors();
+            $attempt = $exam->attempts()->firstOrFail();
+            $this->assertSame([$difficulty], $attempt->papers()->with('question')->get()->pluck('question.difficulty')->all());
+            $attempt->papers()->delete();
+        }
+    }
+
+    public function test_insufficient_selected_difficulty_does_not_fall_back_to_other_questions(): void
+    {
+        [$admin, $exam] = $this->examWithCandidateAndQuestions();
+        $exam->examSubjects()->update(['difficulty_distribution' => ['easy' => 2]]);
+        $this->actingAs($admin)->post("/exams/{$exam->id}/papers/generate")->assertSessionHasErrors('questions');
+        $this->assertDatabaseCount('candidate_papers', 0);
+    }
+
     private function examWithCandidateAndQuestions(): array
     {
         $organization = Organization::factory()->create();

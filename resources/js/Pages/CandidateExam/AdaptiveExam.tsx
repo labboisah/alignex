@@ -1,3 +1,4 @@
+import { enterExamFullscreen, isExamFullscreen, watchExamFullscreen } from './fullscreen';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/Components/ui/button';
@@ -93,7 +94,7 @@ export default function AdaptiveExam() {
         deadline.current = Date.now() + next.remaining_time * 1000;
         setRemaining(next.remaining_time); expiryRequested.current = false;
         setControlsReady(!next.exam.settings.require_fullscreen && !next.exam.settings.require_webcam
-            || (!next.exam.settings.require_fullscreen || Boolean(document.fullscreenElement)) && (!next.exam.settings.require_webcam || Boolean(stream.current?.active)));
+            || (!next.exam.settings.require_fullscreen || isExamFullscreen()) && (!next.exam.settings.require_webcam || Boolean(stream.current?.active)));
         const path = next.attempt.status === 'disqualified' ? '/exam/disqualified' : next.submitted ? '/exam/submitted' : next.attempt.status === 'in_progress' ? '/exam/write' : '/exam/instructions';
         navigate(path, { replace: true });
         if (changed) setTimeout(() => heading.current?.focus(), 0);
@@ -202,7 +203,7 @@ export default function AdaptiveExam() {
         const blur = () => { void event('window_blur'); };
         const focus = () => { void event('focus_restored'); void refresh(); };
         const fullscreen = () => {
-            if (!document.fullscreenElement && payload.exam.settings.require_fullscreen) {
+            if (!isExamFullscreen() && payload.exam.settings.require_fullscreen) {
                 setControlsReady(false); void event('fullscreen_exit');
             }
         };
@@ -218,29 +219,36 @@ export default function AdaptiveExam() {
             void event(payload.exam.settings.require_webcam ? 'webcam_heartbeat' : 'heartbeat', metadata);
         }, 30000);
         window.addEventListener('blur', blur); window.addEventListener('focus', focus);
-        document.addEventListener('fullscreenchange', fullscreen); document.addEventListener('keydown', keyboard);
+        const stopWatchingFullscreen = watchExamFullscreen(fullscreen); document.addEventListener('keydown', keyboard);
         ['copy','paste','cut','contextmenu'].forEach(name => document.addEventListener(name, copy));
         return () => {
             clearInterval(heartbeat); window.removeEventListener('blur', blur); window.removeEventListener('focus', focus);
-            document.removeEventListener('fullscreenchange', fullscreen); document.removeEventListener('keydown', keyboard);
+            stopWatchingFullscreen(); document.removeEventListener('keydown', keyboard);
             ['copy','paste','cut','contextmenu'].forEach(name => document.removeEventListener(name, copy));
         };
     }, [event, payload?.attempt.status, payload?.attempt.id, payload?.exam.settings.require_fullscreen, payload?.exam.settings.require_webcam, payload?.exam.settings.monitor_screenshots, refresh]);
 
     const prepareControls = async () => {
         setError('');
+        let failedControl = 'fullscreen';
         try {
+            if (payload?.exam.settings.require_fullscreen) await enterExamFullscreen();
+            failedControl = 'webcam';
             if (payload?.exam.settings.require_webcam && !stream.current?.active) {
                 if (!navigator.mediaDevices?.getUserMedia) throw new Error('A webcam is required. Use a supported browser and allow camera access.');
                 stream.current = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
                 stream.current.getVideoTracks().forEach(track => track.addEventListener('ended', () => { setControlsReady(false); void event('webcam_disconnected'); }));
                 if (video.current) video.current.srcObject = stream.current;
             }
-            if (payload?.exam.settings.require_fullscreen && !document.fullscreenElement) await document.documentElement.requestFullscreen();
+            failedControl = 'fullscreen';
+            if (payload?.exam.settings.require_fullscreen && !isExamFullscreen()) {
+                throw new Error('Fullscreen closed during setup. Tap Enable exam controls again to continue.');
+            }
             setControlsReady(true);
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Allow the required exam controls to continue.');
-            void event(payload?.exam.settings.require_webcam ? 'webcam_permission_failed' : 'fullscreen_permission_failed', { severity: 'high' });
+            setControlsReady(false);
+            void event(failedControl + '_permission_failed', { severity: 'high' });
         }
     };
     const answer = (commit: boolean) => {

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\BulkQuestionStatusRequest;
+use App\Http\Requests\ImportQuestionsRequest;
 use App\Http\Requests\StoreQuestionRequest;
 use App\Http\Requests\UpdateQuestionRequest;
 use App\Http\Resources\QuestionBankResource;
@@ -179,16 +180,11 @@ class QuestionController extends Controller
         }, 'questions-template.csv', ['Content-Type' => 'text/csv']);
     }
 
-    public function import(Request $request): RedirectResponse
+    public function import(ImportQuestionsRequest $request): RedirectResponse
     {
         Gate::authorize('create', Question::class);
 
-        $request->validate([
-            'file' => ['required', 'file', 'mimes:csv,txt', 'max:4096'],
-            'question_bank_id' => ['required', 'string', 'exists:question_banks,id'],
-            'subject_id' => ['nullable', 'string', 'exists:subjects,id'],
-            'topic_id' => ['nullable', 'string', 'exists:topics,id'],
-        ]);
+        $request->validated();
 
         $questionBank = $this->authorizedQuestionBank($request, $request->string('question_bank_id')->toString());
         $subjectId = $this->subjectIdForQuestionBank($request->input('subject_id'), $questionBank);
@@ -213,7 +209,7 @@ class QuestionController extends Controller
                     'marks' => trim($row['marks'] ?? '1') ?: '1',
                     'stem' => trim($row['question_text'] ?? ''),
                     'explanation' => $row['explanation'] ?? null,
-                    'status' => trim($row['status'] ?? Question::STATUS_DRAFT) ?: Question::STATUS_DRAFT,
+                    'status' => $request->input('status') ?? (trim($row['status'] ?? Question::STATUS_DRAFT) ?: Question::STATUS_DRAFT),
                     'options' => [
                         ['label' => 'A', 'option_text' => trim($row['option_a'] ?? ''), 'is_correct' => $correctAnswer === 'A'],
                         ['label' => 'B', 'option_text' => trim($row['option_b'] ?? ''), 'is_correct' => $correctAnswer === 'B'],

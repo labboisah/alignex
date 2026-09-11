@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\UpdateProfessionalStructureRequest;
+use App\Http\Requests\ImportQuestionsRequest;
 use App\Models\Candidate;
 use App\Models\Certificate;
 use App\Models\Course;
@@ -595,14 +596,11 @@ class ProfessionalSchoolController extends Controller
         }, 'professional_question_template.csv', ['Content-Type' => 'text/csv']);
     }
 
-    public function importQuestions(Request $request, ProfessionalSchool $professionalSchool): RedirectResponse
+    public function importQuestions(ImportQuestionsRequest $request, ProfessionalSchool $professionalSchool): RedirectResponse
     {
         $this->authorizeQuestionBankContent($request->user(), $professionalSchool);
 
-        $data = $request->validate([
-            'file' => ['required', 'file', 'mimes:csv,txt', 'max:4096'],
-            'question_bank_id' => ['required', 'string', 'exists:question_banks,id'],
-        ]);
+        $data = $request->validated();
 
         $questionBank = $professionalSchool->questionBanks()
             ->whereKey($data['question_bank_id'])
@@ -629,7 +627,7 @@ class ProfessionalSchoolController extends Controller
                         'stem' => trim((string) ($row['question_text'] ?? '')),
                         'difficulty' => trim((string) ($row['difficulty'] ?? 'medium')) ?: 'medium',
                         'marks' => trim((string) ($row['marks'] ?? '1')) ?: '1',
-                        'status' => trim((string) ($row['status'] ?? Question::STATUS_DRAFT)) ?: Question::STATUS_DRAFT,
+                        'status' => $request->input('status') ?? (trim((string) ($row['status'] ?? Question::STATUS_DRAFT)) ?: Question::STATUS_DRAFT),
                         'options' => $options,
                     ], [
                         'stem' => ['required', 'string'],
@@ -657,7 +655,7 @@ class ProfessionalSchoolController extends Controller
                         'explanation' => filled($row['explanation'] ?? null) ? trim((string) $row['explanation']) : null,
                         'difficulty' => trim((string) ($row['difficulty'] ?? 'medium')) ?: 'medium',
                         'marks' => trim((string) ($row['marks'] ?? '1')) ?: '1',
-                        'status' => trim((string) ($row['status'] ?? Question::STATUS_DRAFT)) ?: Question::STATUS_DRAFT,
+                        'status' => $request->input('status') ?? (trim((string) ($row['status'] ?? Question::STATUS_DRAFT)) ?: Question::STATUS_DRAFT),
                     ]);
 
                     $this->syncQuestionOptions($question, $options);

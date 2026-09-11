@@ -1,3 +1,4 @@
+import { enterExamFullscreen, isExamFullscreen, watchExamFullscreen } from './fullscreen';
 import AdaptiveExam, { initializeAdaptiveSession, clearAdaptiveSession, type AdaptivePayload } from './AdaptiveExam';
 import { Head } from '@inertiajs/react';
 import { AlertTriangle, Camera, CheckCircle2, Clock, Flag, Loader2, Maximize2, Wifi, WifiOff } from 'lucide-react';
@@ -174,7 +175,7 @@ function ExamInstructionsPage() {
     const navigate = useNavigate();
     const [payload, setPayload] = useState<ExamPayload | null>(storedPayload());
     const [webcamReady, setWebcamReady] = useState(sessionStorage.getItem('alignex_webcam_ready') === 'yes');
-    const [fullscreenReady, setFullscreenReady] = useState(Boolean(document.fullscreenElement));
+    const [fullscreenReady, setFullscreenReady] = useState(isExamFullscreen());
     const [setupError, setSetupError] = useState('');
     const [checkingSetup, setCheckingSetup] = useState(false);
     const [startsIn, setStartsIn] = useState(payload?.starts_in_seconds ?? 0);
@@ -218,6 +219,10 @@ function ExamInstructionsPage() {
         setSetupError('');
 
         try {
+            if (payload.exam.settings.require_fullscreen) {
+                await enterExamFullscreen();
+                setFullscreenReady(isExamFullscreen());
+            }
             if (payload.exam.settings.require_webcam && !webcamReady) {
                 if (!navigator.mediaDevices?.getUserMedia) {
                     throw new Error('This device/browser does not support webcam access.');
@@ -229,13 +234,9 @@ function ExamInstructionsPage() {
                 setWebcamReady(true);
             }
 
-            if (payload.exam.settings.require_fullscreen && !document.fullscreenElement) {
-                if (!document.documentElement.requestFullscreen) {
-                    throw new Error('This device/browser does not support fullscreen mode.');
-                }
-
-                await document.documentElement.requestFullscreen();
-                setFullscreenReady(true);
+            if (payload.exam.settings.require_fullscreen && !isExamFullscreen()) {
+                setFullscreenReady(false);
+                throw new Error('Fullscreen closed during setup. Tap the start button again to continue.');
             }
 
             if (payload.attempt?.status !== 'in_progress') {
@@ -647,7 +648,7 @@ function ExamScreenPage() {
         };
         const onBlur = () => reportProctoringEvent('window_blur');
         const onFullscreenChange = () => {
-            if (payload.exam.settings.require_fullscreen && !document.fullscreenElement) {
+            if (payload.exam.settings.require_fullscreen && !isExamFullscreen()) {
                 reportProctoringEvent('fullscreen_exit', { severity: 'high' });
             }
         };
@@ -670,7 +671,7 @@ function ExamScreenPage() {
         };
 
         document.addEventListener('visibilitychange', onVisibilityChange);
-        document.addEventListener('fullscreenchange', onFullscreenChange);
+        const stopWatchingFullscreen = watchExamFullscreen(onFullscreenChange);
         document.addEventListener('copy', onCopy);
         document.addEventListener('paste', onPaste);
         document.addEventListener('contextmenu', onContextMenu);
@@ -679,7 +680,7 @@ function ExamScreenPage() {
 
         return () => {
             document.removeEventListener('visibilitychange', onVisibilityChange);
-            document.removeEventListener('fullscreenchange', onFullscreenChange);
+            stopWatchingFullscreen();
             document.removeEventListener('copy', onCopy);
             document.removeEventListener('paste', onPaste);
             document.removeEventListener('contextmenu', onContextMenu);

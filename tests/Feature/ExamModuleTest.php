@@ -45,6 +45,13 @@ class ExamModuleTest extends TestCase
             'candidate_ids' => [$candidate->id],
         ]);
 
+        foreach ([['simple' => 25], ['easy' => -1], ['easy' => 24], ['easy' => 'invalid']] as $distribution) {
+            $payload['subjects'][0]['difficulty_distribution'] = $distribution;
+            $this->actingAs($admin)->post('/exams', $payload)->assertInvalid();
+            $this->assertDatabaseCount('exams', 0);
+        }
+        $payload['subjects'][0]['difficulty_distribution'] = ['easy' => 25];
+
         $this->actingAs($admin)
             ->post('/exams', $payload)
             ->assertRedirect();
@@ -52,6 +59,7 @@ class ExamModuleTest extends TestCase
         $exam = Exam::query()->where('code', 'TERM-001')->firstOrFail();
 
         $this->assertSame($organization->id, $exam->organization_id);
+        $this->assertSame(['easy' => 25], $exam->examSubjects()->firstOrFail()->difficulty_distribution);
         $this->assertSame('traditional', $exam->mode);
         $this->assertSame('online', $exam->delivery_mode);
         $this->assertEquals(50, (float) $exam->total_marks);
@@ -81,6 +89,7 @@ class ExamModuleTest extends TestCase
                 [
                     'subject_id' => $subject->id,
                     'number_of_questions' => 20,
+                    'difficulty_distribution' => ['hard' => 20],
                     'marks_per_question' => 3,
                     'duration_minutes' => 45,
                 ],
@@ -92,6 +101,7 @@ class ExamModuleTest extends TestCase
             ->assertRedirect(route('exams.show', $exam, absolute: false));
 
         $exam->refresh();
+        $this->assertSame(['hard' => 20], $exam->examSubjects()->firstOrFail()->difficulty_distribution);
         $this->assertSame('Updated Exam', $exam->title);
         $this->assertEquals(60, (float) $exam->total_marks);
 
@@ -100,6 +110,26 @@ class ExamModuleTest extends TestCase
             ->assertRedirect();
 
         $this->assertSame(Exam::STATUS_CANCELLED, $exam->refresh()->status);
+    }
+
+    public function test_unified_exam_screen_lists_categories_and_supports_filters_within_owner_scope(): void
+    {
+        $organization = Organization::factory()->create();
+        $admin = User::factory()->create(['role' => User::ROLE_ORGANIZATION_ADMIN, 'organization_id' => $organization->id]);
+        $assessment = Exam::factory()->create(['organization_id' => $organization->id, 'exam_category' => Exam::CATEGORY_ASSESSMENT]);
+        $recruitment = Exam::factory()->create(['organization_id' => $organization->id, 'exam_category' => Exam::CATEGORY_RECRUITMENT]);
+        Exam::factory()->create(['organization_id' => Organization::factory(), 'exam_category' => Exam::CATEGORY_ASSESSMENT]);
+
+        $this->actingAs($admin)->get('/exams')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('Exams/Index')
+            ->has('exams.data', 2)
+            ->where('exams.data', fn ($rows) => collect($rows)->pluck('id')->sort()->values()->all() === collect([$assessment->id, $recruitment->id])->sort()->values()->all())
+        );
+        $this->get('/exams?category=assessment')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->has('exams.data', 1)
+            ->where('exams.data.0.id', $assessment->id)
+            ->where('filters.category', 'assessment')
+        );
     }
 
     public function test_exam_subjects_must_belong_to_actor_scope(): void

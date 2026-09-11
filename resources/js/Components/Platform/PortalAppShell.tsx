@@ -73,6 +73,7 @@ const iconByLabel = {
     Questions: FileQuestion,
     Assessment: ClipboardCheck,
     Exams: ClipboardList,
+    'Exams/Assessment': ClipboardList,
     'Recruitment Exams': ClipboardList,
     Assessments: ClipboardCheck,
     'Create Assessment': ClipboardCheck,

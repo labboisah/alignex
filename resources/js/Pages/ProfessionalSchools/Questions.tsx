@@ -8,7 +8,7 @@ import { Button } from '@/Components/ui/button';
 const inputClass = 'mt-1 block w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary sm:text-sm';
 
 export default function Questions({ professionalSchool, questions, questionBanks = [], importCourses = [], importModules = [], importSummary }: { professionalSchool: any; questions: any[]; questionBanks?: any[]; importCourses?: any[]; importModules?: any[]; importSummary?: any }) {
-    const importForm = useForm<{ question_bank_id: string; file: File | null }>({ question_bank_id: '', file: null });
+    const importForm = useForm<{ question_bank_id: string; file: File | null; status: string }>({ question_bank_id: '', file: null, status: 'draft' });
     const submitImport = (event: FormEvent) => {
         event.preventDefault();
         importForm.post(`/professional-schools/${professionalSchool.id}/questions/import`, { onSuccess: () => importForm.reset('file') });
@@ -32,6 +32,12 @@ export default function Questions({ professionalSchool, questions, questionBanks
                     <div className="grid gap-4 md:grid-cols-2">
                         <QuestionBankPicker courses={importCourses} moduleOptions={importModules} banks={questionBanks} courseMode value={importForm.data.question_bank_id} disabled={importForm.processing} onChange={bank => importForm.setData('question_bank_id', bank?.id ?? '')} />
                         {importForm.errors.question_bank_id && <p role="alert" className="text-danger">{importForm.errors.question_bank_id}</p>}
+                        <Field label="Import status" error={importForm.errors.status}>
+                            <select aria-label="Import status" className={inputClass} required disabled={importForm.processing} value={importForm.data.status} onChange={event => importForm.setData('status', event.target.value)}>
+                                {['draft', 'review', 'approved', 'rejected', 'archived'].map(status => <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>)}
+                            </select>
+                            <span className="mt-1 block text-xs text-slate-500">Applied to every imported question, overriding the CSV status.</span>
+                        </Field>
                         <Field label="CSV File" error={importForm.errors.file}>
                             <input required type="file" accept=".csv,text/csv" className={inputClass} onChange={(event) => importForm.setData('file', event.target.files?.[0] ?? null)} />
                         </Field>

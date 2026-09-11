@@ -89,7 +89,8 @@ class StoreExamRequest extends FormRequest
             'subjects.*.number_of_questions' => ['required', 'integer', 'min:1', 'max:1000'],
             'subjects.*.marks_per_question' => ['required', 'numeric', 'min:0.01', 'max:1000'],
             'subjects.*.duration_minutes' => ['nullable', 'integer', 'min:1', 'max:10080'],
-            'subjects.*.difficulty_distribution' => ['nullable', 'array'],
+            'subjects.*.difficulty_distribution' => ['nullable', 'array:easy,medium,hard'],
+            'subjects.*.difficulty_distribution.*' => ['required', 'integer', 'min:0', 'max:1000'],
             'question_bank_id' => ['nullable', 'exists:question_banks,id'],
             'candidate_ids' => [Rule::excludeIf($this->isSecondaryExamRequest() || $this->isProfessionalExamRequest() || $this->isInstitutionExamRequest()), 'nullable', 'array'],
             'candidate_ids.*' => [Rule::excludeIf($this->isSecondaryExamRequest() || $this->isProfessionalExamRequest() || $this->isInstitutionExamRequest()), 'string', 'exists:candidates,id', 'distinct'],
@@ -142,6 +143,17 @@ class StoreExamRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
+            foreach ($this->input('subjects', []) as $index => $row) {
+                $distribution = is_array($row) ? ($row['difficulty_distribution'] ?? []) : [];
+                if (is_array($distribution) && $distribution !== [] && ! $validator->errors()->any()) {
+                    if (array_sum($distribution) != (int) ($row['number_of_questions'] ?? 0)) {
+                        $validator->errors()->add("subjects.{$index}.difficulty_distribution", 'Difficulty counts must add up to the number of questions.');
+                    }
+                    if (($this->input('exam_mode') ?? $this->input('mode')) === Exam::MODE_ADAPTIVE) {
+                        $validator->errors()->add("subjects.{$index}.difficulty_distribution", 'Fixed difficulty selection requires traditional mode. Adaptive exams choose difficulty as candidates progress.');
+                    }
+                }
+            }
             if (($this->input('exam_mode') ?? $this->input('mode')) !== Exam::MODE_ADAPTIVE) {
                 $seenSubjects = [];
                 foreach ($this->input('subjects', []) as $index => $row) {

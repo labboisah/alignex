@@ -213,8 +213,9 @@ class CbtCenterFeatureTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Dashboard/Index')
                 ->where('auth.navigation.1.label', 'Candidates')
-                ->where('auth.navigation.2.children.3.label', 'Exams')
-                ->where('auth.navigation.2.children.4.label', 'Traditional CBT Exams')
+                ->has('auth.navigation.2.children', 5)
+                ->where('auth.navigation.2.children.4.label', 'Exams/Assessment')
+                ->where('auth.navigation.2.children.4.href', '/exams')
             );
 
         $orgAdmin = User::factory()->create(['role' => User::ROLE_ORGANIZATION_ADMIN, 'organization_id' => $organization->id]);

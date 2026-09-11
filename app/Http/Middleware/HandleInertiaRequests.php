@@ -173,7 +173,7 @@ class HandleInertiaRequests extends Middleware
                 ['label' => 'Assessment', 'children' => [
                     ['label' => 'Question Bank', 'href' => '/question-bank', 'permission' => 'manageQuestionBank'],
                     ['label' => 'Questions', 'href' => '/questions', 'permission' => 'manageQuestionBank'],
-                    ['label' => 'Exams', 'href' => '/exams', 'permission' => 'manageExams'],
+                    ['label' => 'Exams/Assessment', 'href' => '/exams', 'permission' => 'manageExams'],
                 ]],
                 ...$departmentItems,
                 ['label' => 'Reports', 'children' => [
@@ -190,7 +190,7 @@ class HandleInertiaRequests extends Middleware
                 ['label' => 'Topics', 'href' => '/topics', 'permission' => 'manageQuestionBank'],
                 ['label' => 'Question Bank', 'href' => '/question-bank', 'permission' => 'manageQuestionBank'],
                 ['label' => 'Questions', 'href' => '/questions', 'permission' => 'manageQuestionBank'],
-                ['label' => 'Assessments', 'href' => '/exams?category=assessment', 'permission' => 'manageExams'],
+                ['label' => 'Exams/Assessment', 'href' => '/exams', 'permission' => 'manageExams'],
                 ['label' => 'Results', 'href' => '/results', 'permission' => 'viewReports'],
                 ['label' => 'Offline Server', 'href' => '/offline-server/download', 'feature' => 'offline_activation'],
                 ['label' => 'Client App', 'href' => '/candidate-client/download'],
@@ -208,7 +208,7 @@ class HandleInertiaRequests extends Middleware
                     ['label' => 'Modules', 'href' => $base.'/modules', 'permission' => 'manageQuestionBank'],
                     ['label' => 'Question Bank', 'href' => $base.'/question-banks', 'permission' => 'manageQuestionBank'],
                     ['label' => 'Questions', 'href' => $base.'/questions', 'permission' => 'manageQuestionBank'],
-                    ['label' => 'Assessments', 'href' => '/exams?category=assessment', 'permission' => 'manageExams'],
+                    ['label' => 'Exams/Assessment', 'href' => '/exams', 'permission' => 'manageExams'],
                     ['label' => 'Results', 'href' => '/results', 'permission' => 'viewReports'],
                     ['label' => 'Offline Server', 'href' => '/offline-server/download', 'feature' => 'offline_activation'],
                     ['label' => 'Client App', 'href' => '/candidate-client/download'],
@@ -234,8 +234,7 @@ class HandleInertiaRequests extends Middleware
                         ['label' => 'Topics', 'href' => '/topics', 'permission' => 'manageQuestionBank'],
                         ['label' => 'Question Bank', 'href' => '/question-bank', 'permission' => 'manageQuestionBank'],
                         ['label' => 'Questions', 'href' => '/questions', 'permission' => 'manageQuestionBank'],
-                        ['label' => 'Exams', 'href' => '/exams?category=terminal', 'permission' => 'manageExams'],
-                        ['label' => 'Assessments', 'href' => '/exams?category=assessment', 'permission' => 'manageExams'],
+                        ['label' => 'Exams/Assessment', 'href' => '/exams', 'permission' => 'manageExams'],
                     ]],
                     ['label' => 'Results', 'href' => '/results', 'permission' => 'viewReports'],
                     ['label' => 'Reports', 'href' => '/reports', 'permission' => 'viewReports', 'feature' => 'custom_reports'],
@@ -260,9 +259,7 @@ class HandleInertiaRequests extends Middleware
                     ['label' => 'Exam', 'children' => [
                         ['label' => 'Question Bank', 'href' => $professionalBase.'/question-banks', 'permission' => 'manageQuestionBank'],
                         ['label' => 'Questions', 'href' => $professionalBase.'/questions', 'permission' => 'manageQuestionBank'],
-                        ['label' => 'Traditional Exams', 'href' => '/exams?mode=traditional', 'permission' => 'manageExams'],
-                        ['label' => 'Adaptive Exams', 'href' => '/exams?mode=adaptive', 'permission' => 'manageExams', 'feature' => 'adaptive_exam'],
-                        ['label' => 'Certification Exams', 'href' => '/exams?category=certification', 'permission' => 'manageExams'],
+                        ['label' => 'Exams/Assessment', 'href' => '/exams', 'permission' => 'manageExams'],
                     ]],
                     ['label' => 'Reports', 'children' => [
                         ['label' => 'Results', 'href' => '/results', 'permission' => 'viewReports'],
@@ -286,9 +283,7 @@ class HandleInertiaRequests extends Middleware
                         ['label' => 'Topics', 'href' => '/topics', 'permission' => 'manageQuestionBank'],
                         ['label' => 'Question Bank', 'href' => $cbtCenterBase.'/question-banks', 'permission' => 'manageQuestionBank'],
                         ['label' => 'Questions', 'href' => '/questions', 'permission' => 'manageQuestionBank'],
-                        ['label' => 'Exams', 'href' => '/exams', 'permission' => 'manageExams'],
-                        ['label' => 'Traditional CBT Exams', 'href' => '/exams?mode=traditional', 'permission' => 'manageExams'],
-                        ['label' => 'Adaptive CBT Exams', 'href' => '/exams?mode=adaptive', 'permission' => 'manageExams', 'feature' => 'adaptive_exam'],
+                        ['label' => 'Exams/Assessment', 'href' => '/exams', 'permission' => 'manageExams'],
                     ]],
                     ['label' => 'Reports', 'children' => [
                         ['label' => 'Results', 'href' => '/results', 'permission' => 'viewReports'],
@@ -313,11 +308,7 @@ class HandleInertiaRequests extends Middleware
                         ['label' => 'Questions', 'href' => '/questions', 'permission' => 'manageQuestionBank'],
                     ]],
                     ['label' => 'Exams', 'children' => [
-                        ['label' => 'Exams', 'href' => '/exams', 'permission' => 'manageExams'],
-                        ['label' => 'Recruitment Exams', 'href' => '/exams?category=recruitment', 'permission' => 'manageExams'],
-                        ['label' => 'Assessment Exams', 'href' => '/exams?category=assessment', 'permission' => 'manageExams'],
-                        ['label' => 'Certification Exams', 'href' => '/exams?category=certification', 'permission' => 'manageExams'],
-                        ['label' => 'Adaptive Exams', 'href' => '/exams?mode=adaptive', 'permission' => 'manageExams', 'feature' => 'adaptive_exam'],
+                        ['label' => 'Exams/Assessment', 'href' => '/exams', 'permission' => 'manageExams'],
                     ]],
                     ['label' => 'Reports', 'children' => [
                         ['label' => 'Results', 'href' => '/results'],
@@ -350,7 +341,7 @@ class HandleInertiaRequests extends Middleware
                 ['label' => 'Assessment', 'children' => [
                     ['label' => 'Question Bank', 'href' => '/question-bank', 'permission' => 'manageQuestionBank'],
                     ['label' => 'Questions', 'href' => '/questions', 'permission' => 'manageQuestionBank'],
-                    ['label' => 'Exams', 'href' => '/exams', 'permission' => 'manageExams'],
+                    ['label' => 'Exams/Assessment', 'href' => '/exams', 'permission' => 'manageExams'],
                 ]],
                 ...$departmentItems,
                 ['label' => 'Reports', 'children' => [
