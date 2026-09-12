@@ -104,6 +104,87 @@ class ExamPaperGenerationTest extends TestCase
         $this->assertDatabaseCount('candidate_papers', 0);
     }
 
+    public function test_configured_marks_are_snapshotted_used_for_scoring_and_shown_to_candidates(): void
+    {
+        [$admin, $exam] = $this->examWithCandidateAndQuestions();
+        $exam->examSubjects()->update(['marks_per_question' => 2.5, 'total_marks' => 5]);
+        $exam->update(['total_marks' => 5, 'pass_mark' => 3]);
+        $this->actingAs($admin)->post("/exams/{$exam->id}/papers/generate")->assertSessionHasNoErrors();
+        $attempt = $exam->attempts()->with('papers.question.options')->firstOrFail();
+        $this->assertEquals(5, $attempt->total_marks);
+        $this->assertSame(['2.50', '2.50'], $attempt->papers->pluck('marks')->all());
+
+        $paper = $attempt->papers->first();
+        $this->assertSame(2.5, CandidatePaperResource::make($paper)->resolve()['marks']);
+        $paper->question->update(['marks' => 99]);
+        $answer = $attempt->answers()->create([
+            'question_id' => $paper->question_id,
+            'selected_option_ids' => $paper->question->options->where('is_correct', true)->pluck('id')->all(),
+        ]);
+        $result = app(\App\Services\ExamResultService::class)->calculate($attempt);
+        $this->assertEquals(2.5, $result->score);
+        $this->assertEquals(5, $result->total_marks);
+        $this->assertEquals(50, $result->percentage);
+        $this->assertSame('failed', $result->result_status);
+        $this->assertEquals(2.5, $answer->fresh()->score_awarded);
+    }
+
+    public function test_legacy_papers_keep_question_mark_scoring(): void
+    {
+        [$admin, $exam] = $this->examWithCandidateAndQuestions();
+        $this->actingAs($admin)->post("/exams/{$exam->id}/papers/generate")->assertSessionHasNoErrors();
+        $attempt = $exam->attempts()->firstOrFail();
+        $attempt->papers()->update(['marks' => null]);
+        $paper = $attempt->papers()->with('question.options')->firstOrFail();
+        $answer = $attempt->answers()->create([
+            'question_id' => $paper->question_id,
+            'selected_option_ids' => $paper->question->options->where('is_correct', true)->pluck('id')->all(),
+        ]);
+        $this->assertEquals($paper->question->marks, app(\App\Services\ExamResultService::class)->scoreAnswer($attempt, $answer));
+        $this->assertEquals($paper->question->marks, CandidatePaperResource::make($paper)->resolve()['marks']);
+    }
+
+    public function test_readiness_is_read_only_and_requires_complete_matching_papers(): void
+    {
+        [$admin, $exam] = $this->examWithCandidateAndQuestions();
+        $exam->update(['total_marks' => 2, 'pass_mark' => 1, 'duration_minutes' => 60, 'ends_at' => now()->addDay()->addHours(2), 'status' => Exam::STATUS_DRAFT]);
+        $service = app(\App\Services\ExamReadinessService::class);
+        $before = $exam->participants()->count();
+        $readiness = $service->inspect($exam);
+        $this->assertFalse($readiness['ready']);
+        $this->assertSame($before, $exam->participants()->count());
+        $this->assertFalse(collect($readiness['checks'])->firstWhere('id', 'papers')['ready']);
+
+        $this->actingAs($admin)->post("/exams/{$exam->id}/papers/generate")->assertSessionHasNoErrors();
+        $this->assertTrue($service->inspect($exam->fresh())['ready']);
+        $this->actingAs($admin)->get("/exams/{$exam->id}")->assertOk()->assertInertia(fn (Assert $page) => $page->where('readiness.ready', true));
+        $row = $exam->examSubjects()->firstOrFail();
+        $payload = [
+            'title' => $exam->title, 'exam_code' => $exam->code, 'exam_type' => 'secondary',
+            'mode' => 'traditional', 'delivery_mode' => 'online', 'status' => Exam::STATUS_SCHEDULED,
+            'start_at' => $exam->starts_at->format('Y-m-d H:i:s'), 'end_at' => $exam->ends_at->format('Y-m-d H:i:s'),
+            'duration_minutes' => 60, 'pass_mark' => 1, 'question_bank_id' => $exam->question_bank_id,
+            'candidate_ids' => $exam->candidates->pluck('id')->all(),
+            'subjects' => [['subject_id' => $row->subject_id, 'question_bank_id' => $row->question_bank_id,
+                'number_of_questions' => 2, 'marks_per_question' => 1, 'difficulty_distribution' => ['easy' => 1, 'medium' => 1]]],
+            'settings' => ['shuffle_questions' => true, 'shuffle_options' => true, 'show_result_immediately' => false,
+                'allow_back_navigation' => true, 'require_webcam' => false, 'require_fullscreen' => true,
+                'max_tab_switches' => 3, 'negative_marking' => false, 'bind_device' => false, 'allow_retake' => false],
+        ];
+        $this->actingAs($admin)->patch("/exams/{$exam->id}", $payload)->assertSessionHasNoErrors();
+        $this->assertSame(Exam::STATUS_SCHEDULED, $exam->fresh()->status);
+        $payload['subjects'][0]['difficulty_distribution'] = ['hard' => 2];
+        $this->actingAs($admin)->patch("/exams/{$exam->id}", $payload)->assertSessionHasErrors('status');
+        $this->assertSame(['easy' => 1, 'medium' => 1], $exam->examSubjects()->firstOrFail()->difficulty_distribution);
+        $exam->update(['pass_mark' => 3]);
+        $this->assertFalse(collect($service->inspect($exam->fresh())['checks'])->firstWhere('id', 'marks')['ready']);
+        $exam->update(['pass_mark' => 1, 'duration_minutes' => 300]);
+        $this->assertFalse(collect($service->inspect($exam->fresh())['checks'])->firstWhere('id', 'timing')['ready']);
+        $exam->update(['duration_minutes' => 60]);
+        $exam->attempts()->firstOrFail()->papers()->firstOrFail()->delete();
+        $this->assertFalse(collect($service->inspect($exam->fresh())['checks'])->firstWhere('id', 'papers')['ready']);
+    }
+
     private function examWithCandidateAndQuestions(): array
     {
         $organization = Organization::factory()->create();

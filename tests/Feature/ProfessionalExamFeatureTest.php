@@ -513,7 +513,7 @@ class ProfessionalExamFeatureTest extends TestCase
             'end_at' => now()->addDays(2)->toDateTimeString(),
             'duration_minutes' => 90,
             'pass_mark' => 50,
-            'status' => ($overrides['mode'] ?? Exam::MODE_ADAPTIVE) === Exam::MODE_ADAPTIVE ? Exam::STATUS_DRAFT : Exam::STATUS_SCHEDULED,
+            'status' => Exam::STATUS_DRAFT,
             'subjects' => [
                 [
                     'subject_id' => (string) $subject->id,

@@ -41,7 +41,7 @@ class AdaptiveOfflineBoundaryTest extends TestCase
         $attempt = CandidateExamAttempt::factory()->create(['exam_id' => $exam->id, 'candidate_id' => $candidate->id]);
         $question = Question::factory()->create(['question_type' => 'single_choice', 'marks' => 2]);
         $option = QuestionOption::factory()->create(['question_id' => $question->id, 'is_correct' => true]);
-        CandidatePaper::create(['attempt_id' => $attempt->id, 'question_id' => $question->id, 'question_order' => 1, 'option_order' => [$option->id]]);
+        CandidatePaper::create(['attempt_id' => $attempt->id, 'question_id' => $question->id, 'question_order' => 1, 'marks' => 5, 'option_order' => [$option->id]]);
         $before = $attempt->fresh()->getAttributes();
         $this->syncAdmin();
         $this->getJson('/api/offline/exam-packages/'.$exam->code)->assertOk()
@@ -49,6 +49,7 @@ class AdaptiveOfflineBoundaryTest extends TestCase
             ->assertJsonPath('package.manifest.exam_mode', 'traditional')
             ->assertJsonPath('package.manifest.exam_context', $context)
             ->assertJsonPath('package.papers.0.questions.0.question_id', $question->id)
+            ->assertJsonPath('package.questions.0.marks', 5)
             ->assertJsonCount(1, 'package.candidates');
         $this->assertSame($before, $attempt->fresh()->getAttributes());
     }

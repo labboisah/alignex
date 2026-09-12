@@ -180,6 +180,7 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
 
     return (
         <form onSubmit={submit}>
+            <p className="mb-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">Save as Draft first. Complete the readiness checklist on the exam page, then change the status to Scheduled or Active.</p>
             {hasErrors && (
                 <div className="mb-5 rounded-md border border-red-200 bg-red-50 p-4 text-danger">
                     <div className="flex gap-3">
@@ -382,6 +383,7 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
                                 ) : <div className="text-sm text-slate-500">Adaptive difficulty changes as candidates progress.</div>}
                                 <Field label="Marks Each" error={fieldError(errors, `subjects.${index}.marks_per_question`)}>
                                     <input className={inputClass} type="number" min="0.01" step="0.01" value={row.marks_per_question} onChange={(event) => setSubject(index, { marks_per_question: event.target.value })} required />
+                                    <span className="mt-1 block text-xs text-slate-500">{data.mode === 'traditional' ? 'Each correct answer earns this mark, regardless of the question-bank mark. Saved when papers are generated.' : 'Sets the scoring budget for this paper row.'}</span>
                                 </Field>
                                 <Field label="Duration" error={fieldError(errors, `subjects.${index}.duration_minutes`)}>
                                     <input className={inputClass} type="number" min="1" value={row.duration_minutes ?? ''} onChange={(event) => setSubject(index, { duration_minutes: event.target.value })} placeholder="Optional" />

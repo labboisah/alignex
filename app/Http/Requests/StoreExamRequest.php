@@ -143,6 +143,20 @@ class StoreExamRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
+            $exam = $this->route('exam');
+            if ($exam instanceof Exam && $exam->effectiveMode() === Exam::MODE_TRADITIONAL
+                && $exam->attempts()->whereHas('papers')->exists()) {
+                $configured = $exam->examSubjects->map(fn ($row) => [
+                    (string) $row->subject_id, (int) $row->question_count, (float) $row->marks_per_question,
+                ])->sortBy(fn ($row) => $row[0])->values()->all();
+                $requested = collect($this->input('subjects', []))->filter(fn ($row) => is_array($row))->map(fn ($row) => [
+                    (string) ($row['subject_id'] ?? ''), (int) ($row['number_of_questions'] ?? 0), (float) ($row['marks_per_question'] ?? 0),
+                ])->sortBy(fn ($row) => $row[0])->values()->all();
+                if ($configured !== $requested) {
+                    $validator->errors()->add('subjects', 'Question counts and Marks Each cannot change after papers have been generated. Create a new exam to use a different scoring setup.');
+                }
+            }
+
             foreach ($this->input('subjects', []) as $index => $row) {
                 $distribution = is_array($row) ? ($row['difficulty_distribution'] ?? []) : [];
                 if (is_array($distribution) && $distribution !== [] && ! $validator->errors()->any()) {

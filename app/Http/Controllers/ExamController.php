@@ -86,6 +86,7 @@ class ExamController extends Controller
         return Inertia::render('Exams/Show', [
             'exam' => ExamResource::make($exam->load(['organization', 'institution', 'faculty', 'department', 'school', 'center', 'secondarySchool', 'professionalSchool', 'cbtCenter', 'examType', 'questionBank', 'examSubjects.subject', 'examSubjects.questionBank', 'candidates'])->loadCount(['participants', 'attempts', 'examSubjects'])),
             'adaptive_notice' => app(AdaptiveRolloutService::class)->isAdaptive($exam) ? 'Candidates begin at Level 1 and can improve weaker areas in further levels, according to your settings.' : null,
+            'readiness' => app(\App\Services\ExamReadinessService::class)->inspect($exam),
             'supervisors' => $this->supervisorRows($exam),
             'supervisorOptions' => $this->supervisorOptions($request->user(), $exam),
             'can' => [
@@ -288,6 +289,10 @@ class ExamController extends Controller
 
     private function persistExam(StoreExamRequest $request, ?Exam $exam = null): Exam
     {
+        if ($exam) {
+            $exam = Exam::query()->lockForUpdate()->findOrFail($exam->id);
+        }
+        $previousStatus = $exam?->status;
         $data = $request->validated();
         $tenant = $this->tenantFor($request, $data, $exam);
         if (($tenant['exam_owner_type'] ?? null) === Exam::OWNER_INSTITUTION) {
@@ -446,6 +451,17 @@ class ExamController extends Controller
             $prepared = app(AdaptivePreparationService::class)->prepare($exam->fresh(), $request->user()->id);
             if (! $prepared->ready && in_array($exam->status, [Exam::STATUS_ACTIVE, Exam::STATUS_SCHEDULED], true)) {
                 throw ValidationException::withMessages(['subjects' => 'Add enough approved questions before opening this exam. '.implode(' ', $prepared->readiness['warnings'])]);
+            }
+        }
+
+        if (in_array($exam->status, [Exam::STATUS_SCHEDULED, Exam::STATUS_ACTIVE], true)) {
+            app(\App\Services\ExamReadinessService::class)->ensureReady($exam->fresh());
+            if ($previousStatus !== $exam->status) {
+                $exam->auditLogs()->create([
+                    'actor_user_id' => $request->user()->id, 'actor_type' => 'user',
+                    'event_type' => 'exam_published', 'description' => 'Exam readiness passed before publication.',
+                    'metadata' => ['previous_status' => $previousStatus, 'status' => $exam->status], 'occurred_at' => now(),
+                ]);
             }
         }
 

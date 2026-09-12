@@ -244,7 +244,7 @@ class SharedExamWorkflowTest extends TestCase
             'end_at' => now()->addDay()->addHours(2)->format('Y-m-d\TH:i'),
             'duration_minutes' => 60,
             'pass_mark' => 1,
-            'status' => Exam::STATUS_SCHEDULED,
+            'status' => Exam::STATUS_DRAFT,
             'subjects' => [['subject_id' => $subjectId, 'number_of_questions' => 1, 'marks_per_question' => 1]],
             'settings' => [
                 'shuffle_questions' => false,

@@ -51,6 +51,10 @@ class ExamModuleTest extends TestCase
             $this->assertDatabaseCount('exams', 0);
         }
         $payload['subjects'][0]['difficulty_distribution'] = ['easy' => 25];
+        foreach ([Exam::STATUS_SCHEDULED, Exam::STATUS_ACTIVE] as $status) {
+            $this->actingAs($admin)->post('/exams', array_replace($payload, ['status' => $status]))->assertSessionHasErrors('status');
+            $this->assertDatabaseCount('exams', 0);
+        }
 
         $this->actingAs($admin)
             ->post('/exams', $payload)
@@ -104,6 +108,18 @@ class ExamModuleTest extends TestCase
         $this->assertSame(['hard' => 20], $exam->examSubjects()->firstOrFail()->difficulty_distribution);
         $this->assertSame('Updated Exam', $exam->title);
         $this->assertEquals(60, (float) $exam->total_marks);
+
+        $attempt = \App\Models\CandidateExamAttempt::factory()->create([
+            'exam_id' => $exam->id, 'candidate_id' => $candidate->id,
+        ]);
+        $question = \App\Models\Question::factory()->create(['question_bank_id' => $bank->id, 'subject_id' => $subject->id]);
+        $attempt->papers()->create(['question_id' => $question->id, 'question_order' => 1, 'marks' => 3]);
+        $this->actingAs($admin)->patch("/exams/{$exam->id}", $updated)->assertSessionHasNoErrors();
+        $changedMarks = $updated;
+        $changedMarks['subjects'][0]['marks_per_question'] = 9;
+        $this->actingAs($admin)->patch("/exams/{$exam->id}", $changedMarks)->assertSessionHasErrors('subjects');
+        $this->assertEquals(3, $exam->examSubjects()->firstOrFail()->marks_per_question);
+
 
         $this->actingAs($admin)
             ->patch("/exams/{$exam->id}/cancel")
@@ -176,7 +192,7 @@ class ExamModuleTest extends TestCase
             'end_at' => now()->addDay()->addHours(2)->format('Y-m-d\TH:i'),
             'duration_minutes' => 90,
             'pass_mark' => 25,
-            'status' => Exam::STATUS_SCHEDULED,
+            'status' => Exam::STATUS_DRAFT,
             'subjects' => [
                 [
                     'subject_id' => $subjectId,

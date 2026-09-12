@@ -42,7 +42,7 @@ class ExamResultService
                 ]);
             }
 
-            $totalMarks = (float) ($attempt->total_marks ?: $attempt->papers->sum(fn ($paper) => (float) ($paper->question?->marks ?? 0)));
+            $totalMarks = (float) ($attempt->total_marks ?: $attempt->papers->sum(fn ($paper) => $paper->scoringMarks()));
             $percentage = $totalMarks > 0 ? round(($score / $totalMarks) * 100, 2) : 0;
             $passed = $score >= (float) ($attempt->exam?->pass_mark ?? 0);
             $durationUsed = $attempt->started_at ? $attempt->started_at->diffInSeconds($submittedAt) : null;
@@ -93,7 +93,10 @@ class ExamResultService
             ->all();
 
         if ($selectedIds === $correctIds) {
-            return (float) $question->marks;
+            $attempt->loadMissing('papers.question');
+            $paper = $attempt->papers->firstWhere('question_id', $question->id);
+
+            return $paper ? $paper->scoringMarks() : (float) $question->marks;
         }
 
         if (! (bool) data_get($attempt->exam?->settings ?? [], 'negative_marking', false)) {

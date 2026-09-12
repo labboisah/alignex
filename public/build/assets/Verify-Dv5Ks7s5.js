@@ -1,1 +1,0 @@
-import{j as t}from"./app-g_5Knngl.js";import{Lookup as r}from"./Self-DWuoKXhi.js";import"./button-DPv4tAv8.js";import"./clsx-B-dksMZM.js";function p(){return t.jsx(r,{title:"Verify Result",endpoint:"/api/results/verify",fields:["hash"]})}export{p as default};

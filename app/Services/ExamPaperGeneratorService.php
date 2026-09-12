@@ -139,12 +139,13 @@ class ExamPaperGeneratorService
                         'question_id' => $question->id,
                         'question_order' => $questionOrder++,
                         'option_order' => $optionIds->all(),
+                        'marks' => $exam->examSubjects->firstWhere('subject_id', $question->subject_id)->marks_per_question,
                     ]);
                 }
 
                 $attempt->update([
                     'total_questions' => $questions->count(),
-                    'total_marks' => $questions->sum(fn ($question) => (float) $question->marks),
+                    'total_marks' => $attempt->papers()->sum('marks'),
                 ]);
 
                 $created++;
@@ -214,6 +215,33 @@ class ExamPaperGeneratorService
     /**
      * @return array<string, mixed>
      */
+    public function matchesConfiguration(Exam $exam, Collection $papers): bool
+    {
+        foreach ($exam->examSubjects as $row) {
+            $ids = $this->questionQuery($exam, $row)->whereIn('id', $papers->pluck('question_id'))->pluck('id');
+            $selected = $papers->whereIn('question_id', $ids);
+            if ($selected->count() !== (int) $row->question_count
+                || $selected->contains(fn ($paper) => abs($paper->scoringMarks() - (float) $row->marks_per_question) >= 0.005)) {
+                return false;
+            }
+            foreach ($row->difficulty_distribution ?? [] as $difficulty => $required) {
+                if ($selected->filter(fn ($paper) => $paper->question?->difficulty === $difficulty)->count() !== (int) $required) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    public function availability(Exam $exam): Collection
+    {
+        $exam->loadMissing('examSubjects.subject');
+
+        return $exam->examSubjects->sortBy('display_order')->values()
+            ->map(fn ($row) => $this->subjectSummary($exam, $row));
+    }
+
     private function subjectSummary(Exam $exam, $examSubject): array
     {
         $query = $this->questionQuery($exam, $examSubject);

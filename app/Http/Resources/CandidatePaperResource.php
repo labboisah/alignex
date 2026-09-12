@@ -24,7 +24,7 @@ class CandidatePaperResource extends JsonResource
             'subject_name' => $question?->relationLoaded('subject') ? $question->subject?->name : null,
             'question_text' => $question?->stem,
             'image_url' => $question?->image_path ? Storage::url($question->image_path) : null,
-            'marks' => $question?->marks,
+            'marks' => $this->resource->scoringMarks(),
             'options' => $question?->relationLoaded('options')
                 ? $question->options
                     ->sortBy(fn ($option) => $optionOrder->search($option->id) === false ? $option->display_order : $optionOrder->search($option->id))

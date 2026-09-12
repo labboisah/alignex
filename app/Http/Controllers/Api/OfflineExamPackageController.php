@@ -76,6 +76,10 @@ class OfflineExamPackageController extends Controller
             ->values()
             ->flatMap(fn (CandidateExamAttempt $attempt) => $attempt->papers)
             ->values();
+        if ($papers->groupBy('question_id')->contains(fn ($rows) => $rows->map(fn ($paper) => $paper->scoringMarks())->unique()->count() > 1)) {
+            return response()->json(['message' => 'These papers use different marks for the same question and cannot share one offline package. Create a new exam with a consistent scoring setup.'], 422);
+        }
+
         $questions = $papers
             ->pluck('question')
             ->filter()
@@ -139,7 +143,7 @@ class OfflineExamPackageController extends Controller
                 'unit_id' => (string) $question->subject_id,
                 'question_type' => $this->offlineQuestionType((string) $question->question_type),
                 'body' => (string) $question->stem,
-                'marks' => (float) $question->marks,
+                'marks' => $papers->firstWhere('question_id', $question->id)->scoringMarks(),
                 'display_order' => $index + 1,
             ]),
             'options' => $questions->values()->flatMap(fn (Question $question) => $question->options

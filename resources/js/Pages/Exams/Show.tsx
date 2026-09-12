@@ -1,3 +1,4 @@
+import { ReadinessChecklist, type ExamReadiness } from './ReadinessChecklist';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { Award, BarChart3, BriefcaseBusiness, FileText, Monitor, Pencil, RefreshCw, Shuffle, Trash2, UserCheck, UserPlus, XCircle } from 'lucide-react';
 import { PageHeader, PortalAppShell, ProtectedAction, StatusBadge } from '@/Components/Platform';
@@ -12,6 +13,7 @@ export default function ShowExam({ exam, can, supervisors = [], supervisorOption
     const isAssessmentRole = auth.user?.role === 'teacher' || auth.user?.role === 'facilitator';
     const noun = isAssessmentRole ? 'Assessment' : 'Exam';
     const record = exam.data;
+    const readiness = usePage().props.readiness as ExamReadiness | undefined;
     const adaptiveNotice = usePage().props.adaptive_notice as string | null;
     const { data, setData, post, processing, reset } = useForm({ user_id: '', role: 'supervisor' });
     const isSecondary = record.owner_context === 'secondary_school' || record.secondary_school_id;
@@ -44,6 +46,7 @@ export default function ShowExam({ exam, can, supervisors = [], supervisorOption
                 />
                 {(record.exam_mode ?? record.mode) === 'adaptive' && can.update && <div className="mb-4"><Button asChild variant="secondary"><Link href={'/exams/' + record.id + '/adaptive'}>Question readiness</Link></Button>{['offline','hybrid'].includes(String(record.delivery_mode)) && <Button asChild variant="secondary"><Link href={'/exams/' + record.id + '/adaptive/pilot'}>Center delivery</Link></Button>}</div>}
                 {adaptiveNotice && <div role="status" className="mb-5 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{adaptiveNotice}</div>}
+                {readiness && <ReadinessChecklist readiness={readiness} editable={can.update} examId={String(record.id)} />}
                 <div className="grid gap-4 md:grid-cols-4">
                     <Metric label="Status" value={record.status_label} badge={record.status} />
                     <Metric label="Owner Context" value={record.owner_context_label ?? 'Exam'} />
