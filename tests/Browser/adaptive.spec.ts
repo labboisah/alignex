@@ -176,6 +176,7 @@ test('proctor tab policy disqualifies through browser events and prevents furthe
 });
 
 test('camera denial blocks start; camera and fullscreen controls can be restored', async ({ page, request, context }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
     const data = await fixture(request, { settings: { require_webcam: true, require_fullscreen: true } });
     await context.grantPermissions(['camera']);
     await page.addInitScript(() => {
@@ -194,6 +195,10 @@ test('camera denial blocks start; camera and fullscreen controls can be restored
     // Routing can release the initial camera stream; the writing view offers explicit restoration.
     if (await page.getByRole('button', { name: 'Restore exam controls' }).isVisible()) await page.getByRole('button', { name: 'Restore exam controls' }).click();
     await expect(page.getByRole('radio').first()).toBeEnabled();
+    const preview = page.getByLabel('Your live webcam preview');
+    await expect(preview).toBeVisible();
+    await expect.poll(() => preview.evaluate((node: HTMLVideoElement) => node.readyState >= 2 && node.videoWidth > 0 && node.muted && node.playsInline)).toBeTruthy();
+    await expect(page.getByRole('region', { name: 'Your live camera' }).getByRole('status')).toHaveText('Live');
     await page.evaluate(() => document.exitFullscreen());
     await expect(page.getByRole('button', { name: 'Confirm and continue' })).toBeDisabled();
     await page.getByRole('button', { name: 'Restore exam controls' }).click();

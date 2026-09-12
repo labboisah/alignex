@@ -1,3 +1,4 @@
+import { CameraPreview } from './CameraPreview';
 import { enterExamFullscreen, isExamFullscreen, watchExamFullscreen } from './fullscreen';
 import AdaptiveExam, { initializeAdaptiveSession, clearAdaptiveSession, type AdaptivePayload } from './AdaptiveExam';
 import { Head } from '@inertiajs/react';
@@ -365,6 +366,7 @@ function ExamScreenPage() {
     const submittedRef = useRef(false);
     const questionStartedAt = useRef(Date.now());
     const videoRef = useRef<HTMLVideoElement | null>(null);
+    const [cameraError, setCameraError] = useState('');
     const webcamStreamRef = useRef<MediaStream | null>(null);
     const lastEventAt = useRef<Record<string, number>>({});
 
@@ -429,20 +431,36 @@ function ExamScreenPage() {
             return;
         }
 
-        navigator.mediaDevices?.getUserMedia({ video: true, audio: false })
-            .then((stream) => {
+        let disposed = false;
+        setCameraError('');
+        const startCamera = async () => {
+            try {
+                if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera unavailable');
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+                if (disposed) { stream.getTracks().forEach(track => track.stop()); return; }
                 webcamStreamRef.current = stream;
+                stream.getVideoTracks().forEach(track => track.addEventListener('ended', () => {
+                    if (disposed) return;
+                    setCameraError('Camera disconnected. Check your camera and browser permissions.');
+                    reportProctoringEvent('webcam_disconnected', { severity: 'high' });
+                }));
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream;
-                    videoRef.current.play().catch(() => undefined);
+                    videoRef.current.play().catch(() => {
+                        if (!disposed) setCameraError('Camera preview could not play. Check browser permissions.');
+                    });
                 }
-            })
-            .catch(() => {
+            } catch {
+                if (disposed) return;
+                setCameraError('Camera access failed. Allow camera access in your browser.');
                 setWarning('Webcam access failed. This has been reported to the supervisor.');
                 reportProctoringEvent('webcam_permission_failed', { severity: 'high' });
-            });
+            }
+        };
+        void startCamera();
 
         return () => {
+            disposed = true;
             webcamStreamRef.current?.getTracks().forEach((track) => track.stop());
             webcamStreamRef.current = null;
         };
@@ -777,7 +795,6 @@ function ExamScreenPage() {
                         </div>
                     </div>
                 )}
-                {payload.exam.settings.require_webcam && <video ref={videoRef} className="hidden" muted playsInline />}
                 <div className="sticky top-0 z-10 border-b border-border bg-white px-4 py-3 shadow-sm">
                     <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3">
                         <div>
@@ -802,6 +819,7 @@ function ExamScreenPage() {
                     </div>
                 )}
 
+                {payload.exam.settings.require_webcam && <div className="mx-auto flex max-w-7xl justify-end px-4 pt-4"><CameraPreview ref={videoRef} error={cameraError} /></div>}
                 <main className="mx-auto grid max-w-7xl gap-5 px-4 py-6 lg:grid-cols-[1fr_280px]">
                     <section className="rounded-md border border-border bg-white p-5 shadow-sm">
                         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

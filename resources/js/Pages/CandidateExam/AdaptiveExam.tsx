@@ -1,3 +1,4 @@
+import { CameraPreview } from './CameraPreview';
 import { enterExamFullscreen, isExamFullscreen, watchExamFullscreen } from './fullscreen';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -79,6 +80,7 @@ export default function AdaptiveExam() {
     const payloadRef = useRef<AdaptivePayload | null>(null);
     const stream = useRef<MediaStream | null>(null);
     const video = useRef<HTMLVideoElement | null>(null);
+    const [cameraError, setCameraError] = useState('');
     const heading = useRef<HTMLHeadingElement | null>(null);
     const errorAlert = useRef<HTMLDivElement | null>(null);
     useEffect(() => { if (error) errorAlert.current?.focus(); }, [error]);
@@ -234,10 +236,11 @@ export default function AdaptiveExam() {
         try {
             if (payload?.exam.settings.require_fullscreen) await enterExamFullscreen();
             failedControl = 'webcam';
+            setCameraError('');
             if (payload?.exam.settings.require_webcam && !stream.current?.active) {
                 if (!navigator.mediaDevices?.getUserMedia) throw new Error('A webcam is required. Use a supported browser and allow camera access.');
-                stream.current = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-                stream.current.getVideoTracks().forEach(track => track.addEventListener('ended', () => { setControlsReady(false); void event('webcam_disconnected'); }));
+                stream.current = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+                stream.current.getVideoTracks().forEach(track => track.addEventListener('ended', () => { setControlsReady(false); setCameraError('Camera disconnected. Enable exam controls to reconnect.'); void event('webcam_disconnected'); }));
                 if (video.current) video.current.srcObject = stream.current;
             }
             failedControl = 'fullscreen';
@@ -248,6 +251,7 @@ export default function AdaptiveExam() {
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Allow the required exam controls to continue.');
             setControlsReady(false);
+            if (failedControl === 'webcam') setCameraError('Camera access failed. Allow camera access and enable exam controls again.');
             void event(failedControl + '_permission_failed', { severity: 'high' });
         }
     };
@@ -281,7 +285,7 @@ export default function AdaptiveExam() {
             </div>
             {!payload && <p role="status">Loading your server state…</p>}
             {payload && <>
-                {payload.exam.settings.require_webcam && <video ref={node => { video.current = node; if (node && stream.current) node.srcObject = stream.current; }} autoPlay muted playsInline aria-label="Your webcam preview" className="h-24 w-32 rounded border bg-slate-900" />}
+                {payload.exam.settings.require_webcam && !payload.submitted && payload.attempt.status !== 'disqualified' && <CameraPreview error={cameraError} ref={node => { video.current = node; if (node && stream.current) node.srcObject = stream.current; }} />}
                 {payload.attempt.status === 'disqualified' ? <section className="rounded-lg border bg-white p-6"><h2 className="text-xl font-bold">Exam disqualified</h2><p>Contact your supervisor. Further answers and recovery levels are unavailable.</p></section> :
                 payload.submitted ? <section className="space-y-4 rounded-lg border bg-white p-6">
                     <h2 className="text-xl font-bold">Level completed</h2>
