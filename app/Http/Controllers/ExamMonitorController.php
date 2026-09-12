@@ -18,6 +18,23 @@ class ExamMonitorController extends Controller
 {
     public function __construct(private readonly ExamMonitorService $monitor) {}
 
+    public function evidence(Request $request, Exam $exam, \App\Models\ProctoringEvent $event)
+    {
+        $this->authorizeExam($request->user(), $exam);
+        abort_unless((string) $event->exam_id === (string) $exam->id, 404);
+        $path = data_get($event->payload, 'snapshot_path');
+        abort_unless(is_string($path) && preg_match('~^proctoring-snapshots/[A-Za-z0-9_-]+\\.(jpg|jpeg|png)$~', $path), 404);
+        abort_unless($event->candidate_exam_attempt_id && str_starts_with($path, 'proctoring-snapshots/'.$event->candidate_exam_attempt_id.'-'), 404);
+        $disk = \Illuminate\Support\Facades\Storage::disk('public');
+        abort_unless($disk->exists($path), 404, 'This evidence image is no longer available.');
+
+        return $disk->response($path, null, [
+            'Content-Type' => str_ends_with($path, '.png') ? 'image/png' : 'image/jpeg',
+            'Cache-Control' => 'private, no-store',
+            'X-Content-Type-Options' => 'nosniff',
+        ], 'inline');
+    }
+
     public function show(Request $request, Exam $exam): Response
     {
         $this->authorizeExam($request->user(), $exam);

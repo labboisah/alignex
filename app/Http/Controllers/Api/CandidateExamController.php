@@ -641,6 +641,7 @@ class CandidateExamController extends Controller
      */
     private function prepareEventMetadata(CandidateExamAttempt $attempt, array $metadata): array
     {
+        unset($metadata['snapshot_path'], $metadata['snapshot_url']);
         $snapshot = data_get($metadata, 'webcam_snapshot');
 
         if (! is_string($snapshot) || ! (bool) data_get($this->proctorSettings($attempt), 'require_webcam', false)) {

@@ -1,3 +1,4 @@
+import { EvidenceImage, EvidenceDetails } from './Evidence';
 import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft, Printer } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -94,8 +95,8 @@ export default function IncidentReport({ exam, supervisor, summary, rows, events
                             <td>{event.registration_number ?? 'N/A'}</td>
                             <td>{event.event_type.replaceAll('_', ' ')}</td>
                             <td>{event.severity}</td>
-                            <td>{event.snapshot_url ? <a className="text-primary underline" href={event.snapshot_url} target="_blank" rel="noreferrer">Evidence</a> : 'None'}</td>
-                            <td className="max-w-md truncate">{event.payload ? JSON.stringify(event.payload) : 'N/A'}</td>
+                            <td><EvidenceImage key={event.snapshot_url} url={event.snapshot_url} /></td>
+                            <td><EvidenceDetails payload={event.payload} /></td>
                         </tr>
                     ))}
                 </ReportTable>

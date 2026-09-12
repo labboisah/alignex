@@ -1,3 +1,4 @@
+import { EvidenceImage, EvidenceDetails } from './Evidence';
 import { Head, Link } from '@inertiajs/react';
 import { Activity, AlertTriangle, CheckCircle2, Clock, FileText, LogIn, RefreshCw, RotateCcw, StopCircle, Users, WifiOff } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -337,15 +338,9 @@ export default function ExamMonitorShow({ exam, summary: initialSummary, rows: i
                                         <td>{event.event_type.replaceAll('_', ' ')}</td>
                                         <td><StatusBadge label={event.severity} tone={event.severity === 'critical' ? 'danger' : event.severity === 'info' ? 'neutral' : 'warning'} /></td>
                                         <td>
-                                            {event.snapshot_url ? (
-                                                <a href={event.snapshot_url} target="_blank" rel="noreferrer" className="inline-block">
-                                                    <img src={event.snapshot_url} alt="Webcam evidence" className="h-14 w-20 rounded-md border border-border object-cover" />
-                                                </a>
-                                            ) : (
-                                                <span className="text-slate-500">None</span>
-                                            )}
+                                            <EvidenceImage key={event.snapshot_url} url={event.snapshot_url} />
                                         </td>
-                                        <td className="max-w-xs truncate text-slate-600">{event.payload ? JSON.stringify(event.payload) : 'N/A'}</td>
+                                        <td className="text-slate-600"><EvidenceDetails payload={event.payload} /></td>
                                     </tr>
                                 ))}
                             </tbody>

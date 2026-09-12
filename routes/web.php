@@ -477,6 +477,7 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
         Route::get('/exams/{exam}/monitor/summary', [ExamMonitorController::class, 'summary'])->name('exams.monitor.summary');
         Route::get('/exams/{exam}/monitor/rows', [ExamMonitorController::class, 'rows'])->name('exams.monitor.rows');
         Route::get('/exams/{exam}/monitor/feed', [ExamMonitorController::class, 'feed'])->name('exams.monitor.feed');
+        Route::get('/exams/{exam}/monitor/events/{event}/evidence', [ExamMonitorController::class, 'evidence'])->name('exams.monitor.evidence');
         Route::get('/exams/{exam}/monitor/events', [ExamMonitorController::class, 'events'])->name('exams.monitor.events');
         Route::get('/exams/{exam}/monitor/incident-report', [ExamMonitorController::class, 'incidentReport'])->name('exams.monitor.incident-report');
         Route::post('/exams/{exam}/monitor/end', [ExamMonitorController::class, 'end'])->name('exams.monitor.end');

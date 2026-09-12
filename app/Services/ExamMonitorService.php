@@ -120,7 +120,7 @@ class ExamMonitorService
                 'registration_number' => $event->candidate?->candidate_number,
                 'message' => str($event->event_type)->replace('_', ' ')->headline()->toString(),
                 'occurred_at' => $event->occurred_at?->toISOString(),
-                'snapshot_url' => data_get($event->payload ?? [], 'snapshot_url'),
+                'snapshot_url' => data_get($event->payload ?? [], 'snapshot_path') ? route('exams.monitor.evidence', ['exam' => $exam->id, 'event' => $event->id], false) : null,
             ]);
 
         return $audit
@@ -148,9 +148,9 @@ class ExamMonitorService
                 'event_type' => $event->event_type,
                 'severity' => $event->severity,
                 'source' => $event->source,
-                'snapshot_url' => data_get($event->payload ?? [], 'snapshot_url'),
+                'snapshot_url' => data_get($event->payload ?? [], 'snapshot_path') ? route('exams.monitor.evidence', ['exam' => $exam->id, 'event' => $event->id], false) : null,
                 'occurred_at' => $event->occurred_at?->toISOString(),
-                'payload' => collect($event->payload ?? [])->except(['snapshot_path', 'snapshot_url'])->all(),
+                'payload' => collect($event->payload ?? [])->except(['snapshot_path', 'snapshot_url', 'webcam_snapshot'])->all(),
             ])
             ->values()
             ->all();

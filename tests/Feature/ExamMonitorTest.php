@@ -29,6 +29,34 @@ class ExamMonitorTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_webcam_evidence_is_served_as_an_authorized_image_without_a_public_storage_link(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+        [$exam, $attempt] = $this->examWithAttempt();
+        $supervisor = User::factory()->create(['role' => User::ROLE_SUPERVISOR, 'center_id' => $exam->center_id]);
+        $event = $exam->proctoringEvents()->firstOrFail();
+        $path = 'proctoring-snapshots/'.$attempt->id.'-evidence.png';
+        $image = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aZ1sAAAAASUVORK5CYII=');
+        \Illuminate\Support\Facades\Storage::disk('public')->put($path, $image);
+        $event->update(['payload' => ['snapshot_path' => $path, 'snapshot_url' => 'http://old-host/storage/missing.png', 'camera_active' => true]]);
+        $url = "/exams/{$exam->id}/monitor/events/{$event->id}/evidence";
+        $this->actingAs($supervisor)->get($url)->assertOk()->assertHeader('Content-Type', 'image/png')->assertStreamedContent($image);
+        $this->getJson("/exams/{$exam->id}/monitor/events")->assertOk()
+            ->assertJsonFragment(['snapshot_url' => $url])
+            ->assertDontSee('old-host')->assertDontSee('snapshot_path');
+
+        $outside = User::factory()->create(['role' => User::ROLE_SUPERVISOR, 'center_id' => Center::factory()]);
+        $this->actingAs($outside)->get($url)->assertForbidden();
+        $this->actingAs($supervisor);
+        $event->update(['exam_id' => Exam::factory()->create()->id]);
+        $this->get($url)->assertNotFound();
+        $event->update(['exam_id' => $exam->id, 'payload' => ['snapshot_path' => '../private.png']]);
+        $this->get($url)->assertNotFound();
+        $event->update(['payload' => ['snapshot_path' => $path]]);
+        \Illuminate\Support\Facades\Storage::disk('public')->delete($path);
+        $this->get($url)->assertNotFound();
+    }
+
     public function test_supervisor_can_monitor_assigned_center_exam(): void
     {
         [$exam, $attempt] = $this->examWithAttempt();
