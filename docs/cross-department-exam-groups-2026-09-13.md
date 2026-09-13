@@ -14,3 +14,5 @@ No migration or offline-server version change is required.
 - Production Vite build passed; patch whitespace checks passed.
 - CbtCenterFeatureTest: 4 passed and 2 existing exam-creation failures. Running the same suite with the original ExamController and ExamParticipantAssignmentService loaded from Git produced the identical failures, confirming they are unrelated to this change.
 - The older institution creation test fixture now creates a draft, matching the existing draft-first readiness requirement.
+
+The group picker uses individually labelled checkboxes and a department filter (All departments, departments with available groups, and No department assigned). Switching filters preserves all selections; a count identifies selections outside the current filter. Filter changes do not change the exam department.

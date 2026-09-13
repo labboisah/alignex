@@ -143,7 +143,35 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
     const paperLabel = isInstitutionExam ? 'Course' : isProfessionalExam ? 'Module' : 'Subject';
     const paperLabelPlural = isInstitutionExam ? 'Courses' : isProfessionalExam ? 'Modules' : 'Subjects';
     const paperStepLabel = isInstitutionExam ? 'Course Paper' : isProfessionalExam ? 'Course / Module Paper' : 'Subjects';
-    const availableCandidateGroups = candidateGroups;
+    const [groupDepartment, setGroupDepartment] = useState('all');
+    const groupDepartments = useMemo(() => {
+        const departments = new Map<string, string>();
+        candidateGroups.forEach(group => {
+            if (group.department_id != null) {
+                departments.set(String(group.department_id), group.department?.name ?? 'Department ' + group.department_id);
+            }
+        });
+        return Array.from(departments, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+    }, [candidateGroups]);
+    const availableCandidateGroups = candidateGroups.filter(group =>
+        groupDepartment === 'all'
+        || (groupDepartment === 'unassigned' ? group.department_id == null : String(group.department_id) === groupDepartment)
+    );
+    const hiddenSelectedGroupCount = data.candidate_group_ids.filter(id =>
+        !availableCandidateGroups.some(group => String(group.id) === id)
+    ).length;
+
+    function toggleCandidateGroup(id: string, checked: boolean) {
+        const groupIds = checked
+            ? Array.from(new Set([...data.candidate_group_ids, id]))
+            : data.candidate_group_ids.filter(selectedId => selectedId !== id);
+        setData({
+            ...data,
+            candidate_group_ids: groupIds,
+            candidate_group_id: groupIds[0] ?? '',
+            candidate_ids: isCbtExam || isInstitutionExam || groupIds.length > 0 ? [] : data.candidate_ids,
+        });
+    }
 
     const submit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -255,24 +283,41 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
                 <FormSection title={paperStepLabel} description={isInstitutionExam ? 'Add one or more course rows and configure question counts and marks.' : isProfessionalExam ? 'Add one or more course/module rows and configure question counts and marks.' : 'Add one or more subjects and configure question counts and marks.'}>
                     {(isCbtExam || isOrganizationExam || isInstitutionExam) && (
                         <div className="mb-4 grid gap-4 rounded-md border border-border bg-white p-4 md:grid-cols-2">
-                            <Field label="Candidate Groups" error={errors.candidate_group_ids ?? errors.candidate_group_id}>
-                                <select
-                                    multiple
-                                    className={`${inputClass} min-h-32`}
-                                    value={data.candidate_group_ids}
-                                    onChange={(event) => {
-                                        const groupIds = Array.from(event.target.selectedOptions).map((option) => option.value);
-                                        setData({
-                                            ...data,
-                                            candidate_group_ids: groupIds,
-                                            candidate_group_id: groupIds[0] ?? '',
-                                            candidate_ids: isCbtExam || isInstitutionExam || groupIds.length > 0 ? [] : data.candidate_ids,
-                                        });
-                                    }}
-                                >
-                                    {availableCandidateGroups.map((group) => <option key={group.id} value={group.id}>{group.name}{group.code ? ` (${group.code})` : ''}{group.department ? ` - ${group.department.name}` : ''}</option>)}
-                                </select>
-                            </Field>
+                            <fieldset className="min-w-0">
+                                <legend className={labelClass}>Candidate Groups</legend>
+                                {(isInstitutionExam || groupDepartments.length > 0) && (
+                                    <label className="mb-3 block text-sm text-slate-600">
+                                        Department
+                                        <select className={inputClass} value={groupDepartment} onChange={event => setGroupDepartment(event.target.value)}>
+                                            <option value="all">All departments</option>
+                                            {groupDepartments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
+                                            {candidateGroups.some(group => group.department_id == null) && <option value="unassigned">No department assigned</option>}
+                                        </select>
+                                    </label>
+                                )}
+                                <div role="group" aria-label="Candidate groups" className="mt-1 max-h-64 space-y-1 overflow-y-auto rounded-md border border-border p-2">
+                                    {availableCandidateGroups.map(group => (
+                                        <label key={group.id} className="flex cursor-pointer items-start gap-3 rounded-md p-2 hover:bg-slate-50">
+                                            <input
+                                                type="checkbox"
+                                                className="mt-1 rounded border-border text-primary focus:ring-primary"
+                                                checked={data.candidate_group_ids.includes(String(group.id))}
+                                                onChange={event => toggleCandidateGroup(String(group.id), event.target.checked)}
+                                            />
+                                            <span className="text-sm">
+                                                <span className="font-medium text-slateDark">{group.name}{group.code ? ` (${group.code})` : ''}</span>
+                                                {group.department && <span className="block text-xs text-slate-500">{group.department.name}</span>}
+                                            </span>
+                                        </label>
+                                    ))}
+                                    {availableCandidateGroups.length === 0 && <p className="p-2 text-sm text-slate-500">{candidateGroups.length === 0 ? 'No candidate groups are available.' : 'No candidate groups in this department.'}</p>}
+                                </div>
+                                <p className="mt-2 text-xs text-slate-600" aria-live="polite">
+                                    {data.candidate_group_ids.length} group(s) selected.
+                                    {hiddenSelectedGroupCount > 0 && ` ${hiddenSelectedGroupCount} selected in other departments. Choose All departments to review them.`}
+                                </p>
+                            {(errors.candidate_group_ids ?? errors.candidate_group_id) && <p role="alert" className="mt-1 text-sm text-danger">{errors.candidate_group_ids ?? errors.candidate_group_id}</p>}
+                            </fieldset>
                             {isCbtExam || isInstitutionExam || data.candidate_group_ids.length > 0 ? (
                                 <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm font-semibold text-primary">
                                     {isInstitutionExam ? 'Select groups from any department in this institution. The selected courses determine the exam department; the groups determine who writes it.' : 'Select one or more groups for this exam. Candidates will be fetched automatically from the selected groups.'}

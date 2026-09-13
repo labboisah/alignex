@@ -122,7 +122,7 @@ function GroupForm({ statuses, departments, candidates, editing, onDone }: { sta
         <form onSubmit={submit} className="mb-6">
             <FormSection
                 title={editing ? 'Edit Candidate Group' : 'New Candidate Group'}
-                description="Create an empty group, then upload candidates into it from candidate import."
+                description="Select candidates for this group, or create an empty group and add candidates later through import."
                 footer={
                     <div className="flex flex-wrap gap-2">
                         {editing && <Button type="button" variant="secondary" onClick={onDone}><X className="h-4 w-4" />Cancel</Button>}
@@ -146,20 +146,36 @@ function GroupForm({ statuses, departments, candidates, editing, onDone }: { sta
                         </select>
                     </Field>
                     <Field label="Description" error={errors.description}><textarea className={inputClass} value={data.description} onChange={(event) => setData('description', event.target.value)} /></Field>
-                    <Field label="Candidates" error={errors.candidate_ids}>
-                        <select
-                            multiple
-                            className={`${inputClass} min-h-40`}
-                            value={data.candidate_ids}
-                            onChange={(event) => setData('candidate_ids', Array.from(event.target.selectedOptions).map((option) => option.value))}
-                        >
-                            {availableCandidates.map((candidate) => (
-                                <option key={candidate.id} value={candidate.id}>
-                                    {candidate.name} ({candidate.registration_number})
-                                </option>
+                    <fieldset className="min-w-0">
+                        <legend className="text-sm font-semibold text-slateDark">Candidates</legend>
+                        <div className="mt-1 max-h-64 space-y-1 overflow-y-auto rounded-md border border-border p-2">
+                            {availableCandidates.map(candidate => (
+                                <label key={candidate.id} className="flex cursor-pointer items-start gap-3 rounded-md p-2 hover:bg-slate-50">
+                                    <input
+                                        type="checkbox"
+                                        className="mt-1 rounded border-border text-primary focus:ring-primary"
+                                        checked={data.candidate_ids.includes(String(candidate.id))}
+                                        disabled={processing}
+                                        onChange={event => {
+                                            const id = String(candidate.id);
+                                            setData('candidate_ids', event.target.checked
+                                                ? Array.from(new Set([...data.candidate_ids, id]))
+                                                : data.candidate_ids.filter(selectedId => selectedId !== id));
+                                        }}
+                                    />
+                                    <span className="text-sm">
+                                        <span className="font-medium text-slateDark">{candidate.name}</span>
+                                        <span className="block text-xs text-slate-500">{candidate.registration_number}</span>
+                                    </span>
+                                </label>
                             ))}
-                        </select>
-                    </Field>
+                            {availableCandidates.length === 0 && (
+                                <p className="p-2 text-sm text-slate-500">No candidates are available{data.department_id ? ' for this department' : ''}.</p>
+                            )}
+                        </div>
+                        <p className="mt-2 text-xs text-slate-600" aria-live="polite">{data.candidate_ids.length} candidate(s) selected.</p>
+                        {errors.candidate_ids && <p role="alert" className="mt-1 text-sm text-danger">{errors.candidate_ids}</p>}
+                    </fieldset>
                 </div>
             </FormSection>
         </form>
