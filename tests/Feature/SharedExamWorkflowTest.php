@@ -100,6 +100,9 @@ class SharedExamWorkflowTest extends TestCase
         $candidate = Candidate::factory()->create(['organization_id' => $organization->id, 'school_id' => null, 'center_id' => null]);
         $group = CandidateGroup::factory()->create(['organization_id' => $organization->id]);
         $group->candidates()->attach($candidate->id);
+        $secondCandidate = Candidate::factory()->create(['organization_id' => $organization->id, 'school_id' => null, 'center_id' => null]);
+        $secondGroup = CandidateGroup::factory()->create(['organization_id' => $organization->id]);
+        $secondGroup->candidates()->attach([$candidate->id, $secondCandidate->id]);
 
         $this->actingAs($admin)
             ->post('/exams', $this->payload($subject->id, [
@@ -107,12 +110,15 @@ class SharedExamWorkflowTest extends TestCase
                 'organization_id' => $organization->id,
                 'question_bank_id' => $bank->id,
                 'candidate_group_id' => $group->id,
+                'candidate_group_ids' => [$group->id, $secondGroup->id],
                 'candidate_ids' => [],
             ]))
-            ->assertRedirect();
+            ->assertSessionHasNoErrors()->assertRedirect();
 
         $exam = Exam::query()->latest('id')->firstOrFail();
         $this->assertTrue($exam->candidates()->whereKey($candidate->id)->exists());
+        $this->assertTrue($exam->candidates()->whereKey($secondCandidate->id)->exists());
+        $this->assertSame(2, $exam->candidates()->count());
     }
 
     public function test_result_calculation_is_server_side_and_marks_certificate_eligibility(): void

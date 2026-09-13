@@ -10,6 +10,7 @@ export type TenantOption = {
     subject_id?: string | number | null;
     programme_id?: string | number | null;
     department_id?: string | number | null;
+    department?: { id: string | number; name: string } | null;
     course_id?: string | number | null;
     module_id?: string | number | null;
     school_class_id?: string | number;

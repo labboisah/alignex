@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ReleaseExamResultsRequest;
 use App\Models\AdaptiveAttemptState;
 use App\Models\AdaptiveProgression;
 use App\Models\CandidateExamAttempt;
@@ -10,11 +11,15 @@ use App\Models\Exam;
 use App\Models\User;
 use App\Services\AdaptiveLifecycleService;
 use App\Services\AdaptiveReportService;
+use App\Services\AdaptiveRolloutService;
 use App\Services\CandidatePerformanceProfileService;
+use App\Services\CandidateResultVisibilityService;
+use App\Services\ExamResultReleaseService;
 use App\Services\ResultManagementService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -81,10 +86,24 @@ class ResultController extends Controller
                 'total_marks' => $exam->total_marks,
                 'pass_mark' => $exam->pass_mark,
             ],
+            'can_release' => $request->user()->can('update', $exam) && ! app(AdaptiveRolloutService::class)->isAdaptive($exam) && ! app(AdaptiveReportService::class)->hasProgressions($exam),
+            'results_released' => app(CandidateResultVisibilityService::class)->allows($exam),
+            'offline_uploads' => DB::table('offline_result_receipts')
+                ->join('candidate_exam_attempts', 'candidate_exam_attempts.id', '=', 'offline_result_receipts.attempt_id')
+                ->join('candidates', 'candidates.id', '=', 'candidate_exam_attempts.candidate_id')
+                ->where('candidate_exam_attempts.exam_id', $exam->id)
+                ->select('offline_result_receipts.id', 'offline_result_receipts.local_score', 'offline_result_receipts.official_score', 'offline_result_receipts.legacy_package', 'offline_result_receipts.created_at', 'candidates.candidate_number')->get(),
             'rows' => $rows,
             'dashboard' => $this->results->dashboard($attempts),
             'adaptive_analysis' => $this->examAdaptiveAnalysis($exam),
         ]);
+    }
+
+    public function release(ReleaseExamResultsRequest $request, Exam $exam, ExamResultReleaseService $service)
+    {
+        $service->setReleased($exam, $request->boolean('released'), $request->user());
+
+        return back()->with('success', $request->boolean('released') ? 'Results released to candidates.' : 'Results held.');
     }
 
     public function candidate(Request $request, CandidateExamAttempt $attempt): InertiaResponse
@@ -268,6 +287,7 @@ class ResultController extends Controller
             ->where('candidate_id', $candidate->id)
             ->whereIn('status', [CandidateExamAttempt::STATUS_SUBMITTED, CandidateExamAttempt::STATUS_AUTO_SUBMITTED])
             ->with(['candidate', 'exam', 'answers.subject', 'proctoringEvents'])
+            ->orderByDesc('attempt_number')->orderByDesc('submitted_at')->orderByDesc('id')
             ->first();
 
         if (! $attempt) {

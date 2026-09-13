@@ -31,3 +31,5 @@ Route::get('/offline/updates/{artifact}/download', [OfflineUpdateController::cla
 
 Route::get('/offline/adaptive/packages/{package}', [AdaptiveOfflinePilotController::class, 'package'])->middleware('throttle:10,1');
 Route::post('/offline/adaptive/leases/{lease}/sync', [AdaptiveOfflinePilotController::class, 'sync'])->middleware('throttle:10,1');
+
+Route::post('/offline/results', [\App\Http\Controllers\Api\OfflineResultController::class, 'store'])->middleware('throttle:120,1');

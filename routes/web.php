@@ -506,6 +506,7 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
 
         Route::middleware('permission:viewReports')->group(function (): void {
             Route::get('/results', [ResultController::class, 'index'])->name('results.index');
+            Route::post('/results/exams/{exam}/release', [ResultController::class, 'release'])->name('results.exams.release');
             Route::get('/results/exams/{exam}', [ResultController::class, 'show'])->name('results.exams.show');
             Route::get('/results/attempts/{attempt}', [ResultController::class, 'candidate'])->name('results.attempts.show');
             Route::get('/results/attempts/{attempt}/marked-paper.pdf', [ResultController::class, 'markedPaperPdf'])->name('results.attempts.marked-paper');

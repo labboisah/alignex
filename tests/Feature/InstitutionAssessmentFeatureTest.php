@@ -151,7 +151,7 @@ class InstitutionAssessmentFeatureTest extends TestCase
 
         $this->actingAs($admin)
             ->post('/exams', $this->examPayload($institution->id, $course->id, $bank->id, $group->id))
-            ->assertRedirect();
+            ->assertSessionHasNoErrors()->assertRedirect();
 
         $exam = Exam::query()->where('code', 'CSC201-CA1')->firstOrFail();
         $this->assertSame(Exam::OWNER_INSTITUTION, $exam->effectiveOwnerType());
@@ -197,7 +197,7 @@ class InstitutionAssessmentFeatureTest extends TestCase
         ]);
     }
 
-    public function test_institution_lecturer_can_select_department_candidate_group_when_creating_assessment(): void
+    public function test_institution_lecturer_can_assign_groups_from_multiple_departments_to_an_authorized_course(): void
     {
         $organization = Organization::factory()->create();
         $institution = Institution::query()->create([
@@ -278,6 +278,13 @@ class InstitutionAssessmentFeatureTest extends TestCase
             'candidate_number' => 'CSC201-001',
         ]);
         $group->candidates()->attach($candidate->id);
+        $otherCandidate = Candidate::factory()->create([
+            'organization_id' => $organization->id, 'institution_id' => $institution->id,
+            'faculty_id' => $faculty->id, 'department_id' => $otherDepartment->id,
+        ]);
+        $otherGroup->candidates()->attach([$otherCandidate->id, $candidate->id]);
+        $foreignInstitution = Institution::create(['organization_id' => $organization->id, 'name' => 'Other university', 'code' => 'OTHER', 'status' => 'active']);
+        $foreignGroup = CandidateGroup::factory()->create(['organization_id' => $organization->id, 'institution_id' => $foreignInstitution->id]);
 
         $lecturer = User::factory()->create([
             'role' => User::ROLE_FACILITATOR,
@@ -303,14 +310,22 @@ class InstitutionAssessmentFeatureTest extends TestCase
                 ->component('Exams/Create')
                 ->where('candidateGroups.0.id', $group->id)
                 ->where('candidateGroups.0.department_id', $department->id)
-                ->missing('candidateGroups.1')
+                ->where('candidateGroups.0.department.name', 'Computer Science')
+                ->where('candidateGroups.1.id', $otherGroup->id)
+                ->where('candidateGroups.1.department.name', 'Mathematics')
+                ->has('candidateGroups', 2)
             );
 
         $payload = $this->examPayload($institution->id, $course->id, $bank->id, $group->id);
+        $payload['status'] = Exam::STATUS_DRAFT;
+        $payload['candidate_group_ids'] = [$group->id, $foreignGroup->id];
+        $this->actingAs($lecturer)->post('/exams', $payload)->assertSessionHasErrors('candidate_group_ids');
+        $this->assertDatabaseMissing('exams', ['code' => 'CSC201-CA1']);
+        $payload['candidate_group_ids'] = [$group->id, $otherGroup->id];
 
         $this->actingAs($lecturer)
             ->post('/exams', $payload)
-            ->assertRedirect();
+            ->assertSessionHasNoErrors()->assertRedirect();
 
         $exam = Exam::query()->where('code', 'CSC201-CA1')->firstOrFail();
         $this->assertSame($department->id, $exam->department_id);
@@ -319,10 +334,23 @@ class InstitutionAssessmentFeatureTest extends TestCase
             'participant_type' => ExamParticipant::TYPE_CANDIDATE,
             'participant_id' => $candidate->id,
         ]);
-        $this->assertDatabaseMissing('exam_candidates', [
-            'exam_id' => $exam->id,
-            'candidate_id' => $otherGroup->id,
+        $this->assertDatabaseHas('exam_candidates', ['exam_id' => $exam->id, 'candidate_id' => $otherCandidate->id]);
+        $this->assertSame(2, $exam->candidates()->count());
+        $this->assertSame($course->id, $exam->course_id);
+        $this->assertEqualsCanonicalizing([$group->id, $otherGroup->id], $exam->settings['participant_candidate_group_ids']);
+        $newCandidate = Candidate::factory()->create([
+            'organization_id' => $organization->id, 'institution_id' => $institution->id,
+            'department_id' => $otherDepartment->id,
         ]);
+        $otherGroup->candidates()->attach($newCandidate->id);
+        $this->actingAs($lecturer)->post('/exams/'.$exam->id.'/participants/refresh')->assertSessionHasNoErrors()->assertRedirect();
+        $this->assertSame(3, $exam->candidates()->count());
+        $this->assertSame($department->id, $exam->fresh()->department_id);
+        $foreignCandidate = Candidate::factory()->create(['organization_id' => $organization->id, 'institution_id' => $foreignInstitution->id]);
+        $otherGroup->candidates()->attach($foreignCandidate->id);
+        $this->actingAs($lecturer)->post('/exams/'.$exam->id.'/participants/refresh')->assertSessionHasErrors('candidate_ids');
+        $this->assertSame(3, $exam->candidates()->count());
+        $otherGroup->candidates()->detach($foreignCandidate->id);
 
         $attempt = CandidateExamAttempt::query()->create([
             'candidate_id' => $candidate->id,
@@ -512,7 +540,7 @@ class InstitutionAssessmentFeatureTest extends TestCase
             'end_at' => now()->addDay()->addHours(2)->format('Y-m-d\TH:i'),
             'duration_minutes' => 60,
             'pass_mark' => 5,
-            'status' => Exam::STATUS_SCHEDULED,
+            'status' => Exam::STATUS_DRAFT,
             'candidate_group_id' => $candidateGroupId,
             'candidate_group_ids' => [$candidateGroupId],
             'subjects' => [

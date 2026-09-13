@@ -143,12 +143,7 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
     const paperLabel = isInstitutionExam ? 'Course' : isProfessionalExam ? 'Module' : 'Subject';
     const paperLabelPlural = isInstitutionExam ? 'Courses' : isProfessionalExam ? 'Modules' : 'Subjects';
     const paperStepLabel = isInstitutionExam ? 'Course Paper' : isProfessionalExam ? 'Course / Module Paper' : 'Subjects';
-    const selectedInstitutionDepartmentId = isInstitutionExam
-        ? courses.find((course) => String(course.id) === String(data.subjects.find((row) => row.course_id)?.course_id))?.department_id
-        : null;
-    const availableCandidateGroups = selectedInstitutionDepartmentId
-        ? candidateGroups.filter((group) => !group.department_id || String(group.department_id) === String(selectedInstitutionDepartmentId))
-        : candidateGroups;
+    const availableCandidateGroups = candidateGroups;
 
     const submit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -275,12 +270,12 @@ export function ExamWizard({ exam, subjects, organizations = [], schools = [], c
                                         });
                                     }}
                                 >
-                                    {availableCandidateGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+                                    {availableCandidateGroups.map((group) => <option key={group.id} value={group.id}>{group.name}{group.code ? ` (${group.code})` : ''}{group.department ? ` - ${group.department.name}` : ''}</option>)}
                                 </select>
                             </Field>
                             {isCbtExam || isInstitutionExam || data.candidate_group_ids.length > 0 ? (
                                 <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm font-semibold text-primary">
-                                    Candidates will be fetched automatically from the selected group(s).
+                                    {isInstitutionExam ? 'Select groups from any department in this institution. The selected courses determine the exam department; the groups determine who writes it.' : 'Select one or more groups for this exam. Candidates will be fetched automatically from the selected groups.'}
                                 </div>
                             ) : (
                                 <Field label="Candidates" error={errors.candidate_ids}>

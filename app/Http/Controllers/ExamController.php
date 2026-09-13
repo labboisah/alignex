@@ -1092,7 +1092,6 @@ class ExamController extends Controller
                 });
             })
             ->when($institutionId, fn ($query) => $query->where('institution_id', $institutionId))
-            ->when($user->isInstitutionLecturer() && $user->department_id, fn ($query) => $query->where('department_id', $user->department_id))
             ->when(Schema::hasColumn('candidate_groups', 'cbt_center_id'), function ($query) use ($centerId): void {
                 $centerId
                     ? $query->where('cbt_center_id', $centerId)
@@ -1100,6 +1099,7 @@ class ExamController extends Controller
             })
             ->where('status', CandidateGroup::STATUS_ACTIVE)
             ->orderBy('name')
+            ->with('department:id,name')
             ->get(['id', 'department_id', 'name', 'code']);
     }
 
@@ -1262,7 +1262,7 @@ class ExamController extends Controller
                 ->whereIn('id', $groupIds)
                 ->when($tenant['organization_id'] ?? null, fn ($query) => $query->where('organization_id', $tenant['organization_id']))
                 ->when($tenant['institution_id'] ?? null, fn ($query) => $query->where('institution_id', $tenant['institution_id']))
-                ->when($tenant['department_id'] ?? null, fn ($query) => $query->where('department_id', $tenant['department_id']))
+                ->when(! ($tenant['institution_id'] ?? null) && ($tenant['department_id'] ?? null), fn ($query) => $query->where('department_id', $tenant['department_id']))
                 ->when(Schema::hasColumn('candidate_groups', 'cbt_center_id') && ($tenant['cbt_center_id'] ?? null), fn ($query) => $query->where('cbt_center_id', $tenant['cbt_center_id']))
                 ->with('candidates:id')
                 ->get();

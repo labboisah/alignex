@@ -4,7 +4,7 @@ import { Button } from '@/Components/ui/button';
 import { ResultRow } from './types';
 
 export default function SelfResult() {
-    return <Lookup title="Online Exam Result" endpoint="/api/candidate/result" fields={['exam_code', 'registration_number']} />;
+    return <Lookup title="Exam Result" endpoint="/api/candidate/result" fields={['exam_code', 'registration_number']} />;
 }
 
 export function Lookup({ title, endpoint, fields }: { title: string; endpoint: string; fields: string[] }) {
@@ -33,7 +33,7 @@ export function Lookup({ title, endpoint, fields }: { title: string; endpoint: s
             <section className="mx-auto max-w-lg rounded-md border border-border bg-white p-6 shadow-sm">
                 <Link href="/" className="text-sm font-semibold text-primary">AlignEx</Link>
                 <h1 className="mt-4 text-2xl font-bold">{title}</h1>
-                <p className="mt-2 text-sm leading-6 text-slate-600">Enter your exam code and registration number to view your released online exam result.</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">Enter your exam code and registration number to view your released exam result.</p>
                 <form onSubmit={submit} className="mt-5 space-y-4">
                     {fields.map((field) => <label key={field} className="block text-sm font-semibold">{fieldLabel(field)}<input className="mt-1 block w-full rounded-md border-border shadow-sm focus:border-primary focus:ring-primary" value={form[field] ?? ''} onChange={(event) => setForm((next) => ({ ...next, [field]: field === 'exam_code' ? event.target.value.toUpperCase() : event.target.value }))} required /></label>)}
                     {error && <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm font-semibold text-danger">{error}</div>}

@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { Download, Eye, FileText, Printer } from 'lucide-react';
 import { PageHeader, PortalAppShell, StatusBadge } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
@@ -22,7 +22,8 @@ type AdaptiveAnalysis = {
     recommended_practice_areas: PerformanceRow[];
 };
 
-export default function ExamResults({ exam, rows, dashboard, adaptive_analysis }: { exam: { id: string; title: string; exam_code: string; owner?: { type: string; name: string }; service_provider?: string; total_marks: string; pass_mark: string }; rows: ResultRow[]; dashboard: ResultsDashboard; adaptive_analysis: AdaptiveAnalysis }) {
+export default function ExamResults({ exam, rows, dashboard, adaptive_analysis, can_release, results_released, offline_uploads }: { exam: { id: string; title: string; exam_code: string; owner?: { type: string; name: string }; service_provider?: string; total_marks: string; pass_mark: string }; rows: ResultRow[]; dashboard: ResultsDashboard; adaptive_analysis: AdaptiveAnalysis; can_release: boolean; results_released: boolean; offline_uploads: { id: string; candidate_number: string; local_score: string | null; official_score: string | null; legacy_package: boolean; created_at: string }[] }) {
+    const release = useForm({ released: !results_released });
     return (
         <PortalAppShell title={exam.title}>
             <Head title={`${exam.title} Results`} />
@@ -33,6 +34,19 @@ export default function ExamResults({ exam, rows, dashboard, adaptive_analysis }
                     description={`${exam.owner?.name ?? 'AlignEx'} | ${exam.service_provider ?? 'Service provided by AlignEx CBT, Sokoto'} | ${exam.exam_code} | Total marks ${exam.total_marks} | Pass mark ${exam.pass_mark}`}
                     actions={<><Button asChild variant="secondary"><a href={`/results/exams/${exam.id}/export.csv`}><Download className="h-4 w-4" />CSV</a></Button><Button asChild variant="secondary"><a href={`/results/exams/${exam.id}/summary.pdf`}><FileText className="h-4 w-4" />PDF Summary</a></Button></>}
                 />
+                <div className="mb-5 rounded-md border border-border bg-white p-4">
+                    <p className="font-semibold">Candidate results: {results_released ? 'Released' : 'Held for review'}</p>
+                    <p className="my-2 text-sm text-slate-500">This controls the online result checker for all submitted attempts in this exam, including uploaded offline attempts.</p>
+                    {can_release && <Button disabled={release.processing} onClick={() => { release.transform(() => ({ released: !results_released })); release.post(`/results/exams/${exam.id}/release`, { preserveScroll: true }); }}>{release.processing ? 'Saving...' : results_released ? 'Hold results' : 'Release results'}</Button>}
+                    {release.errors.released && <p role="alert" className="text-danger">{release.errors.released}</p>}
+                    {release.recentlySuccessful && <p role="status" className="mt-2 text-success">Result visibility updated.</p>}
+                </div>
+                {offline_uploads.length > 0 && <div className="mb-5 overflow-x-auto rounded border border-border bg-white p-4">
+                    <h2 className="font-semibold">Offline upload reconciliation</h2>
+                    <table className="mt-3 w-full text-left text-sm"><thead><tr><th>Candidate</th><th>Local score</th><th>Official score</th><th>Paper verification</th><th>Received</th></tr></thead><tbody>
+                        {offline_uploads.map(upload => <tr key={upload.id}><td className="py-2">{upload.candidate_number}</td><td>{upload.local_score ?? 'N/A'}</td><td>{upload.official_score ?? 'N/A'}</td><td>{upload.legacy_package ? 'Legacy paper matched' : 'Signed paper verified'}</td><td>{new Date(upload.created_at).toLocaleString()}</td></tr>)}
+                    </tbody></table>
+                </div>}
                 <Summary dashboard={dashboard} />
                 <Charts dashboard={dashboard} />
                 <section className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">

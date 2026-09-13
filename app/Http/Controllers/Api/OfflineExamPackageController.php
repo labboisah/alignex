@@ -10,9 +10,11 @@ use App\Models\Question;
 use App\Models\User;
 use App\Services\OfflineActivationGuard;
 use App\Services\OfflineExamCapabilityService;
+use App\Services\OfflinePaperProofService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -23,7 +25,7 @@ class OfflineExamPackageController extends Controller
 
     public function show(Request $request, string $examCode): JsonResponse
     {
-        $this->activationGuard->requireActive($request);
+        $activation = $this->activationGuard->requireActive($request);
 
         $user = $this->authenticateSyncAdmin($request);
 
@@ -157,11 +159,13 @@ class OfflineExamPackageController extends Controller
                     'is_correct' => (bool) $option->is_correct,
                     'display_order' => $index + 1,
                 ]))->values(),
-            'papers' => $candidates->map(function (Candidate $candidate) use ($attempts) {
+            'papers' => $candidates->map(function (Candidate $candidate) use ($attempts, $activation, $exam) {
                 $attempt = $attempts->get($candidate->id);
 
                 return [
                     'candidate_id' => (string) $candidate->id,
+                    'attempt_id' => (string) $attempt->id,
+                    'upload_proof' => app(OfflinePaperProofService::class)->issue($attempt, (string) $activation->id, 'exam-'.$exam->id.'-'.optional($exam->updated_at)->timestamp),
                     'questions' => $attempt?->papers
                         ->sortBy('question_order')
                         ->values()
@@ -191,6 +195,14 @@ class OfflineExamPackageController extends Controller
                 ];
             })->values(),
         ];
+
+        if ($activation->exists) {
+            $records = $attempts->map(fn ($attempt) => [
+                'attempt_id' => $attempt->id, 'activation_id' => $activation->id,
+                'package_id' => $package['manifest']['package_id'], 'created_at' => now(), 'updated_at' => now(),
+            ])->values()->all();
+            DB::table('offline_paper_exports')->upsert($records, ['attempt_id', 'activation_id', 'package_id'], ['updated_at']);
+        }
 
         return response()->json(['package' => $package]);
     }
