@@ -10,6 +10,7 @@ use App\Http\Controllers\AppReleaseController;
 use App\Http\Controllers\CandidateClientDownloadController;
 use App\Http\Controllers\CandidateController;
 use App\Http\Controllers\CandidateGroupController;
+use App\Http\Controllers\CandidateRetakeController;
 use App\Http\Controllers\CbtCenterController;
 use App\Http\Controllers\CenterController;
 use App\Http\Controllers\CurrentContextController;
@@ -111,6 +112,9 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
     Route::patch('/organizations/{organization}/deactivate', [OrganizationController::class, 'deactivate'])
         ->middleware(['role:super_admin', 'permission:manageOrganizations'])
         ->name('organizations.deactivate');
+
+    Route::post('/exams/attempts/{attempt}/retake', [CandidateRetakeController::class, 'store'])->middleware('throttle:20,1')->name('exams.attempts.retake');
+    Route::post('/exams/attempts/{attempt}/retake/cancel', [CandidateRetakeController::class, 'cancel'])->middleware('throttle:20,1')->name('exams.attempts.retake.cancel');
 
     Route::middleware('permission:viewReports')->group(function (): void {
         Route::get('/exams/{exam}/adaptive/research', [AdaptiveResearchController::class, 'show'])->name('adaptive.research');

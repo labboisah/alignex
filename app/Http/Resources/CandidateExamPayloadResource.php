@@ -27,8 +27,8 @@ class CandidateExamPayloadResource extends JsonResource
             return app(AdaptiveLifecycleService::class)->execute($attempt, 'read', $request->only('device_fingerprint')) + ['exam_token' => $this->token];
         }
         $session = app(CandidateExamSessionService::class);
-        $startsInSeconds = $attempt->exam?->starts_at
-            ? max(0, (int) ceil(now()->diffInSeconds($attempt->exam->starts_at, false)))
+        $startsInSeconds = $attempt->accessStartsAt()
+            ? max(0, (int) ceil(now()->diffInSeconds($attempt->accessStartsAt(), false)))
             : 0;
         $answers = $attempt->answers()
             ->get()
@@ -46,9 +46,9 @@ class CandidateExamPayloadResource extends JsonResource
                 'id' => $attempt->exam?->id,
                 'title' => $attempt->exam?->title,
                 'exam_code' => $attempt->exam?->code,
-                'duration_minutes' => $attempt->exam?->duration_minutes,
-                'starts_at' => $attempt->exam?->starts_at?->toISOString(),
-                'ends_at' => $attempt->exam?->ends_at?->toISOString(),
+                'duration_minutes' => $attempt->durationMinutes(),
+                'starts_at' => $attempt->accessStartsAt()?->toISOString(),
+                'ends_at' => $attempt->accessEndsAt()?->toISOString(),
                 'settings' => [
                     'allow_back_navigation' => (bool) data_get($attempt->exam?->settings ?? [], 'allow_back_navigation', true),
                     'require_fullscreen' => (bool) data_get($attempt->exam?->settings ?? [], 'require_fullscreen', false),
@@ -66,7 +66,8 @@ class CandidateExamPayloadResource extends JsonResource
             ],
             'remaining_time' => $session->remainingSeconds($attempt),
             'server_now' => now()->toISOString(),
-            'can_start' => $startsInSeconds <= 0,
+            'can_start' => $startsInSeconds <= 0 && ! $attempt->retake_cancelled_at
+                && (! $attempt->accessEndsAt() || $attempt->accessEndsAt()->isFuture()),
             'starts_in_seconds' => $startsInSeconds,
             'exam_token' => $this->token,
             'questions' => CandidatePaperResource::collection(

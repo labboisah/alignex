@@ -78,7 +78,7 @@ class RecruitmentService
 
         return CandidateExamAttempt::query()
             ->where('exam_id', $exam->id)
-            ->whereIn('status', [CandidateExamAttempt::STATUS_SUBMITTED, CandidateExamAttempt::STATUS_AUTO_SUBMITTED])
+            ->currentResult()
             ->with(['candidate', 'proctoringEvents'])
             ->get()
             ->sortByDesc(fn (CandidateExamAttempt $attempt) => (float) ($attempt->score ?? 0))

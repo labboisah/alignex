@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Events\ExamMonitorEvent;
 use App\Models\Candidate;
 use App\Models\CandidateExamAttempt;
 use App\Models\CandidatePaper;
@@ -12,9 +13,12 @@ use App\Models\Organization;
 use App\Models\Question;
 use App\Models\QuestionOption;
 use App\Models\User;
+use App\Services\CandidateRetakeService;
 use App\Services\OfflinePaperProofService;
+use App\Services\ResultManagementService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -173,6 +177,32 @@ class OfflineResultUploadTest extends TestCase
         $this->postJson('/api/offline/results', $payload, $headers)->assertOk();
         $this->assertEquals(-0.75, $attempt->fresh()->score);
         $this->assertNotNull($attempt->fresh()->auto_submitted_at);
+    }
+
+    public function test_old_offline_receipt_cannot_replace_a_completed_online_retake(): void
+    {
+        extract($this->fixture());
+        Event::fake([ExamMonitorEvent::class]);
+        $this->postJson('/api/offline/results', $payload, $headers)->assertOk();
+        $retake = app(CandidateRetakeService::class)->schedule($attempt->fresh(), [
+            'starts_at' => now()->addHour()->toISOString(), 'ends_at' => now()->addHours(2)->toISOString(),
+            'duration_minutes' => 30, 'reason' => 'Approved retake after offline exam.',
+        ], $admin);
+        $this->travel(61)->minutes();
+        $login = $this->postJson('/api/candidate/login', [
+            'exam_code' => $exam->code, 'registration_number' => $candidate->candidate_number,
+            'device_fingerprint' => 'online-retake',
+        ])->assertOk();
+        $tokenHeaders = ['Authorization' => 'Bearer '.$login->json('exam_token')];
+        $this->postJson('/api/candidate/submit', [], $tokenHeaders)->assertOk();
+        $this->assertEquals(0, $retake->fresh()->score);
+        $this->postJson('/api/offline/results', $payload, $headers)->assertOk();
+        $this->assertEquals(5, $attempt->fresh()->score);
+        $this->assertEquals([$retake->id], app(ResultManagementService::class)->queryForExam($exam)->pluck('id')->all());
+        $legacy = [...$payload, 'attempt_id' => null, 'upload_proof' => null];
+        $this->postJson('/api/offline/results', $legacy, $headers)->assertConflict();
+        $this->postJson('/api/offline/results', [...$payload, 'attempt_id' => $retake->id], $headers)->assertConflict();
+        $this->assertEquals(0, $retake->fresh()->score);
     }
 
     public function test_unanswered_submission_keeps_full_available_marks_and_latest_retake_is_selected(): void

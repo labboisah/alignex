@@ -42,6 +42,22 @@ class ExamMonitorService
         return CandidateExamAttempt::query()
             ->where('exam_id', $exam->id)
             ->with(['candidate', 'answers', 'auditLogs', 'proctoringEvents'])
+            ->whereNull('retake_cancelled_at')
+            ->whereNotExists(function ($newer): void {
+                $newer->selectRaw('1')->from('candidate_exam_attempts as newer')
+                    ->whereColumn('newer.exam_id', 'candidate_exam_attempts.exam_id')
+                    ->whereColumn('newer.candidate_id', 'candidate_exam_attempts.candidate_id')
+                    ->whereColumn('newer.attempt_number', '>', 'candidate_exam_attempts.attempt_number')
+                    ->whereNull('newer.deleted_at')->whereNull('newer.retake_cancelled_at')
+                    ->where(function ($active): void {
+                        $active->whereNull('newer.retake_ends_at')->orWhere('newer.retake_ends_at', '>', now())
+                            ->orWhere('newer.status', '!=', CandidateExamAttempt::STATUS_NOT_STARTED);
+                    });
+            })
+            ->where(function ($visible): void {
+                $visible->whereNull('retake_ends_at')->orWhere('retake_ends_at', '>', now())
+                    ->orWhere('status', '!=', CandidateExamAttempt::STATUS_NOT_STARTED);
+            })
             ->whereNotIn('id', AdaptiveLevel::query()->select('attempt_id')->whereExists(function ($query): void {
                 $query->selectRaw('1')->from('adaptive_levels as later')
                     ->whereColumn('later.progression_id', 'adaptive_levels.progression_id')
@@ -192,7 +208,10 @@ class ExamMonitorService
                 }
             }
 
+            // Retakes have independent windows. Closing the original exam must not
+            // complete a future/cancelled retake and replace an existing result.
             $exam->attempts()
+                ->whereNull('retake_of_attempt_id')
                 ->whereNotIn('id', AdaptiveAttemptState::select('attempt_id'))
                 ->whereIn('status', [
                     CandidateExamAttempt::STATUS_NOT_STARTED,
@@ -222,6 +241,10 @@ class ExamMonitorService
                 ->whereKey($attempt->id)
                 ->lockForUpdate()
                 ->firstOrFail();
+
+            if ($attempt->retake_of_attempt_id || CandidateExamAttempt::where('retake_of_attempt_id', $attempt->id)->exists()) {
+                throw ValidationException::withMessages(['exam' => 'Retake history cannot be reset. Schedule another retake from the results page.']);
+            }
 
             $attempt->answers()->update([
                 'submitted_at' => null,

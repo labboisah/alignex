@@ -61,9 +61,15 @@ class OfflineExamPackageController extends Controller
         $attempts = CandidateExamAttempt::query()
             ->where('exam_id', $exam->id)
             ->whereIn('candidate_id', $candidates->pluck('id'))
+            ->whereNull('retake_cancelled_at')
             ->with(['papers.question.subject', 'papers.question.options'])
+            ->orderBy('attempt_number')
             ->get()
             ->keyBy('candidate_id');
+
+        if ($attempts->contains(fn ($attempt) => $attempt->retake_of_attempt_id !== null)) {
+            return response()->json(['message' => 'This exam has scheduled retakes. Retakes must be taken online; the offline package cannot enforce candidate-specific schedules.'], 409);
+        }
 
         $missingPaperCandidates = $candidates->filter(fn (Candidate $candidate) => ! $attempts->get($candidate->id)?->papers->isNotEmpty());
 

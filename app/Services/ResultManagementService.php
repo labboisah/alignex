@@ -14,11 +14,7 @@ class ResultManagementService
     {
         return CandidateExamAttempt::query()
             ->where('exam_id', $exam->id)
-            ->whereNotIn('id', AdaptiveAttemptState::select('attempt_id'))
-            ->whereIn('status', [
-                CandidateExamAttempt::STATUS_SUBMITTED,
-                CandidateExamAttempt::STATUS_AUTO_SUBMITTED,
-            ])
+            ->currentResult()
             ->with(['candidate', 'exam.organization', 'exam.institution', 'exam.school', 'exam.secondarySchool', 'exam.professionalSchool', 'exam.center', 'exam.cbtCenter', 'answers.subject', 'proctoringEvents']);
     }
 

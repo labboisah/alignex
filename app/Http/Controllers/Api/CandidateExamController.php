@@ -69,13 +69,23 @@ class CandidateExamController extends Controller
             }
         }
 
-        if ($exam && $this->examOverdue($exam)) {
+        $candidate = $exam ? $this->candidateForLogin($exam, $data) : null;
+        $attempt = $candidate ? CandidateExamAttempt::query()
+            ->where('exam_id', $exam->id)->where('candidate_id', $candidate->id)
+            ->whereNull('retake_cancelled_at')
+            ->orderByDesc('attempt_number')
+            ->with(['candidate', 'exam', 'papers.question.subject', 'papers.question.options'])
+            ->first() : null;
+
+        if ($exam && ! $attempt?->retake_of_attempt_id && $this->examOverdue($exam)) {
             $exam = app(ExamStatusService::class)->sync($exam);
             $this->session->log($request, 'login_failed', null, ['exam_id' => $exam->id], 'Exam time has ended.');
             throw ValidationException::withMessages(['exam_code' => 'This exam time has ended.']);
         }
 
-        if (! $exam || $exam->status !== Exam::STATUS_ACTIVE) {
+        if (! $exam || ($attempt?->retake_of_attempt_id
+            ? ! in_array($exam->status, [Exam::STATUS_ACTIVE, Exam::STATUS_COMPLETED], true)
+            : $exam->status !== Exam::STATUS_ACTIVE)) {
             $this->session->log($request, 'login_failed', null, ['exam_code' => $data['exam_code'] ?? null], 'Exam not found or not active.');
             throw ValidationException::withMessages(['exam_code' => 'Exam not found or not active.']);
         }
@@ -86,12 +96,6 @@ class CandidateExamController extends Controller
             $this->session->log($request, 'login_failed', null, ['exam_id' => $exam->id], 'Candidate is not assigned to this exam.');
             throw ValidationException::withMessages(['identifier' => 'Candidate is not assigned to this exam.']);
         }
-
-        $attempt = CandidateExamAttempt::query()
-            ->where('exam_id', $exam->id)
-            ->where('candidate_id', $candidate->id)
-            ->with(['candidate', 'exam', 'papers.question.subject', 'papers.question.options'])
-            ->first();
 
         if (! $attempt || ! $attempt->papers()->exists()) {
             $this->session->log($request, 'login_failed', $attempt, ['exam_id' => $exam->id, 'candidate_id' => $candidate->id], 'Candidate paper has not been generated.');
@@ -108,6 +112,7 @@ class CandidateExamController extends Controller
             throw ValidationException::withMessages(['exam' => 'This candidate has been disqualified.']);
         }
 
+        $this->ensureAttemptWindow($attempt);
         $this->ensureProfessionalEligibility($request, $exam, $attempt);
         $this->session->ensureRolloutAccess($request, $attempt);
 
@@ -117,17 +122,20 @@ class CandidateExamController extends Controller
             $this->session->log($request, 'login_failed', $attempt, [], 'Device binding failed.');
             throw $exception;
         }
-        if (! $this->examCanStart($exam) && $attempt->status === CandidateExamAttempt::STATUS_NOT_STARTED) {
+        if (! $this->attemptCanStart($attempt) && $attempt->status === CandidateExamAttempt::STATUS_NOT_STARTED) {
             $token = $this->session->makeToken($attempt->refresh()->load(['candidate', 'exam', 'papers.question.subject', 'papers.question.options']));
             $this->session->log($request, 'login_waiting', $attempt, [
-                'starts_at' => $exam->starts_at?->toISOString(),
-                'starts_in_seconds' => $this->secondsUntilStart($exam),
+                'starts_at' => $attempt->accessStartsAt()?->toISOString(),
+                'starts_in_seconds' => $this->secondsUntilStart($attempt),
             ], 'Candidate logged in before exam start time.');
 
             return response()->json((new CandidateExamPayloadResource($attempt, $token))->resolve($request));
         }
 
         $this->startAttempt($exam, $attempt, $request, $data['device_fingerprint']);
+        if ($this->session->remainingSeconds($attempt->refresh()) <= 0) {
+            $attempt = $this->finalizeAttempt($request, $attempt, CandidateExamAttempt::STATUS_AUTO_SUBMITTED);
+        }
 
         $token = $this->session->makeToken($attempt->refresh()->load(['candidate', 'exam', 'papers.question.subject', 'papers.question.options']));
         $this->session->log($request, 'login_success', $attempt, ['device_binding' => (bool) data_get($exam->settings ?? [], 'bind_device', false)]);
@@ -147,20 +155,27 @@ class CandidateExamController extends Controller
             return response()->json(app(AdaptiveLifecycleService::class)->execute($attempt, 'start', $data));
         }
 
-        if (! $exam || $exam->status !== Exam::STATUS_ACTIVE) {
+        if (! $exam || ($attempt->retake_of_attempt_id
+            ? ! in_array($exam->status, [Exam::STATUS_ACTIVE, Exam::STATUS_COMPLETED], true)
+            : $exam->status !== Exam::STATUS_ACTIVE)) {
             throw ValidationException::withMessages(['exam' => 'Exam not found or not active.']);
         }
 
-        if ($this->examOverdue($exam)) {
+        $this->ensureAttemptWindow($attempt);
+        if (! $this->isOpenAttempt($attempt)) {
+            throw ValidationException::withMessages(['exam' => 'This exam attempt is already closed.']);
+        }
+
+        if (! $attempt->retake_of_attempt_id && $this->examOverdue($exam)) {
             app(ExamStatusService::class)->sync($exam);
             $this->session->log($request, 'start_failed', $attempt, [], 'Exam time has ended.');
             throw ValidationException::withMessages(['exam' => 'This exam time has ended.']);
         }
 
-        if (! $this->examCanStart($exam)) {
+        if (! $this->attemptCanStart($attempt)) {
             $this->session->log($request, 'start_waiting', $attempt, [
-                'starts_at' => $exam->starts_at?->toISOString(),
-                'starts_in_seconds' => $this->secondsUntilStart($exam),
+                'starts_at' => $attempt->accessStartsAt()?->toISOString(),
+                'starts_in_seconds' => $this->secondsUntilStart($attempt),
             ], 'Candidate attempted to start before exam start time.');
             throw ValidationException::withMessages(['exam' => 'This exam has not started yet.']);
         }
@@ -459,7 +474,27 @@ class CandidateExamController extends Controller
         }
 
         return Exam::query()
-            ->where('status', Exam::STATUS_ACTIVE)
+            ->where(function ($available) use ($identifiers): void {
+                $available->where('status', Exam::STATUS_ACTIVE)
+                    ->orWhere(function ($completed) use ($identifiers): void {
+                        $completed->where('status', Exam::STATUS_COMPLETED)
+                            ->whereHas('attempts', function ($retake) use ($identifiers): void {
+                                $retake->whereNotNull('retake_of_attempt_id')->whereNull('retake_cancelled_at')
+                                    ->whereIn('status', [CandidateExamAttempt::STATUS_NOT_STARTED, CandidateExamAttempt::STATUS_IN_PROGRESS])
+                                    ->where(function ($open): void {
+                                        $open->where('retake_ends_at', '>', now())->orWhere('status', CandidateExamAttempt::STATUS_IN_PROGRESS);
+                                    })
+                                    ->whereHas('candidate', function ($candidate) use ($identifiers): void {
+                                        $candidate->where(function ($identity) use ($identifiers): void {
+                                            foreach ($identifiers as $identifier) {
+                                                $identity->orWhere('candidate_number', $identifier)->orWhere('phone', $identifier)
+                                                    ->orWhere('nin', $identifier)->orWhere('metadata->nin', $identifier);
+                                            }
+                                        });
+                                    });
+                            });
+                    });
+            })
             ->whereHas('candidates', function ($query) use ($identifiers): void {
                 $query->where(function ($candidateQuery) use ($identifiers): void {
                     foreach ($identifiers as $identifier) {
@@ -497,21 +532,47 @@ class CandidateExamController extends Controller
 
     private function startAttempt(Exam $exam, CandidateExamAttempt $attempt, Request $request, string $fingerprint): void
     {
-        $startedAt = $attempt->started_at ?? now();
-        $dueAt = $attempt->server_due_at ?? $startedAt->copy()->addMinutes($exam->duration_minutes);
+        DB::transaction(function () use ($exam, $attempt, $request, $fingerprint): void {
+            $exam = Exam::whereKey($exam->id)->lockForUpdate()->firstOrFail();
+            $locked = CandidateExamAttempt::whereKey($attempt->id)->lockForUpdate()->firstOrFail();
+            $locked->setRelation('exam', $exam);
+            $this->ensureAttemptWindow($locked);
+            if (! $this->isOpenAttempt($locked) || ! $this->attemptCanStart($locked)) {
+                throw ValidationException::withMessages(['exam' => 'This attempt cannot be started.']);
+            }
+            if ($locked->status === CandidateExamAttempt::STATUS_IN_PROGRESS) {
+                return;
+            }
+            $startedAt = now();
+            $dueAt = $startedAt->copy()->addMinutes($locked->durationMinutes());
+            $endsAt = $locked->accessEndsAt();
+            if ($endsAt && $endsAt->lessThan($dueAt)) {
+                $dueAt = $endsAt;
+            }
+            $locked->update([
+                'status' => CandidateExamAttempt::STATUS_IN_PROGRESS,
+                'started_at' => $startedAt,
+                'server_due_at' => $dueAt,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'device_fingerprint' => $locked->device_fingerprint ?: $fingerprint,
+            ]);
+        });
+    }
 
-        if ($exam->ends_at && $exam->ends_at->lessThan($dueAt)) {
-            $dueAt = $exam->ends_at;
+    private function ensureAttemptWindow(CandidateExamAttempt $attempt): void
+    {
+        if ($attempt->retake_cancelled_at) {
+            throw ValidationException::withMessages(['exam' => 'This retake has been cancelled.']);
         }
-
-        $attempt->update([
-            'status' => CandidateExamAttempt::STATUS_IN_PROGRESS,
-            'started_at' => $startedAt,
-            'server_due_at' => $dueAt,
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent(),
-            'device_fingerprint' => $attempt->device_fingerprint ?: $fingerprint,
-        ]);
+        if ($attempt->retake_of_attempt_id && (! $attempt->retake_starts_at || ! $attempt->retake_ends_at
+            || ! in_array($attempt->exam->status, [Exam::STATUS_ACTIVE, Exam::STATUS_COMPLETED], true))) {
+            throw ValidationException::withMessages(['exam' => 'This retake is not available.']);
+        }
+        if ($attempt->status === CandidateExamAttempt::STATUS_NOT_STARTED
+            && $attempt->accessEndsAt()?->lessThanOrEqualTo(now())) {
+            throw ValidationException::withMessages(['exam' => 'This exam attempt window has closed.']);
+        }
     }
 
     private function isOpenAttempt(CandidateExamAttempt $attempt): bool
@@ -528,18 +589,15 @@ class CandidateExamController extends Controller
         return $exam->ends_at !== null && $exam->ends_at->isPast();
     }
 
-    private function examCanStart(Exam $exam): bool
+    private function attemptCanStart(CandidateExamAttempt $attempt): bool
     {
-        return ! $exam->starts_at || $exam->starts_at->lessThanOrEqualTo(now());
+        return ! $attempt->accessStartsAt() || $attempt->accessStartsAt()->lessThanOrEqualTo(now());
     }
 
-    private function secondsUntilStart(Exam $exam): int
+    private function secondsUntilStart(CandidateExamAttempt $attempt): int
     {
-        if (! $exam->starts_at) {
-            return 0;
-        }
-
-        return max(0, now()->diffInSeconds($exam->starts_at, false));
+        return $attempt->accessStartsAt()
+            ? max(0, (int) ceil(now()->diffInSeconds($attempt->accessStartsAt(), false))) : 0;
     }
 
     private function finalizeAttempt(Request $request, CandidateExamAttempt $attempt, string $status): CandidateExamAttempt
@@ -595,7 +653,8 @@ class CandidateExamController extends Controller
 
         $settings = app(ProfessionalExamService::class)->settings($exam);
 
-        if ($attempt->attempt_number > (int) $settings['attempt_limit']) {
+        // A manually scheduled retake is an audited exception to the normal attempt limit.
+        if (! $attempt->retake_of_attempt_id && $attempt->attempt_number > (int) $settings['attempt_limit']) {
             $this->session->log($request, 'login_failed', $attempt, ['attempt_limit' => $settings['attempt_limit']], 'Professional attempt limit exceeded.');
             throw ValidationException::withMessages(['exam' => 'Attempt limit has been reached for this professional exam.']);
         }

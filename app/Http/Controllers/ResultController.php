@@ -14,6 +14,7 @@ use App\Services\AdaptiveReportService;
 use App\Services\AdaptiveRolloutService;
 use App\Services\CandidatePerformanceProfileService;
 use App\Services\CandidateResultVisibilityService;
+use App\Services\CandidateRetakeService;
 use App\Services\ExamResultReleaseService;
 use App\Services\ResultManagementService;
 use Illuminate\Database\Eloquent\Builder;
@@ -33,10 +34,7 @@ class ResultController extends Controller
     {
         $exams = $this->examScope($request->user(), $request->route('organization'))
             ->with(['organization', 'institution', 'school', 'secondarySchool', 'professionalSchool', 'center', 'cbtCenter'])
-            ->withCount(['attempts as submitted_attempts_count' => fn ($query) => $query->whereIn('status', [
-                CandidateExamAttempt::STATUS_SUBMITTED,
-                CandidateExamAttempt::STATUS_AUTO_SUBMITTED,
-            ])->whereNotIn('id', AdaptiveAttemptState::select('attempt_id'))])
+            ->withCount(['attempts as submitted_attempts_count' => fn ($query) => $query->currentResult()])
             ->latest()
             ->get()
             ->map(fn (Exam $exam) => [
@@ -54,8 +52,7 @@ class ResultController extends Controller
 
         $attempts = CandidateExamAttempt::query()
             ->whereIn('exam_id', $exams->pluck('id'))
-            ->whereNotIn('id', AdaptiveAttemptState::select('attempt_id'))
-            ->whereIn('status', [CandidateExamAttempt::STATUS_SUBMITTED, CandidateExamAttempt::STATUS_AUTO_SUBMITTED])
+            ->currentResult()
             ->with(['candidate', 'exam', 'answers.subject', 'proctoringEvents'])
             ->get();
 
@@ -85,7 +82,13 @@ class ResultController extends Controller
                 'service_provider' => $this->results->serviceProvider(),
                 'total_marks' => $exam->total_marks,
                 'pass_mark' => $exam->pass_mark,
+                'duration_minutes' => $exam->duration_minutes,
             ],
+            'retake_candidates' => $request->user()->can('update', $exam)
+                && in_array($exam->status, [Exam::STATUS_ACTIVE, Exam::STATUS_COMPLETED], true)
+                && ! app(AdaptiveRolloutService::class)->isAdaptive($exam)
+                && ! app(AdaptiveReportService::class)->hasProgressions($exam)
+                    ? app(CandidateRetakeService::class)->candidates($exam) : null,
             'can_release' => $request->user()->can('update', $exam) && ! app(AdaptiveRolloutService::class)->isAdaptive($exam) && ! app(AdaptiveReportService::class)->hasProgressions($exam),
             'results_released' => app(CandidateResultVisibilityService::class)->allows($exam),
             'offline_uploads' => DB::table('offline_result_receipts')
@@ -118,6 +121,19 @@ class ResultController extends Controller
 
         return Inertia::render('Results/Candidate', [
             'result' => $this->results->row($attempt),
+            'attempt_history' => CandidateExamAttempt::where('exam_id', $attempt->exam_id)
+                ->where('candidate_id', $attempt->candidate_id)
+                ->when(! $attempt->candidate_id, fn ($query) => $query->where('exam_participant_id', $attempt->exam_participant_id))
+                ->orderByDesc('attempt_number')->get()
+                ->map(fn ($item) => [
+                    'id' => $item->id, 'attempt_number' => $item->attempt_number,
+                    'status' => $item->retake_cancelled_at ? 'cancelled' : $item->status,
+                    'score' => $item->score, 'total_marks' => $item->total_marks,
+                    'submitted_at' => $item->submitted_at?->toISOString(),
+                    'starts_at' => $item->accessStartsAt()?->toISOString(),
+                    'reason' => $item->retake_reason,
+                    'is_current' => CandidateExamAttempt::whereKey($item->id)->currentResult()->exists(),
+                ]),
             'answers' => $this->markedPaperRows($attempt, $request->user()),
             'adaptive' => $this->candidateAdaptiveAnalysis($attempt),
         ]);
@@ -246,6 +262,7 @@ class ResultController extends Controller
         $data = $request->validate(['hash' => ['required', 'string']]);
         $attempt = CandidateExamAttempt::query()
             ->where('result_hash', strtoupper(trim($data['hash'])))
+            ->currentResult()
             ->whereNotIn('id', AdaptiveAttemptState::select('attempt_id'))
             ->with(['candidate', 'exam', 'answers.subject', 'proctoringEvents'])
             ->first();
@@ -344,6 +361,11 @@ class ResultController extends Controller
      */
     private function candidateAdaptiveAnalysis(CandidateExamAttempt $attempt): array
     {
+        // These profiles are maintained per candidate/exam for the current result.
+        // Do not label an older attempt with the newer attempt's analysis.
+        if (! CandidateExamAttempt::whereKey($attempt->id)->currentResult()->exists()) {
+            return ['weaknesses' => [], 'topic_mastery' => [], 'difficulty_performance' => [], 'recommended_practice_areas' => []];
+        }
         $profiles = CandidatePerformanceProfile::query()
             ->where('candidate_id', $attempt->candidate_id)
             ->where('exam_id', $attempt->exam_id)

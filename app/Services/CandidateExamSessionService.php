@@ -42,6 +42,9 @@ class CandidateExamSessionService
             ->whereKey($payload['attempt_id'] ?? null)
             ->firstOrFail();
 
+        if ($attempt->retake_cancelled_at) {
+            throw ValidationException::withMessages(['exam' => 'This retake has been cancelled.']);
+        }
         $this->ensureRolloutAccess($request, $attempt);
 
         return $attempt;
@@ -59,6 +62,9 @@ class CandidateExamSessionService
 
     public function ensureWritable(CandidateExamAttempt $attempt): void
     {
+        if ($attempt->retake_cancelled_at) {
+            throw ValidationException::withMessages(['exam' => 'This retake has been cancelled.']);
+        }
         if (in_array($attempt->status, [
             CandidateExamAttempt::STATUS_SUBMITTED,
             CandidateExamAttempt::STATUS_AUTO_SUBMITTED,

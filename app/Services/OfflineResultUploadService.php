@@ -27,6 +27,7 @@ class OfflineResultUploadService
             $attempts = $query->lockForUpdate()->get();
             abort_unless($attempts->count() === 1, 409, 'The original candidate attempt cannot be identified uniquely.');
             $attempt = $attempts->first();
+            abort_if($attempt->retake_of_attempt_id, 409, 'Scheduled retakes must be completed in the online candidate app.');
             abort_unless($exam->candidates()->where('candidates.id', $data['candidate_id'])->exists(), 409, 'Candidate is no longer assigned to this exam.');
             $hash = hash('sha256', json_encode($data, JSON_THROW_ON_ERROR));
             $receipt = DB::table('offline_result_receipts')->where('attempt_id', $attempt->id)->first();

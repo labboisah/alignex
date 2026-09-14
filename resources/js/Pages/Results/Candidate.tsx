@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import { Printer } from 'lucide-react';
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { PageHeader, PortalAppShell, StatusBadge } from '@/Components/Platform';
@@ -33,7 +33,9 @@ type AdaptiveAnalysis = {
     recommended_practice_areas: PerformanceRow[];
 };
 
-export default function CandidateResultDetails({ result, answers, adaptive }: { result: ResultRow; answers: MarkedAnswer[]; adaptive: AdaptiveAnalysis }) {
+type AttemptHistory = { id: string; attempt_number: number; status: string; score: string | null; total_marks: string | null; submitted_at: string | null; starts_at: string | null; reason: string | null; is_current: boolean };
+
+export default function CandidateResultDetails({ result, answers, adaptive, attempt_history = [] }: { result: ResultRow; answers: MarkedAnswer[]; adaptive: AdaptiveAnalysis; attempt_history: AttemptHistory[] }) {
     return (
         <PortalAppShell title={result.candidate_name}>
             <Head title={`${result.candidate_name} Result`} />
@@ -45,6 +47,18 @@ export default function CandidateResultDetails({ result, answers, adaptive }: { 
                     backHref={`/results/exams/${result.exam_id}`}
                     actions={<Button asChild variant="secondary"><a href={`/results/attempts/${result.attempt_id}/marked-paper.pdf`}><Printer className="h-4 w-4" />Marked Paper</a></Button>}
                 />
+                {attempt_history.length > 1 && <section className="mb-6 rounded-md border border-border bg-white p-5">
+                    <h2 className="font-semibold">Attempt history</h2>
+                    <p className="mt-1 text-sm text-slate-500">Only the current result appears in exam result downloads.</p>
+                    <div className="mt-3 space-y-3">
+                        {attempt_history.map(attempt => <div key={attempt.id} className="rounded border border-border p-3 text-sm">
+                            <p className="font-semibold">Attempt {attempt.attempt_number} {attempt.is_current ? '? Current result' : '? ' + attempt.status.replaceAll('_', ' ')}</p>
+                            <p>{attempt.score !== null ? `Score: ${attempt.score}/${attempt.total_marks}` : 'No result yet'}{attempt.submitted_at ? ' ? Submitted ' + new Date(attempt.submitted_at).toLocaleString() : attempt.starts_at ? ' ? Scheduled ' + new Date(attempt.starts_at).toLocaleString() : ''}</p>
+                            {attempt.reason && <p className="mt-1 text-slate-600">Reason: {attempt.reason}</p>}
+                            {['submitted', 'auto_submitted', 'disqualified'].includes(attempt.status) && attempt.id !== result.attempt_id && <Link className="mt-2 inline-block font-medium text-primary underline" href={`/results/attempts/${attempt.id}`}>View attempt</Link>}
+                        </div>)}
+                    </div>
+                </section>}
                 <div className="grid gap-4 md:grid-cols-4">
                     <Metric label="Score" value={`${result.score}/${result.total_marks}`} />
                     <Metric label="Percentage" value={`${result.percentage}%`} />

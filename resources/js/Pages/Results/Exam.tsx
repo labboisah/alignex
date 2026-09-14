@@ -2,9 +2,11 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import { Download, Eye, FileText, Printer } from 'lucide-react';
 import { PageHeader, PortalAppShell, StatusBadge } from '@/Components/Platform';
 import { Button } from '@/Components/ui/button';
+import { ToastProvider } from '@/Components/ui/toast';
 import { DifficultyChart, PracticeAreas, TopicMastery } from './Candidate';
 import { Charts, Summary } from './Index';
 import { ResultRow, ResultsDashboard } from './types';
+import RetakeManager, { RetakeCandidate } from './RetakeManager';
 
 type PerformanceRow = {
     subject: string;
@@ -22,7 +24,7 @@ type AdaptiveAnalysis = {
     recommended_practice_areas: PerformanceRow[];
 };
 
-export default function ExamResults({ exam, rows, dashboard, adaptive_analysis, can_release, results_released, offline_uploads }: { exam: { id: string; title: string; exam_code: string; owner?: { type: string; name: string }; service_provider?: string; total_marks: string; pass_mark: string }; rows: ResultRow[]; dashboard: ResultsDashboard; adaptive_analysis: AdaptiveAnalysis; can_release: boolean; results_released: boolean; offline_uploads: { id: string; candidate_number: string; local_score: string | null; official_score: string | null; legacy_package: boolean; created_at: string }[] }) {
+export default function ExamResults({ exam, rows, dashboard, adaptive_analysis, can_release, results_released, offline_uploads, retake_candidates }: { retake_candidates: RetakeCandidate[] | null; exam: { id: string; title: string; exam_code: string; owner?: { type: string; name: string }; service_provider?: string; total_marks: string; pass_mark: string; duration_minutes: number }; rows: ResultRow[]; dashboard: ResultsDashboard; adaptive_analysis: AdaptiveAnalysis; can_release: boolean; results_released: boolean; offline_uploads: { id: string; candidate_number: string; local_score: string | null; official_score: string | null; legacy_package: boolean; created_at: string }[] }) {
     const release = useForm({ released: !results_released });
     return (
         <PortalAppShell title={exam.title}>
@@ -47,6 +49,7 @@ export default function ExamResults({ exam, rows, dashboard, adaptive_analysis, 
                         {offline_uploads.map(upload => <tr key={upload.id}><td className="py-2">{upload.candidate_number}</td><td>{upload.local_score ?? 'N/A'}</td><td>{upload.official_score ?? 'N/A'}</td><td>{upload.legacy_package ? 'Legacy paper matched' : 'Signed paper verified'}</td><td>{new Date(upload.created_at).toLocaleString()}</td></tr>)}
                     </tbody></table>
                 </div>}
+                {retake_candidates !== null && <ToastProvider><RetakeManager candidates={retake_candidates} duration={exam.duration_minutes} /></ToastProvider>}
                 <Summary dashboard={dashboard} />
                 <Charts dashboard={dashboard} />
                 <section className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
@@ -64,6 +67,7 @@ export default function ExamResults({ exam, rows, dashboard, adaptive_analysis, 
                             <tr><th className="py-2">Candidate Name</th><th>Registration Number</th><th>Score</th><th>Percentage</th><th>Grade</th><th>Pass/Fail</th><th>Submitted At</th><th>Duration Used</th><th>Suspicious Events</th><th>Actions</th></tr>
                         </thead>
                         <tbody className="divide-y divide-border">
+                            {rows.length === 0 && <tr><td colSpan={10} className="py-5 text-center text-slate-500">No completed results yet.</td></tr>}
                             {rows.map((row) => (
                                 <tr key={row.attempt_id}>
                                     <td className="py-3 font-semibold">{row.candidate_name}</td>
