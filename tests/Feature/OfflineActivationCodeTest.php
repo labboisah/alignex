@@ -6,6 +6,7 @@ use App\Models\OfflineActivationCode;
 use App\Models\OfflineServerActivation;
 use App\Models\Institution;
 use App\Models\Organization;
+use App\Models\PricingPlan;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
@@ -177,9 +178,13 @@ class OfflineActivationCodeTest extends TestCase
 
     public function test_institution_admin_navigation_includes_offline_delivery_links(): void
     {
-        $institution = Institution::factory()->create();
+        $plan = PricingPlan::query()->where('slug', 'enterprise')->firstOrFail();
+        $plan->update(['features' => array_merge($plan->features ?? [], ['offline_activation' => true])]);
+        $organization = Organization::factory()->create(['pricing_plan_id' => $plan->id]);
+        $institution = Institution::factory()->create(['organization_id' => $organization->id]);
         $admin = User::factory()->create([
             'role' => User::ROLE_INSTITUTION_ADMIN,
+            'organization_id' => null,
             'institution_id' => $institution->id,
         ]);
 

@@ -100,6 +100,7 @@ class PlanFeatureService
     private function ownerForUser(User $user): ?Model
     {
         return match (true) {
+            $user->institution_id !== null => $user->institution,
             $user->organization_id !== null => $user->organization,
             $user->secondary_school_id !== null => $user->secondarySchool,
             $user->professional_school_id !== null => $user->professionalSchool,
