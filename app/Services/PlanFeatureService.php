@@ -15,6 +15,22 @@ class PlanFeatureService
             return null;
         }
 
+        if ($user->institution_id !== null) {
+            $institutionPlan = $this->planForOwner($user->institution);
+
+            if ($institutionPlan) {
+                return $institutionPlan;
+            }
+
+            $organizationPlan = $this->planForOwner($user->organization);
+
+            if ($organizationPlan) {
+                return $organizationPlan;
+            }
+
+            return PricingPlan::query()->where('slug', 'enterprise')->first();
+        }
+
         $owner = $this->ownerForUser($user);
 
         return $this->planForOwner($owner);
@@ -100,8 +116,8 @@ class PlanFeatureService
     private function ownerForUser(User $user): ?Model
     {
         return match (true) {
-            $user->institution_id !== null => $user->institution,
             $user->organization_id !== null => $user->organization,
+            $user->institution_id !== null => $user->institution,
             $user->secondary_school_id !== null => $user->secondarySchool,
             $user->professional_school_id !== null => $user->professionalSchool,
             $user->cbt_center_id !== null => $user->cbtCenter,
