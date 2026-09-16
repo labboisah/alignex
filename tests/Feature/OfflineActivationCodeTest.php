@@ -173,4 +173,22 @@ class OfflineActivationCodeTest extends TestCase
             ->contains(fn (array $item) => ($item['label'] ?? null) === 'Manage Activation' && ($item['href'] ?? null) === '/admin/manage-activation'));
         $this->assertCount(1, $adminSections);
     }
+
+    public function test_institution_admin_navigation_includes_offline_delivery_links(): void
+    {
+        $admin = User::factory()->create([
+            'role' => User::ROLE_INSTITUTION_ADMIN,
+        ]);
+
+        $navigation = $this->actingAs($admin)
+            ->get('/dashboard')
+            ->assertOk()
+            ->viewData('page')['props']['auth']['navigation'];
+
+        $items = collect($navigation)->flatMap(fn (array $item) => $item['children'] ?? [$item]);
+
+        $this->assertTrue($items->contains(fn (array $item) => ($item['label'] ?? null) === 'Offline Server' && ($item['href'] ?? null) === '/offline-server/download'));
+        $this->assertTrue($items->contains(fn (array $item) => ($item['label'] ?? null) === 'Client App' && ($item['href'] ?? null) === '/candidate-client/download'));
+        $this->assertTrue($items->contains(fn (array $item) => ($item['label'] ?? null) === 'Activation Codes' && ($item['href'] ?? null) === '/offline-activation-codes'));
+    }
 }

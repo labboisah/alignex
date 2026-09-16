@@ -180,6 +180,9 @@ class HandleInertiaRequests extends Middleware
                     ['label' => 'Results', 'href' => '/results', 'permission' => 'viewReports'],
                     ['label' => 'Academic Reports', 'href' => '/reports', 'permission' => 'viewReports'],
                 ]],
+                ['label' => 'Offline Server', 'href' => '/offline-server/download', 'feature' => 'offline_activation'],
+                ['label' => 'Client App', 'href' => '/candidate-client/download'],
+                ['label' => 'Activation Codes', 'href' => '/offline-activation-codes', 'permission' => 'downloadOfflineServer', 'feature' => 'offline_activation'],
                 ['label' => 'Settings', 'href' => $institutionBase.'/edit', 'permission' => 'manageSettings'],
                 ['label' => 'Documentation', 'href' => '/documentation'],
             ]);
