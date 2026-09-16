@@ -117,12 +117,14 @@ class PlanFeatureService
             return null;
         }
 
-        $owner->loadMissing('pricingPlan');
+        if (method_exists($owner, 'pricingPlan')) {
+            $owner->loadMissing('pricingPlan');
 
-        $plan = $owner->getRelation('pricingPlan');
+            $plan = $owner->getRelation('pricingPlan');
 
-        if ($plan) {
-            return $plan;
+            if ($plan) {
+                return $plan;
+            }
         }
 
         if (method_exists($owner, 'organization')) {
