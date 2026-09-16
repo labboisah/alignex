@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\OfflineActivationCode;
 use App\Models\OfflineServerActivation;
+use App\Models\Institution;
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -176,8 +177,10 @@ class OfflineActivationCodeTest extends TestCase
 
     public function test_institution_admin_navigation_includes_offline_delivery_links(): void
     {
+        $institution = Institution::factory()->create();
         $admin = User::factory()->create([
             'role' => User::ROLE_INSTITUTION_ADMIN,
+            'institution_id' => $institution->id,
         ]);
 
         $navigation = $this->actingAs($admin)
