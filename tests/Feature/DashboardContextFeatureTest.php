@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\CbtCenter;
+use App\Models\Exam;
+use App\Models\Institution;
 use App\Models\Organization;
 use App\Models\ProfessionalSchool;
 use App\Models\SecondarySchool;
@@ -36,6 +38,37 @@ class DashboardContextFeatureTest extends TestCase
                 ->where('current_context.type', 'organization')
                 ->where('current_context.name', 'Hope Future NGO')
                 ->where('available_contexts.0.type', 'organization')
+            );
+    }
+
+    public function test_institution_dashboard_scopes_exams_to_the_selected_institution(): void
+    {
+        $organization = Organization::factory()->create();
+        $institution = Institution::factory()->create(['organization_id' => $organization->id]);
+        $otherInstitution = Institution::factory()->create(['organization_id' => $organization->id]);
+        $ownExam = Exam::factory()->create(['institution_id' => $institution->id]);
+        Exam::factory()->create(['institution_id' => $otherInstitution->id]);
+        $admin = User::factory()->create([
+            'role' => User::ROLE_INSTITUTION_ADMIN,
+            'organization_id' => $organization->id,
+            'institution_id' => $institution->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->get('/dashboard')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Dashboard/Index')
+                ->where('current_context.type', 'institution')
+                ->where('current_context.id', $institution->id)
+                ->where('metrics', function ($metrics) {
+                    $values = $metrics->pluck('value', 'label');
+
+                    $this->assertSame(1, $values['Active Exams']);
+
+                    return true;
+                })
+                ->where('recent_exams.0.code', $ownExam->code)
             );
     }
 

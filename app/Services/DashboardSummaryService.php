@@ -165,9 +165,12 @@ class DashboardSummaryService
 
         return Exam::query()
             ->when($type === 'organization', fn ($query) => $query->where('organization_id', $id))
-            ->when($type === 'secondary_school', fn ($query) => $query->where('secondary_school_id', $id))
+            ->when($type === 'institution', fn ($query) => $query->where('institution_id', $id))
+            ->when($type === 'secondary_school' && ($context['source'] ?? null) === 'legacy_school', fn ($query) => $query->where('school_id', $id))
+            ->when($type === 'secondary_school' && ($context['source'] ?? null) !== 'legacy_school', fn ($query) => $query->where('secondary_school_id', $id))
             ->when($type === 'professional_school', fn ($query) => $query->where('professional_school_id', $id))
-            ->when($type === 'cbt_center', fn ($query) => $query->where('cbt_center_id', $id));
+            ->when($type === 'cbt_center' && ($context['source'] ?? null) === 'legacy_center', fn ($query) => $query->where('center_id', $id))
+            ->when($type === 'cbt_center' && ($context['source'] ?? null) !== 'legacy_center', fn ($query) => $query->where('cbt_center_id', $id));
     }
 
     private function teacherExamScope(User $user, Builder $examScope): Builder
@@ -445,7 +448,12 @@ class DashboardSummaryService
         $id = $context['id'] ?? null;
 
         if ($type === 'secondary_school') {
-            return Student::query()->where('secondary_school_id', $id)->latest()->limit(5)->get()->map(fn ($student) => [
+            return Student::query()
+                ->when(($context['source'] ?? null) === 'legacy_school', fn ($query) => $query->where('school_id', $id))
+                ->when(($context['source'] ?? null) !== 'legacy_school', fn ($query) => $query->where('secondary_school_id', $id))
+                ->latest()
+                ->limit(5)
+                ->get()->map(fn ($student) => [
                 'id' => (string) $student->id,
                 'name' => trim($student->first_name.' '.$student->last_name),
                 'registration_number' => $student->admission_number,
@@ -455,8 +463,10 @@ class DashboardSummaryService
 
         return Candidate::query()
             ->when($type === 'organization', fn ($query) => $query->where('organization_id', $id))
+            ->when($type === 'institution', fn ($query) => $query->where('institution_id', $id))
             ->when($type === 'professional_school', fn ($query) => $query->where('professional_school_id', $id))
-            ->when($type === 'cbt_center', fn ($query) => $query->where('cbt_center_id', $id))
+            ->when($type === 'cbt_center' && ($context['source'] ?? null) === 'legacy_center', fn ($query) => $query->where('center_id', $id))
+            ->when($type === 'cbt_center' && ($context['source'] ?? null) !== 'legacy_center', fn ($query) => $query->where('cbt_center_id', $id))
             ->latest()
             ->limit(5)
             ->get()
