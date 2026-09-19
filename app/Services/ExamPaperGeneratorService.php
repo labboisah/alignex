@@ -162,7 +162,6 @@ class ExamPaperGeneratorService
                 'created' => $created,
                 'skipped' => $skipped,
                 'created_candidate_ids' => array_values(array_unique($createdCandidateIds)),
-                'summary' => $this->generatedSummary($exam),
             ];
         });
 

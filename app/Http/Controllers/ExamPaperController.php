@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\ExamResource;
+use App\Jobs\GenerateExamPapers;
 use App\Models\Exam;
 use App\Services\ExamPaperGeneratorService;
 use Illuminate\Http\RedirectResponse;
@@ -32,8 +33,8 @@ class ExamPaperController extends Controller
     {
         Gate::authorize('update', $exam);
 
-        $result = $this->generator->generate($exam);
+        GenerateExamPapers::dispatch($exam->id);
 
-        return back()->with('success', "{$result['created']} papers generated. {$result['skipped']} already existed.");
+        return back()->with('success', 'Paper generation has been queued and will continue in the background.');
     }
 }
