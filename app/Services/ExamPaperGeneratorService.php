@@ -122,9 +122,9 @@ class ExamPaperGeneratorService
                 }
 
                 $questions = $this->questionsForExam($exam);
-                $questionOrder = 1;
-
-                foreach ($questions as $question) {
+                $subjectMarks = $exam->examSubjects->pluck('marks_per_question', 'subject_id');
+                $generatedAt = now();
+                $papers = $questions->values()->map(function (Question $question, int $index) use ($exam, $attempt, $participant, $subjectMarks, $generatedAt): array {
                     $optionIds = $question->options
                         ->sortBy('display_order')
                         ->pluck('id')
@@ -134,18 +134,24 @@ class ExamPaperGeneratorService
                         $optionIds = $optionIds->shuffle()->values();
                     }
 
-                    $attempt->papers()->create([
+                    return [
+                        'id' => (string) Str::ulid(),
+                        'attempt_id' => $attempt->id,
                         'exam_participant_id' => $participant->id,
                         'question_id' => $question->id,
-                        'question_order' => $questionOrder++,
-                        'option_order' => $optionIds->all(),
-                        'marks' => $exam->examSubjects->firstWhere('subject_id', $question->subject_id)->marks_per_question,
-                    ]);
-                }
+                        'question_order' => $index + 1,
+                        'option_order' => json_encode($optionIds->all(), JSON_THROW_ON_ERROR),
+                        'marks' => $subjectMarks->get($question->subject_id),
+                        'created_at' => $generatedAt,
+                        'updated_at' => $generatedAt,
+                    ];
+                });
+
+                DB::table('candidate_papers')->insert($papers->all());
 
                 $attempt->update([
                     'total_questions' => $questions->count(),
-                    'total_marks' => $attempt->papers()->sum('marks'),
+                    'total_marks' => $papers->sum('marks'),
                 ]);
 
                 $created++;

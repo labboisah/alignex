@@ -257,6 +257,7 @@ function PublicNav() {
                     <img src="/images/brand-logo.png" alt="AlignEx" className="h-12 w-auto max-w-[190px] object-contain" />
                 </Link>
                 <div className="hidden items-center gap-6 text-sm font-semibold text-slate-600 md:flex">
+                    <Link href="/autoboot-readiness" className="hover:text-primary">Autoboot Readiness</Link>
                     <a href="#videos" className="hover:text-primary">Videos</a>
                     <a href="#roles" className="hover:text-primary">Roles</a>
                     <a href="#results" className="hover:text-primary">Results</a>
@@ -287,6 +288,7 @@ function Hero() {
                     </p>
                     <div className="mt-8 flex flex-wrap gap-3">
                         <Button asChild><a href="#roles">Browse Role Guides <ArrowRight className="h-4 w-4" /></a></Button>
+                        <Button asChild variant="secondary"><Link href="/autoboot-readiness">Autoboot Readiness Guide</Link></Button>
                         <Button asChild variant="secondary"><a href="#videos">Video Placement Plan</a></Button>
                         <Button asChild variant="secondary"><Link href="/candidate-result">Candidate Result</Link></Button>
                     </div>

@@ -134,6 +134,44 @@ class OfflineServerActivationController extends Controller
         ]);
     }
 
+    public function deactivate(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'license_key' => ['required', 'string', 'max:255'],
+            'device_id' => ['required', 'string', 'max:120'],
+            'admin_email' => ['required', 'string', 'max:255'],
+            'admin_password' => ['required', 'string', 'max:255'],
+        ]);
+
+        $admin = User::query()->where('email', trim($validated['admin_email']))->first();
+
+        if (! $admin || ! $admin->isPortalUser() || ! Hash::check($validated['admin_password'], $admin->password)) {
+            return response()->json(['message' => 'Invalid platform admin email or password.'], 401);
+        }
+
+        $activation = OfflineServerActivation::query()
+            ->with('activationCode')
+            ->where('license_key', $validated['license_key'])
+            ->where('device_id', $validated['device_id'])
+            ->where('status', 'activated')
+            ->first();
+
+        if (! $activation || ! $activation->activationCode || ! $this->adminCanUseActivationCode($admin, $activation->activationCode)) {
+            return response()->json(['message' => 'This active server activation was not found or cannot be deactivated by this admin.'], 403);
+        }
+
+        DB::transaction(function () use ($activation): void {
+            $activation->forceFill([
+                'status' => 'revoked',
+                'updated_at' => now(),
+            ])->save();
+
+            $this->syncActivationCodeUsage($activation->activationCode);
+        });
+
+        return response()->json(['success' => true, 'status' => 'revoked']);
+    }
+
     private function findActivationCode(string $plainCode): ?OfflineActivationCode
     {
         return OfflineActivationCode::query()

@@ -44,6 +44,7 @@ use Inertia\Inertia;
 
 Route::get('/', PublicWelcomeController::class)->name('home');
 Route::get('/documentation', fn () => Inertia::render('Public/Documentation'))->name('documentation.public');
+Route::get('/autoboot-readiness', fn () => Inertia::render('Public/AutobootReadiness'))->name('autoboot-readiness.public');
 Route::get('/pricing', PublicPricingController::class)->name('pricing.public');
 
 Route::get('/ui-preview', fn () => Inertia::render('UiPreview/Index'))->name('ui-preview');
