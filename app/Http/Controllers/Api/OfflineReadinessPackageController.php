@@ -28,12 +28,15 @@ class OfflineReadinessPackageController extends Controller
 
         $package = OfflineReadinessPackage::query()
             ->where('code', strtolower(trim($code)))
-            ->where('status', OfflineReadinessPackage::STATUS_ACTIVE)
             ->latest('id')
             ->first();
 
         if (! $package) {
-            return response()->json(['message' => 'The active readiness package was not found.'], 404);
+            return response()->json(['message' => 'The Autoboot readiness package code was not found. Do not use an official exam code.'], 404);
+        }
+
+        if ($package->status !== OfflineReadinessPackage::STATUS_ACTIVE) {
+            return response()->json(['message' => "Autoboot package {$package->code} is {$package->status}. Activate it in the platform before importing it into the Center Server."], 409);
         }
 
         return response()->json([
