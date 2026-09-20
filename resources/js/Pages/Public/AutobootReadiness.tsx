@@ -8,7 +8,7 @@ type GuideStep = { title: string; body: string };
 const setupSteps: GuideStep[] = [
     { title: 'Activate the Center Server', body: 'Install the AlignEx Center Server, activate it with the approved center account, and confirm the center name, device identity, license status, and portal URL.' },
     { title: 'Connect client computers', body: 'Install the approved Candidate Client or open the LAN client URL on every test computer. Confirm that each device can reach the server and that the network is stable.' },
-    { title: 'Create a readiness drill', body: 'From Center Server, open Autoboot Readiness and create a synthetic drill. Set the expected client count, duration, and drill name.' },
+    { title: 'Create a readiness drill', body: 'From Center Server, open Autoboot Readiness and create a synthetic drill. Select the approved capacity package, confirm the capacity-plus-15% backup target, duration, and drill name.' },
     { title: 'Confirm the client snapshot', body: 'Wait for the expected number of readiness clients to register. Do not start until the connected count matches the center plan.' },
     { title: 'Start autoboot', body: 'Start the drill from the server. Readiness clients receive the test manifest, show a readiness-test screen, answer automatically, and submit synthetic activity.' },
     { title: 'Finalize and upload the report', body: 'After the clients complete, finalize the local report, review the metrics and checksum, then upload the report to the AlignEx portal.' },
@@ -39,9 +39,9 @@ export default function AutobootReadiness() {
 
                 <section className="border-y border-border bg-white">
                     <div className="mx-auto max-w-7xl px-6 py-12 lg:px-8">
-                        <SectionHeading eyebrow="Configuration" title="What administrators should configure" body="Use the readiness drill to model the real center capacity, not an arbitrary small test. The expected client count should match the computers that will be used on exam day." />
+                        <SectionHeading eyebrow="Configuration" title="What administrators should configure" body="Select one of the supported capacity tiers: 15, 25, 50, 100, 150, 200, or 250 candidates. Autoboot tests the selected capacity plus a 15% synthetic backup, rounded up to a whole client." />
                         <div className="mt-7 grid gap-5 lg:grid-cols-3">
-                            <InfoCard icon={<Network className="h-5 w-5" />} title="Expected clients" body="Set the number of client computers that must be connected before the drill may start. Late or missing devices should be investigated rather than silently ignored." />
+                            <InfoCard icon={<Network className="h-5 w-5" />} title="Capacity package" body="Choose the Super Admin-approved package for the live capacity tier. The server calculates the Autoboot target as capacity plus 15% backup and rejects a mismatched package." />
                             <InfoCard icon={<Gauge className="h-5 w-5" />} title="Duration" body="Use a duration long enough to observe normal answer traffic, reconnect behavior, and local database writes. The server controls the authoritative window." />
                             <InfoCard icon={<ClipboardCheck className="h-5 w-5" />} title="Drill mode" body="Start with Synthetic Full Run. Later, controlled resilience and capacity modes can introduce planned reconnects or partial failures." />
                         </div>
@@ -53,7 +53,7 @@ export default function AutobootReadiness() {
                         <div>
                             <SectionHeading eyebrow="During autoboot" title="What happens on the client computers" body="Clients enter an unmistakable Readiness Test screen. They register with the server, wait for the administrator's start command, receive the synthetic manifest, show progress, submit automatic answers, and report completion." />
                             <div className="mt-6 space-y-3">
-                                {['Client registers with readiness mode, not candidate exam mode.', 'Server issues a short-lived readiness session for the client.', 'Client receives four synthetic subjects with 25 questions each.', 'Client displays timer and question progress while automatic activity runs.', 'Client emits answer and completion telemetry to the readiness-only endpoints.', 'Client never calls the official candidate login, answer, or result APIs.'].map((item) => <div key={item} className="flex gap-3 rounded-md border border-border bg-white p-4 shadow-sm"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" /><span className="text-sm leading-6 text-slate-600">{item}</span></div>)}
+                                {['Client registers with readiness mode, not candidate exam mode.', 'Server issues a short-lived readiness session for the client.', 'Client receives the immutable questions from the selected capacity package.', 'Client displays timer and question progress while automatic activity runs.', 'Client emits answer and completion telemetry to the readiness-only endpoints.', 'Client never calls the official candidate login, answer, or result APIs.'].map((item) => <div key={item} className="flex gap-3 rounded-md border border-border bg-white p-4 shadow-sm"><CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success" /><span className="text-sm leading-6 text-slate-600">{item}</span></div>)}
                             </div>
                         </div>
                         <div className="rounded-md border border-amber-200 bg-amber-50 p-6">

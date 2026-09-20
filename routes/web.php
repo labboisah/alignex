@@ -21,6 +21,7 @@ use App\Http\Controllers\ExamPaperController;
 use App\Http\Controllers\InstitutionController;
 use App\Http\Controllers\InstitutionStructureController;
 use App\Http\Controllers\OfflineActivationCodeController;
+use App\Http\Controllers\OfflineReadinessPackageController;
 use App\Http\Controllers\OfflineServerDownloadController;
 use App\Http\Controllers\OrganizationController;
 use App\Http\Controllers\OwnerStatusController;
@@ -158,6 +159,19 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
         Route::delete('/app-releases/{appRelease}', [AppReleaseController::class, 'destroy'])->name('app-releases.destroy');
         Route::get('/app-releases/{appRelease}/download', [AppReleaseController::class, 'download'])->name('app-releases.download');
     });
+
+        Route::middleware(['role:super_admin', 'permission:manageReadinessPackages'])->group(function (): void {
+            Route::get('/autoboot/candidates', fn () => redirect('/candidates?scope=autoboot'))->name('autoboot.candidates');
+            Route::get('/autoboot/subjects', fn () => redirect('/subjects?scope=autoboot'))->name('autoboot.subjects');
+            Route::get('/autoboot/question-banks', fn () => redirect('/question-bank?scope=autoboot'))->name('autoboot.question-banks');
+            Route::get('/autoboot/questions', fn () => redirect('/questions?scope=autoboot'))->name('autoboot.questions');
+            Route::get('/offline-readiness-packages', [OfflineReadinessPackageController::class, 'index'])->name('offline-readiness-packages.index');
+            Route::post('/offline-readiness-packages', [OfflineReadinessPackageController::class, 'store'])->name('offline-readiness-packages.store');
+            Route::get('/offline-readiness-packages/{offlineReadinessPackage}/paper', [OfflineReadinessPackageController::class, 'paper'])->name('offline-readiness-packages.paper');
+            Route::patch('/offline-readiness-packages/{offlineReadinessPackage}', [OfflineReadinessPackageController::class, 'update'])->name('offline-readiness-packages.update');
+            Route::post('/offline-readiness-packages/{offlineReadinessPackage}/generate-paper', [OfflineReadinessPackageController::class, 'generatePaper'])->name('offline-readiness-packages.generate-paper');
+            Route::delete('/offline-readiness-packages/{offlineReadinessPackage}', [OfflineReadinessPackageController::class, 'destroy'])->name('offline-readiness-packages.destroy');
+        });
 
     Route::get('/organizations/{organization}', [OrganizationController::class, 'show'])
         ->middleware('role:super_admin,organization_admin')

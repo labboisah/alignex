@@ -289,6 +289,12 @@ class QuestionController extends Controller
         $user = $request->user();
         $context = app(CurrentContextService::class)->current($user);
 
+        if ($request->query('scope') === 'autoboot') {
+            $query->whereHas('organization', fn ($organization) => $organization->where('code', 'AUTOBOOT-SYNTHETIC'));
+
+            return;
+        }
+
         if (($context['type'] ?? null) === 'organization') {
             $query
                 ->where('organization_id', $context['id'])

@@ -71,6 +71,14 @@ The server administrator selects **Create Autoboot Drill** and configures:
 
 The server creates the drill locally. It does not create an official exam.
 
+The drill must use a Super Admin-managed readiness package selected for one of the supported live capacity tiers: **15, 25, 50, 100, 150, 200, or 250 candidates**. Autoboot runs at the selected capacity plus a 15% synthetic backup, rounded up:
+
+$$
+	ext{Autoboot clients} = \left\lceil \text{capacity} \times 1.15 \right\rceil
+$$
+
+The resulting Autoboot targets are 18, 29, 58, 115, 173, 230, and 288 clients respectively. The selected package, capacity, backup percentage, and calculated target must be frozen in the drill before clients are started.
+
 ### 3.3 Start the drill
 
 1. The administrator reviews the connected-client list.
@@ -204,9 +212,9 @@ Purpose:
 - Measure server CPU, RAM, SQLite writes, LAN traffic, latency, and completion rate.
 - Confirm the center meets its planned capacity.
 
-## 7. Question Bank and Default Content
+### 7. Question Bank and Capacity Packages
 
-The server should ship with a readiness content pack containing at least:
+The server must import an approved readiness package from the Super Admin-managed package catalog. A package is selected by capacity profile rather than embedded as one fixed default. Each package must contain:
 
 - Four subjects.
 - Twenty-five questions per subject.
@@ -217,16 +225,17 @@ The server should ship with a readiness content pack containing at least:
 - No real examination questions.
 - No confidential or copyrighted production content unless properly authorized.
 
-The default pack should be versioned, for example:
+Each package must be versioned, checksummed, and validated before use. Example metadata:
 
 ```text
-alignex.readiness-pack.v1
-subjects: 4
-questions_per_subject: 25
-total_questions: 100
+alignex.readiness-pack.v1-250
+capacity_profile: 250
+subjects: package-defined
+total_questions: package-defined
+autoboot_target_clients: 288
 ```
 
-The content pack must be immutable once a drill starts. Updating the built-in questions creates a new pack version.
+The package must declare its capacity profile, question count, subject map, schema version, and SHA-256 checksum. The content pack must be immutable once a drill starts. Updating the package creates a new package version.
 
 ## 8. Drill Data Model
 
@@ -239,6 +248,9 @@ The local Center Server should add separate tables or equivalent storage for rea
 - `status`: draft, ready, running, completed, failed, uploaded.
 - `mode`: synthetic_full, network_resilience, partial_failure, capacity.
 - `content_pack_version`.
+- `capacity_profile`.
+- `backup_percent`.
+- `autoboot_target_clients`.
 - `duration_seconds`.
 - `expected_clients`.
 - `connected_clients_at_start`.

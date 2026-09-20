@@ -94,6 +94,7 @@ class HandleInertiaRequests extends Middleware
             'manageAdminRegistrations' => $user->hasPermission('manageAdminRegistrations'),
             'managePricingPlans' => $user->hasPermission('managePricingPlans'),
             'manageAppReleases' => $user->hasPermission('manageAppReleases'),
+            'manageReadinessPackages' => $user->hasPermission('manageReadinessPackages'),
             'manageCenters' => $user->hasPermission('manageCenters'),
             'manageSchools' => $user->hasPermission('manageSchools'),
             'manageUsers' => $user->hasPermission('manageUsers'),
@@ -138,6 +139,13 @@ class HandleInertiaRequests extends Middleware
                     ['label' => 'Secondary Schools', 'href' => '/secondary-schools', 'permission' => 'manageSchools'],
                     ['label' => 'Professional Schools', 'href' => '/professional-schools', 'permission' => 'manageSchools'],
                     ['label' => 'CBT Centers', 'href' => '/cbt-centers', 'permission' => 'manageCenters'],
+                ]],
+                ['label' => 'Autoboot', 'permission' => 'manageReadinessPackages', 'children' => [
+                    ['label' => 'Candidates', 'href' => '/autoboot/candidates', 'permission' => 'manageReadinessPackages'],
+                    ['label' => 'Subjects', 'href' => '/autoboot/subjects', 'permission' => 'manageReadinessPackages'],
+                    ['label' => 'Question Banks', 'href' => '/autoboot/question-banks', 'permission' => 'manageReadinessPackages'],
+                    ['label' => 'Questions', 'href' => '/autoboot/questions', 'permission' => 'manageReadinessPackages'],
+                    ['label' => 'Packages', 'href' => '/offline-readiness-packages', 'permission' => 'manageReadinessPackages'],
                 ]],
                 ['label' => 'Admin', 'children' => [
                     ['label' => 'Users', 'href' => '/users', 'permission' => 'manageUsers'],

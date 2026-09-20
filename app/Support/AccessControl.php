@@ -98,6 +98,11 @@ class AccessControl
                 'group' => 'Platform',
                 'description' => 'Manage offline server and client app versions, downloads, and update metadata.',
             ],
+            'manageReadinessPackages' => [
+                'label' => 'Manage readiness packages',
+                'group' => 'Platform',
+                'description' => 'Import, validate, activate, and retire capacity-specific Autoboot readiness packages.',
+            ],
             'manageCenters' => [
                 'label' => 'Manage centers',
                 'group' => 'Administration',

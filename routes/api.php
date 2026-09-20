@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\OfflineExamPackageController;
 use App\Http\Controllers\Api\OfflineServerActivationController;
 use App\Http\Controllers\Api\OfflineUpdateController;
 use App\Http\Controllers\Api\OfflineReadinessReportController;
+use App\Http\Controllers\Api\OfflineReadinessPackageController;
 use App\Http\Controllers\ProfessionalExamController;
 use App\Http\Controllers\ResultController;
 use Illuminate\Support\Facades\Route;
@@ -36,3 +37,4 @@ Route::post('/offline/adaptive/leases/{lease}/sync', [AdaptiveOfflinePilotContro
 
 Route::post('/offline/results', [\App\Http\Controllers\Api\OfflineResultController::class, 'store'])->middleware('throttle:120,1');
 Route::post('/offline/readiness-reports', [OfflineReadinessReportController::class, 'store'])->middleware('throttle:30,1');
+Route::get('/offline/readiness-packages/{code}', [OfflineReadinessPackageController::class, 'show'])->middleware('throttle:30,1');

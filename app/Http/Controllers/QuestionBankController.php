@@ -198,6 +198,7 @@ class QuestionBankController extends Controller
         $institutionId = $this->institutionId($request);
 
         return QuestionBank::query()
+            ->when($request->query('scope') === 'autoboot', fn ($query) => $query->whereHas('organization', fn ($organization) => $organization->where('code', 'AUTOBOOT-SYNTHETIC')))
             ->when($organization, fn ($query) => $query->where('organization_id', $organization->id))
             ->when($institutionId, fn ($query) => $query->where('institution_id', $institutionId))
             ->when($user->isTeacher(), fn ($query) => $query->whereIn('subject_id', $user->assignedSubjects()->select('subjects.id')))
@@ -217,6 +218,7 @@ class QuestionBankController extends Controller
         $organization = $request->route('organization');
 
         return Subject::query()
+            ->when($request->query('scope') === 'autoboot', fn ($query) => $query->whereHas('organization', fn ($organization) => $organization->where('code', 'AUTOBOOT-SYNTHETIC')))
             ->when($organization, fn ($query) => $query->where('organization_id', $organization->id))
             ->when($user->isTeacher(), fn ($query) => $query->whereIn('id', $user->assignedSubjects()->select('subjects.id')))
             ->when($user->isFacilitator(), fn ($query) => $query->whereHas('questionBanks', fn ($bankQuery) => $this->scopeFacilitatorQuestionBanks($bankQuery, $user)))

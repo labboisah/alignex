@@ -169,6 +169,7 @@ class SubjectController extends Controller
         $context = app(CurrentContextService::class)->current($user);
 
         return Subject::query()
+            ->when($request->query('scope') === 'autoboot', fn ($query) => $query->whereHas('organization', fn ($organization) => $organization->where('code', 'AUTOBOOT-SYNTHETIC')))
             ->when(($context['type'] ?? null) === 'organization', fn ($query) => $query->where('organization_id', $context['id'])->whereNull('secondary_school_id')->whereNull('professional_school_id')->whereNull('cbt_center_id'))
             ->when(($context['type'] ?? null) === 'secondary_school', fn ($query) => $query->where('secondary_school_id', $context['id']))
             ->when(($context['type'] ?? null) === 'professional_school', fn ($query) => $query->where('professional_school_id', $context['id']))

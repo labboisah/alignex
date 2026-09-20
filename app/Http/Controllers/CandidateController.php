@@ -348,6 +348,7 @@ class CandidateController extends Controller
         $departmentId = $request->query('department_id');
 
         return Candidate::query()
+            ->when($request->query('scope') === 'autoboot', fn ($query) => $query->whereHas('organization', fn ($organization) => $organization->where('code', 'AUTOBOOT-SYNTHETIC')))
             ->when($organization, fn ($query) => $query->where('organization_id', $organization->id))
             ->when($institutionId, fn ($query) => $query->where('institution_id', $institutionId))
             ->when(! $institutionId, fn ($query) => $query->whereNull('institution_id'))
@@ -368,6 +369,7 @@ class CandidateController extends Controller
         $institutionId = $this->institutionId($request);
 
         return Exam::query()
+            ->when($request->query('scope') === 'autoboot', fn ($query) => $query->whereHas('organization', fn ($organization) => $organization->where('code', 'AUTOBOOT-SYNTHETIC')))
             ->when($organization, fn ($query) => $query->where('organization_id', $organization->id))
             ->when($institutionId, fn ($query) => $query->where('institution_id', $institutionId))
             ->when(! $institutionId, fn ($query) => $query->whereNull('institution_id'))
@@ -547,6 +549,7 @@ class CandidateController extends Controller
         $institutionId = $this->institutionId($request);
 
         return CandidateGroup::query()
+            ->when($request->query('scope') === 'autoboot', fn ($query) => $query->whereHas('organization', fn ($organization) => $organization->where('code', 'AUTOBOOT-SYNTHETIC')))
             ->when($institutionId, fn ($query) => $query->where('institution_id', $institutionId))
             ->when(! $institutionId, fn ($query) => $query->whereNull('institution_id'))
             ->when($request->query('department_id') && $institutionId, fn ($query) => $query->where('department_id', $request->query('department_id')))
@@ -574,7 +577,9 @@ class CandidateController extends Controller
     private function formOptions(Request $request): array
     {
         return [
-            'organizations' => $request->user()->isSuperAdmin() ? Organization::query()->orderBy('name')->get(['id', 'name', 'code']) : [],
+            'organizations' => $request->user()->isSuperAdmin()
+                ? Organization::query()->when($request->query('scope') === 'autoboot', fn ($query) => $query->where('code', 'AUTOBOOT-SYNTHETIC'))->orderBy('name')->get(['id', 'name', 'code'])
+                : [],
             'schools' => $request->user()->isSuperAdmin() ? School::query()->orderBy('name')->get(['id', 'name', 'code']) : [],
             'centers' => $request->user()->isSuperAdmin() ? Center::query()->orderBy('name')->get(['id', 'name', 'code']) : [],
             'departments' => $this->departmentOptions($request),
