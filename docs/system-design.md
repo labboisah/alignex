@@ -70,9 +70,15 @@ Allowed ownership rules:
 - Correct answers: never sent to candidate frontend.
 - Server authority: timing, eligibility, score, submission, disqualification, and result release.
 
-## Future Offline Workflow
+## Offline Center And Autoboot Workflow
 
 Offline centers will use Electron with local SQLite for controlled exam delivery. The offline app should receive encrypted exam packages, verify center/device authorization, collect answers and events locally, and sync signed payloads back to Laravel when connectivity returns. Conflict handling, replay protection, package expiry, and supervisor audit trails are mandatory.
+
+Autoboot is a separate Electron client for synthetic center-readiness drills. It is not an extension of the Candidate Client candidate flow and must only use the existing Center Server readiness protocol, synthetic packages, readiness tables, and operational report APIs. No separate Autoboot server is planned: one Center Server remains authoritative for official exams and readiness drills, which are mutually exclusive. Its extraction plan, protocol contract, and operations runbook are maintained in [alignex-autoboot](../../alignex-autoboot/README.md).
+
+Actual candidate-exam resource use must be measured on the target hardware and LAN, not assumed as a fixed percentage. The current audit and required CPU/RAM instrumentation are documented in [candidate exam resource audit](candidate-exam-resource-audit-2026-09-23.md).
+
+The Center Server concurrency model, bottlenecks, and required offline-delivery load validation are documented in [offline Center Server concurrency audit](offline-center-server-concurrency-audit-2026-09-23.md).
 
 ## Future Adaptive Workflow
 

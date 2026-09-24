@@ -7,7 +7,6 @@ use App\Models\OfflineReadinessPackage;
 use App\Services\OfflineActivationGuard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 
 class OfflineReadinessPackageController extends Controller
 {
@@ -16,16 +15,6 @@ class OfflineReadinessPackageController extends Controller
     public function show(Request $request, string $code): JsonResponse
     {
         $activation = $this->activationGuard->requireActive($request);
-        $email = trim((string) $request->header('X-AlignEx-Admin-Email'));
-        $password = (string) $request->header('X-AlignEx-Admin-Password');
-        $user = $activation->admin_email === $email
-            ? \App\Models\User::query()->where('email', $email)->first()
-            : null;
-
-        if (! $user || ! Hash::check($password, $user->password)) {
-            return response()->json(['message' => 'Offline sync admin credentials are invalid.'], 401);
-        }
-
         $package = OfflineReadinessPackage::query()
             ->where('code', strtolower(trim($code)))
             ->latest('id')
@@ -39,6 +28,9 @@ class OfflineReadinessPackageController extends Controller
             return response()->json(['message' => "Autoboot package {$package->code} is {$package->status}. Activate it in the platform before importing it into the Center Server."], 409);
         }
 
+        $payloadJson = json_encode($package->payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+        $payloadChecksum = hash('sha256', $payloadJson);
+
         return response()->json([
             'package' => [
                 'code' => $package->code,
@@ -49,7 +41,8 @@ class OfflineReadinessPackageController extends Controller
                 'autoboot_target_clients' => $package->autoboot_target_clients,
                 'question_count' => $package->question_count,
                 'subject_count' => $package->subject_count,
-                'checksum_sha256' => $package->checksum_sha256,
+                'checksum_sha256' => $payloadChecksum,
+                'payload_json' => $payloadJson,
                 'payload' => $package->payload,
             ],
             'activation_id' => (string) $activation->id,

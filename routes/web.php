@@ -21,6 +21,7 @@ use App\Http\Controllers\ExamPaperController;
 use App\Http\Controllers\InstitutionController;
 use App\Http\Controllers\InstitutionStructureController;
 use App\Http\Controllers\OfflineActivationCodeController;
+use App\Http\Controllers\OfflineReadinessEvidenceController;
 use App\Http\Controllers\OfflineReadinessPackageController;
 use App\Http\Controllers\OfflineServerDownloadController;
 use App\Http\Controllers\OrganizationController;
@@ -166,6 +167,8 @@ Route::middleware(['auth', 'portal.user'])->group(function () {
             Route::get('/autoboot/question-banks', fn () => redirect('/question-bank?scope=autoboot'))->name('autoboot.question-banks');
             Route::get('/autoboot/questions', fn () => redirect('/questions?scope=autoboot'))->name('autoboot.questions');
             Route::get('/offline-readiness-packages', [OfflineReadinessPackageController::class, 'index'])->name('offline-readiness-packages.index');
+            Route::get('/offline-readiness-reports', [OfflineReadinessEvidenceController::class, 'index'])->name('offline-readiness-reports.index');
+            Route::get('/offline-readiness-reports/{offlineReadinessReport}/evidence', [OfflineReadinessEvidenceController::class, 'download'])->name('offline-readiness-reports.evidence');
             Route::post('/offline-readiness-packages', [OfflineReadinessPackageController::class, 'store'])->name('offline-readiness-packages.store');
             Route::get('/offline-readiness-packages/{offlineReadinessPackage}/paper', [OfflineReadinessPackageController::class, 'paper'])->name('offline-readiness-packages.paper');
             Route::patch('/offline-readiness-packages/{offlineReadinessPackage}', [OfflineReadinessPackageController::class, 'update'])->name('offline-readiness-packages.update');

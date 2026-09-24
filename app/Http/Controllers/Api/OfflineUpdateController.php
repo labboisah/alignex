@@ -4,12 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AppRelease;
-use App\Models\User;
 use App\Support\AppArtifactFile;
 use App\Services\OfflineActivationGuard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -23,10 +21,6 @@ class OfflineUpdateController extends Controller
     {
         $this->activationGuard->requireActive($request);
 
-        if (! $this->authenticateSyncAdmin($request)) {
-            return response()->json(['message' => 'Offline sync admin credentials are invalid.'], 401);
-        }
-
         return response()->json([
             'updates' => [
                 'server' => $this->publicArtifact($request, 'server'),
@@ -38,10 +32,6 @@ class OfflineUpdateController extends Controller
     public function download(Request $request, string $artifact): BinaryFileResponse|JsonResponse
     {
         $this->activationGuard->requireActive($request);
-
-        if (! $this->authenticateSyncAdmin($request)) {
-            return response()->json(['message' => 'Offline sync admin credentials are invalid.'], 401);
-        }
 
         $metadata = $this->releaseArtifact($request, $artifact) ?? $this->artifact($request, $artifact);
 
@@ -174,21 +164,4 @@ class OfflineUpdateController extends Controller
         return rtrim((string) config("alignex.apps.{$key}"), '\\/').DIRECTORY_SEPARATOR.$childPath;
     }
 
-    private function authenticateSyncAdmin(Request $request): ?User
-    {
-        $email = trim((string) $request->header('X-AlignEx-Admin-Email'));
-        $password = (string) $request->header('X-AlignEx-Admin-Password');
-
-        if ($email === '' || $password === '') {
-            return null;
-        }
-
-        $user = User::query()->where('email', $email)->first();
-
-        if (! $user || ! $user->isPortalUser() || ! Hash::check($password, $user->password)) {
-            return null;
-        }
-
-        return $user;
-    }
 }

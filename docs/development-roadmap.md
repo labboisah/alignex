@@ -20,7 +20,8 @@
 16. Scoring, result review, result release, and reports.
 17. Audit logs, exports, dashboards, and operational reports.
 18. Offline center-based examination with Electron + SQLite.
-19. Adaptive assessment integration with Python FastAPI.
+19. Dedicated Autoboot Electron client extraction from the Candidate Client, with readiness-only protocol, operational evidence, and separate release lifecycle. See the [Autoboot migration plan](../../alignex-autoboot/docs/migration-plan.md).
+20. Adaptive assessment integration with Python FastAPI.
 
 ## Delivery Rules
 

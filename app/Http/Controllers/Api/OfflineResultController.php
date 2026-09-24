@@ -10,7 +10,6 @@ use App\Models\User;
 use App\Services\OfflineActivationGuard;
 use App\Services\OfflineResultUploadService;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Hash;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class OfflineResultController extends Controller
@@ -19,9 +18,8 @@ class OfflineResultController extends Controller
     {
         abort_unless($request->header('X-AlignEx-Device-Id'), 401, 'Device ID is required.');
         $activation = $guard->requireActive($request);
-        $user = User::where('email', trim((string) $request->header('X-AlignEx-Admin-Email')))->first();
-        abort_unless($user && $user->isPortalUser() && Hash::check((string) $request->header('X-AlignEx-Admin-Password'), $user->password), 401, 'Portal admin credentials are invalid.');
-        abort_unless(strcasecmp($activation->admin_email, $user->email) === 0, 403, 'Use the administrator who activated this server.');
+        $user = User::where('email', $activation->admin_email)->first();
+        abort_unless($user && $user->isPortalUser(), 403, 'The activating portal administrator is no longer authorized.');
         $exam = Exam::findOrFail($request->validated('exam_id'));
         Gate::forUser($user)->authorize('update', $exam);
 

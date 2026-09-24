@@ -4,12 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\OfflineReadinessReport;
-use App\Models\User;
 use App\Services\OfflineActivationGuard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Hash;
 
 class OfflineReadinessReportController extends Controller
 {
@@ -38,9 +36,6 @@ class OfflineReadinessReportController extends Controller
 
         abort_unless($request->header('X-AlignEx-Device-Id'), 401, 'Device ID is required.');
         $activation = $guard->requireActive($request);
-        $user = User::query()->where('email', trim((string) $request->header('X-AlignEx-Admin-Email')))->first();
-        abort_unless($user && $user->isPortalUser() && Hash::check((string) $request->header('X-AlignEx-Admin-Password'), $user->password), 401, 'Portal admin credentials are invalid.');
-        abort_unless(strcasecmp($activation->admin_email, $user->email) === 0, 403, 'Use the administrator who activated this server.');
 
         $computedHash = hash('sha256', json_encode($validated['payload'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
         abort_unless(hash_equals($computedHash, $validated['payload_hash']), 422, 'Readiness report payload checksum is invalid.');

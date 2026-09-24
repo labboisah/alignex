@@ -27,7 +27,7 @@ class OfflineExamPackageController extends Controller
     {
         $activation = $this->activationGuard->requireActive($request);
 
-        $user = $this->authenticateSyncAdmin($request);
+        $user = $this->authenticateSyncAdmin($request, $activation->admin_email);
 
         if (! $user) {
             return response()->json(['message' => 'Offline sync admin credentials are invalid.'], 401);
@@ -213,18 +213,28 @@ class OfflineExamPackageController extends Controller
         return response()->json(['package' => $package]);
     }
 
-    private function authenticateSyncAdmin(Request $request): ?User
+    private function authenticateSyncAdmin(Request $request, ?string $activatedAdminEmail = null): ?User
     {
         $email = trim((string) $request->header('X-AlignEx-Admin-Email'));
         $password = (string) $request->header('X-AlignEx-Admin-Password');
 
-        if ($email === '' || $password === '') {
+        if ($password === '') {
+            if ($activatedAdminEmail) {
+                $email = trim($activatedAdminEmail);
+            }
+        }
+
+        if ($email === '') {
             return null;
         }
 
         $user = User::query()->where('email', $email)->first();
 
-        if (! $user || ! $user->isPortalUser() || ! Hash::check($password, $user->password)) {
+        if (! $user || ! $user->isPortalUser()) {
+            return null;
+        }
+
+        if ($password !== '' && ! Hash::check($password, $user->password)) {
             return null;
         }
 
